@@ -12,7 +12,7 @@ import (
 	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
 )
 
-func logLine(t *testing.T, ctx context.Context) map[string]any {
+func logLine(ctx context.Context, t *testing.T) map[string]any {
 	t.Helper()
 	var buf bytes.Buffer
 	logger := slog.New(telemetry.LogHandler(slog.NewJSONHandler(&buf, nil))).With(slog.String("service", "cesta"))
@@ -30,7 +30,7 @@ func TestLogHandlerAddsTraceAndSpanIDsFromContext(t *testing.T) {
 	ctx, span := tp.Tracer("test").Start(context.Background(), "op")
 	defer span.End()
 
-	rec := logLine(t, ctx)
+	rec := logLine(ctx, t)
 
 	sc := span.SpanContext()
 	if rec["trace_id"] != sc.TraceID().String() {
@@ -45,7 +45,7 @@ func TestLogHandlerAddsTraceAndSpanIDsFromContext(t *testing.T) {
 }
 
 func TestLogHandlerLeavesRecordsWithoutASpanAlone(t *testing.T) {
-	rec := logLine(t, context.Background())
+	rec := logLine(context.Background(), t)
 
 	if _, ok := rec["trace_id"]; ok {
 		t.Errorf("trace_id present without a span: %v", rec)
