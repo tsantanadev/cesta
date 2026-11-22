@@ -58,6 +58,19 @@ void main() {
     expect(find.text('Server is up'), findsOneWidget);
   });
 
+  testWidgets('offline after a restart, remembers a degraded server and its database being down', (tester) async {
+    final h = Harness(tester);
+    h.api.health = const Health(status: HealthStatus.degraded, database: HealthDatabase.down);
+    await h.pumpApp();
+    h.api.goOffline();
+
+    await h.pumpApp();
+
+    expect(find.text('Last known status'), findsOneWidget);
+    expect(find.text('Server is degraded'), findsOneWidget);
+    expect(find.text('Database: unreachable'), findsOneWidget);
+  });
+
   testWidgets('checking again after reconnecting shows the live status', (tester) async {
     final h = Harness(tester);
     h.api.goOffline();
