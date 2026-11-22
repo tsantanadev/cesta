@@ -1,0 +1,11 @@
+# Dart API client generation from the shared OpenAPI contract (../api/openapi.yaml).
+# Regenerate: tool/gen_api.sh    Check up to date: tool/gen_api.sh --check
+swagger_parser:
+  schema_path: ../api/openapi.yaml
+  output_directory: lib/src/api/generated
+  generation:
+    root_api_class_name: CestaApi
+    http_client: dio
+    serializer: plain
+    response_mode: all_statuses
+    page_width: 120

@@ -1,0 +1,15 @@
+{
+  "@@locale": "pt",
+  "@@x-note": "Brazilian Portuguese (pt-BR). Kept as the base 'pt' locale so pt-BR and any pt device locale resolve here.",
+  "appTitle": "Cesta",
+  "healthTitle": "Status do servidor",
+  "healthChecking": "Verificando o servidor…",
+  "healthServerUp": "Servidor no ar",
+  "healthServerDegraded": "Servidor instável",
+  "healthDatabaseUp": "Banco de dados: conectado",
+  "healthDatabaseDown": "Banco de dados: inacessível",
+  "healthOffline": "Você está offline",
+  "healthOfflineNoData": "Não foi possível acessar o servidor.",
+  "healthLastKnown": "Último status conhecido",
+  "healthRetry": "Verificar novamente"
+}
