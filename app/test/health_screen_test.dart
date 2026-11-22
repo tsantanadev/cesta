@@ -71,6 +71,22 @@ void main() {
     expect(find.text('Server is up'), findsOneWidget);
   }, variant: TargetPlatformVariant.mobile());
 
+  testWidgets('an unexpected failure says the check failed and lets the user check again', (tester) async {
+    final h = Harness(tester);
+    h.api.failure = const FormatException('malformed health response');
+
+    await h.pumpApp();
+
+    expect(find.text("Couldn't check the server status."), findsOneWidget);
+    expect(find.text('Checking the server…'), findsNothing);
+
+    h.api.failure = null;
+    await tester.tap(find.text('Check again'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Server is up'), findsOneWidget);
+  });
+
   testWidgets('stays readable in dark mode at the largest text size', (tester) async {
     final h = Harness(tester);
     tester.view.physicalSize = const Size(360, 640) * tester.view.devicePixelRatio;

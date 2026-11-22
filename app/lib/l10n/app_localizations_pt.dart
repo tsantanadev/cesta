@@ -40,5 +40,8 @@ class AppLocalizationsPt extends AppLocalizations {
   String get healthLastKnown => 'Último status conhecido';
 
   @override
+  String get healthCheckFailed => 'Não foi possível verificar o status do servidor.';
+
+  @override
   String get healthRetry => 'Verificar novamente';
 }

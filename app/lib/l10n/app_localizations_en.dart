@@ -40,5 +40,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get healthLastKnown => 'Last known status';
 
   @override
+  String get healthCheckFailed => 'Couldn\'t check the server status.';
+
+  @override
   String get healthRetry => 'Check again';
 }

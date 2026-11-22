@@ -11,5 +11,6 @@
   "healthOffline": "Você está offline",
   "healthOfflineNoData": "Não foi possível acessar o servidor.",
   "healthLastKnown": "Último status conhecido",
+  "healthCheckFailed": "Não foi possível verificar o status do servidor.",
   "healthRetry": "Verificar novamente"
 }

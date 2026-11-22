@@ -14,6 +14,10 @@ class FakeApiClient implements ApiClient {
   /// When true, every call throws a connection error.
   bool offline = false;
 
+  /// When set, every call throws this instead of answering, e.g. a parse
+  /// failure on a malformed response.
+  Object? failure;
+
   void goOffline() => offline = true;
   void goOnline() => offline = false;
 
@@ -23,7 +27,8 @@ class FakeApiClient implements ApiClient {
     CancelToken? cancelToken,
     Options? options,
   }) async {
-    _failIfOffline('/healthz');
+    _failIfOffline('/health');
+    if (failure case final failure?) throw failure;
     return health.status == HealthStatus.ok ? GetHealth200(health) : GetHealth503(health);
   }
 
