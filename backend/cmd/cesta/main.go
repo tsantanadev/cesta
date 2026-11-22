@@ -65,7 +65,7 @@ func newLogger(level string) *slog.Logger {
 	if err := l.UnmarshalText([]byte(level)); err != nil {
 		l = slog.LevelInfo
 	}
-	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: l})).
+	return slog.New(telemetry.LogHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: l}))).
 		With(slog.String("service", "cesta"), slog.String("version", version))
 }
 

@@ -25,6 +25,7 @@ import (
 
 	"github.com/tsantanadev/cesta/backend/internal/app"
 	"github.com/tsantanadev/cesta/backend/internal/httpapi"
+	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
 )
 
 // Server is a running backend under test.
@@ -46,7 +47,7 @@ func NewServer(t testing.TB) *Server {
 	}
 	handler := app.New(app.Deps{
 		DB:     pool,
-		Logger: slog.New(slog.NewTextHandler(testWriter{t}, nil)),
+		Logger: slog.New(telemetry.LogHandler(slog.NewTextHandler(testWriter{t}, nil))),
 	})
 	hs := httptest.NewServer(handler)
 	t.Cleanup(hs.Close)
