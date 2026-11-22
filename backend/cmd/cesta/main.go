@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/tsantanadev/cesta/backend/internal/app"
-	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
 	"github.com/tsantanadev/cesta/backend/internal/platform/db"
 	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
 	"github.com/tsantanadev/cesta/backend/migrations"
@@ -124,9 +123,8 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	defer pool.Close()
 
 	srv := &http.Server{
-		Addr: net.JoinHostPort("", port),
-		// TokenVerifier (Firebase) and EmailSender (Resend) are wired by the slices that use them.
-		Handler:           app.New(app.Deps{DB: pool, Logger: logger, Clock: clock.System{}}),
+		Addr:              net.JoinHostPort("", port),
+		Handler:           app.New(app.Deps{DB: pool, Logger: logger}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

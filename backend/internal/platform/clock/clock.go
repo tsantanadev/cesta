@@ -4,7 +4,7 @@ package clock
 import "time"
 
 // Clock tells the current time. Code that needs "now" takes a Clock instead of
-// calling time.Now, so tests can advance time across the 7, 14 and 30 day windows.
+// calling time.Now, so tests can control and advance time.
 type Clock interface {
 	Now() time.Time
 }
