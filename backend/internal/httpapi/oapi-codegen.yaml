@@ -1,0 +1,8 @@
+# Generates server types and routing from the API contract (api/openapi.yaml).
+package: httpapi
+output: openapi.gen.go
+generate:
+  std-http-server: true
+  strict-server: true
+  models: true
+  embedded-spec: true
