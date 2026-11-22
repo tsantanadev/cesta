@@ -1,0 +1,71 @@
+# Cesta
+
+A mobile grocery shopping list app where people build Lists, share them with others, and check Items off while shopping.
+
+## Language
+
+### People and access
+
+**User**:
+A person with a Cesta account, identified by their email address.
+_Avoid_: Account, customer, profile, username
+
+**Member**:
+A User who has access to a specific List, with exactly one Role on it.
+_Avoid_: Collaborator, participant, sharee
+
+**Role**:
+The level of access a Member has on a List: either Owner or Editor.
+_Avoid_: Permission, access level
+
+**Owner**:
+The Role held by the User who created the List; it can delete the List, invite and remove Editors, and manage Share links. Each List has exactly one Owner; ownership never changes and the Owner cannot leave the List.
+_Avoid_: Admin, creator
+
+**Editor**:
+The Role that can add, edit, remove, check and uncheck Items on a List, and leave it at any time.
+_Avoid_: Contributor, collaborator
+
+**Invitation**:
+A pending offer, addressed to an email address, to become an Editor of a List; it takes effect only when the recipient accepts it.
+_Avoid_: Invite request, share request
+
+**Share link**:
+A URL that lets any signed-in User who opens it become an Editor of a List, until it expires or the Owner revokes it. It can be passed along through any channel (messaging apps, email, a Share QR code).
+_Avoid_: Invite link, public link
+
+**Share QR code**:
+A scannable rendering of a Share link, shown so someone nearby can join a List.
+_Avoid_: Join code, invite QR
+
+### Lists and items
+
+**List**:
+A named collection of Items that a group of Members shops from.
+_Avoid_: Shopping list, cart, basket
+
+**Item**:
+One entry on a List representing something to buy.
+_Avoid_: Product, entry, line
+
+**Checked Item**:
+An Item marked as bought; it stays visible, crossed out at the bottom of the List, until cleared.
+_Avoid_: Done item, completed item, purchased item
+
+**Clear checked**:
+The action that removes all Checked Items from a List and records them in Item history.
+_Avoid_: Archive, reset
+
+**Item history**:
+The record of Items that were bought (cleared after being checked) on a List.
+_Avoid_: Purchase log, past items
+
+### Future
+
+**Shopping mode**:
+A focused view used inside the store, where Items are checked by scanning a barcode and a price is recorded.
+_Avoid_: Store mode, checkout
+
+**Product**:
+A real-world thing that can be bought (e.g. a specific brand and size of milk), with its own barcode, category and price history; an Item may refer to one.
+_Avoid_: Item, article, SKU
