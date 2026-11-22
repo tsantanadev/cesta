@@ -20,7 +20,7 @@ A mobile grocery shopping list app where people build Lists, share them with oth
 Run from `backend/`:
 
 ```sh
-make dev     # Postgres + migrations + backend on http://localhost:8080 (check /healthz)
+make dev     # Postgres + migrations + backend on http://localhost:8080 (check /health)
 make down    # stop and delete the local database volume
 ```
 

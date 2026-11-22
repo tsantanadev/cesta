@@ -10,7 +10,7 @@ import (
 func TestHealthReportsOKWhenDatabaseIsUp(t *testing.T) {
 	srv := testkit.NewServer(t)
 
-	res := srv.Get(t, "/healthz")
+	res := srv.Get(t, "/health")
 
 	res.RequireStatus(t, http.StatusOK)
 	res.RequireJSON(t, `{"status":"ok","database":"up"}`)
@@ -20,7 +20,7 @@ func TestHealthReportsDegradedWhenDatabaseIsUnreachable(t *testing.T) {
 	srv := testkit.NewServer(t)
 	srv.CutDatabase(t)
 
-	res := srv.Get(t, "/healthz")
+	res := srv.Get(t, "/health")
 
 	res.RequireStatus(t, http.StatusServiceUnavailable)
 	res.RequireJSON(t, `{"status":"degraded","database":"down"}`)

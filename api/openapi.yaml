@@ -6,7 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 paths:
-  /healthz:
+  /health:
     get:
       operationId: getHealth
       summary: Liveness and database readiness

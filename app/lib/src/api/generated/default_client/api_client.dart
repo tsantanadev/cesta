@@ -29,7 +29,7 @@ class ApiClient {
       headers: {...?options?.headers, 'Accept': "application/json"},
       validateStatus: (status) => status != null && (status == 200 || status == 503),
     );
-    final response = await _transport.request<dynamic>("/healthz", options: _options, cancelToken: cancelToken);
+    final response = await _transport.request<dynamic>("/health", options: _options, cancelToken: cancelToken);
     return switch (response.statusCode) {
       200 => GetHealth200(models.Health.fromJson(response.data as Map<String, Object?>)),
       503 => GetHealth503(models.Health.fromJson(response.data as Map<String, Object?>)),
