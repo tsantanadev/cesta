@@ -20,6 +20,8 @@
   "@healthOfflineNoData": {"description": "Offline and no earlier result is stored on the device."},
   "healthLastKnown": "Last known status",
   "@healthLastKnown": {"description": "Heading above the last health result stored on the device, shown when offline."},
+  "healthCheckFailed": "Couldn't check the server status.",
+  "@healthCheckFailed": {"description": "The health check failed for a reason other than being offline, e.g. an unreadable response or a local storage error."},
   "healthRetry": "Check again",
   "@healthRetry": {"description": "Button that repeats the health check."}
 }

@@ -30,14 +30,19 @@ final class _Checking extends _HealthState {
 }
 
 final class _Reached extends _HealthState {
-  const _Reached(this.serverUp, this.databaseUp);
-  final bool serverUp;
-  final bool databaseUp;
+  const _Reached(this.health);
+  final Health health;
 }
 
 final class _Unreachable extends _HealthState {
   const _Unreachable(this.lastKnown);
-  final KnownHealthData? lastKnown;
+  final Health? lastKnown;
+}
+
+/// The check failed for a reason other than the network, e.g. a response the
+/// client could not parse or a local database error.
+final class _Failed extends _HealthState {
+  const _Failed();
 }
 
 class _HealthScreenState extends State<HealthScreen> {
@@ -53,18 +58,25 @@ class _HealthScreenState extends State<HealthScreen> {
     setState(() => _state = const _Checking());
     _HealthState next;
     try {
+      next = await _fetch();
+    } catch (_) {
+      // Whatever goes wrong, never leave the screen stuck on "checking".
+      next = const _Failed();
+    }
+    if (mounted) setState(() => _state = next);
+  }
+
+  Future<_HealthState> _fetch() async {
+    try {
       final health = switch (await widget.api.getHealth()) {
         GetHealth200(:final value) => value,
         GetHealth503(:final value) => value,
       };
-      final serverUp = health.status == HealthStatus.ok;
-      final databaseUp = health.database == HealthDatabase.up;
-      await widget.database.saveKnownHealth(serverUp: serverUp, databaseUp: databaseUp);
-      next = _Reached(serverUp, databaseUp);
+      await widget.database.saveKnownHealth(health);
+      return _Reached(health);
     } on DioException {
-      next = _Unreachable(await widget.database.readKnownHealth());
+      return _Unreachable(await widget.database.readKnownHealth());
     }
-    if (mounted) setState(() => _state = next);
   }
 
   @override
@@ -77,7 +89,7 @@ class _HealthScreenState extends State<HealthScreen> {
         children: [
           ...switch (_state) {
             _Checking() => [CesProgress(label: l10n.healthChecking)],
-            _Reached(:final serverUp, :final databaseUp) => [_healthCard(l10n, serverUp, databaseUp)],
+            _Reached(:final health) => [_healthCard(l10n, health)],
             _Unreachable(:final lastKnown) => [
               CesStatusCard(
                 tone: CesTone.neutral,
@@ -86,9 +98,10 @@ class _HealthScreenState extends State<HealthScreen> {
               ),
               if (lastKnown != null) ...[
                 const CesGap.md(),
-                _healthCard(l10n, lastKnown.serverUp, lastKnown.databaseUp, caption: l10n.healthLastKnown),
+                _healthCard(l10n, lastKnown, caption: l10n.healthLastKnown),
               ],
             ],
+            _Failed() => [CesStatusCard(tone: CesTone.warning, title: l10n.healthCheckFailed)],
           },
           const CesGap.lg(),
           CesButton(label: l10n.healthRetry, onPressed: _state is _Checking ? null : _check),
@@ -97,10 +110,18 @@ class _HealthScreenState extends State<HealthScreen> {
     );
   }
 
-  Widget _healthCard(AppLocalizations l10n, bool serverUp, bool databaseUp, {String? caption}) => CesStatusCard(
-    tone: serverUp && databaseUp ? CesTone.positive : CesTone.warning,
+  Widget _healthCard(AppLocalizations l10n, Health health, {String? caption}) => CesStatusCard(
+    tone: health.status == HealthStatus.ok && health.database == HealthDatabase.up ? CesTone.positive : CesTone.warning,
     caption: caption,
-    title: serverUp ? l10n.healthServerUp : l10n.healthServerDegraded,
-    lines: [databaseUp ? l10n.healthDatabaseUp : l10n.healthDatabaseDown],
+    title: switch (health.status) {
+      HealthStatus.ok => l10n.healthServerUp,
+      HealthStatus.degraded => l10n.healthServerDegraded,
+    },
+    lines: [
+      switch (health.database) {
+        HealthDatabase.up => l10n.healthDatabaseUp,
+        HealthDatabase.down => l10n.healthDatabaseDown,
+      },
+    ],
   );
 }

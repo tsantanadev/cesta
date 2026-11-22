@@ -14,7 +14,8 @@ analyzer:
     strict-inference: true
     strict-raw-types: true
   errors:
-    # Treat lint and hint findings as failures so `flutter analyze` gates CI.
+    # Severity overrides only. CI is gated by `flutter analyze`, which already
+    # exits non-zero on any error, warning or info (lint) finding.
     missing_required_param: error
     missing_return: error
 

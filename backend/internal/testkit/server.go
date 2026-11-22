@@ -1,7 +1,7 @@
 // Package testkit is the Seam 1 harness: black-box HTTP tests against the real
-// backend and a real, migrated Postgres (testcontainers). The only fakes are
-// TokenVerifier, EmailSender and Clock, exposed on Server so tests can act as
-// named Users, read captured emails and advance time.
+// backend and a real, migrated Postgres (testcontainers). The only fakes allowed
+// are TokenVerifier, EmailSender and Clock (package fakes); they are exposed on
+// Server once the slices that use them are wired into app.Deps.
 //
 // Every response is checked against api/openapi.yaml, so a handler that drifts
 // from the contract fails the test that exercised it.
@@ -25,18 +25,12 @@ import (
 
 	"github.com/tsantanadev/cesta/backend/internal/app"
 	"github.com/tsantanadev/cesta/backend/internal/httpapi"
-	"github.com/tsantanadev/cesta/backend/internal/testkit/fakes"
+	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
 )
-
-// Epoch is where the fake Clock starts in every test.
-var Epoch = time.Date(2026, time.January, 5, 9, 0, 0, 0, time.UTC)
 
 // Server is a running backend under test.
 type Server struct {
-	URL    string
-	Clock  *fakes.Clock
-	Tokens *fakes.TokenVerifier
-	Emails *fakes.EmailSender
+	URL string
 
 	router routers.Router
 	dbName string
@@ -48,18 +42,12 @@ func NewServer(t testing.TB) *Server {
 	pool, dbName := newDatabase(t)
 
 	s := &Server{
-		Clock:  fakes.NewClock(Epoch),
-		Tokens: fakes.NewTokenVerifier(),
-		Emails: &fakes.EmailSender{},
 		router: contractRouter(t),
 		dbName: dbName,
 	}
 	handler := app.New(app.Deps{
-		DB:            pool,
-		Logger:        slog.New(slog.NewTextHandler(testWriter{t}, nil)),
-		TokenVerifier: s.Tokens,
-		EmailSender:   s.Emails,
-		Clock:         s.Clock,
+		DB:     pool,
+		Logger: slog.New(telemetry.LogHandler(slog.NewTextHandler(testWriter{t}, nil))),
 	})
 	hs := httptest.NewServer(handler)
 	t.Cleanup(hs.Close)
@@ -157,8 +145,14 @@ func (r *Response) RequireJSON(t testing.TB, want string) {
 	if err := json.Unmarshal([]byte(want), &exp); err != nil {
 		t.Fatalf("testkit: want is not JSON: %v", err)
 	}
-	gotN, _ := json.Marshal(got)
-	expN, _ := json.Marshal(exp)
+	gotN, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("testkit: normalise body: %v", err)
+	}
+	expN, err := json.Marshal(exp)
+	if err != nil {
+		t.Fatalf("testkit: normalise want: %v", err)
+	}
 	if !bytes.Equal(gotN, expN) {
 		t.Fatalf("body = %s, want %s", gotN, expN)
 	}

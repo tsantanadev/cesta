@@ -17,28 +17,24 @@ class $KnownHealthTable extends KnownHealth with TableInfo<$KnownHealthTable, Kn
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _serverUpMeta = const VerificationMeta('serverUp');
   @override
-  late final GeneratedColumn<bool> serverUp = GeneratedColumn<bool>(
-    'server_up',
+  late final GeneratedColumnWithTypeConverter<HealthStatus, String> status = GeneratedColumn<String>(
+    'status',
     aliasedName,
     false,
-    type: DriftSqlType.bool,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways('CHECK ("server_up" IN (0, 1))'),
-  );
-  static const VerificationMeta _databaseUpMeta = const VerificationMeta('databaseUp');
+  ).withConverter<HealthStatus>($KnownHealthTable.$converterstatus);
   @override
-  late final GeneratedColumn<bool> databaseUp = GeneratedColumn<bool>(
-    'database_up',
+  late final GeneratedColumnWithTypeConverter<HealthDatabase, String> database = GeneratedColumn<String>(
+    'database',
     aliasedName,
     false,
-    type: DriftSqlType.bool,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways('CHECK ("database_up" IN (0, 1))'),
-  );
+  ).withConverter<HealthDatabase>($KnownHealthTable.$converterdatabase);
   @override
-  List<GeneratedColumn> get $columns => [id, serverUp, databaseUp];
+  List<GeneratedColumn> get $columns => [id, status, database];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -51,16 +47,6 @@ class $KnownHealthTable extends KnownHealth with TableInfo<$KnownHealthTable, Kn
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     }
-    if (data.containsKey('server_up')) {
-      context.handle(_serverUpMeta, serverUp.isAcceptableOrUnknown(data['server_up']!, _serverUpMeta));
-    } else if (isInserting) {
-      context.missing(_serverUpMeta);
-    }
-    if (data.containsKey('database_up')) {
-      context.handle(_databaseUpMeta, databaseUp.isAcceptableOrUnknown(data['database_up']!, _databaseUpMeta));
-    } else if (isInserting) {
-      context.missing(_databaseUpMeta);
-    }
     return context;
   }
 
@@ -71,8 +57,12 @@ class $KnownHealthTable extends KnownHealth with TableInfo<$KnownHealthTable, Kn
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return KnownHealthData(
       id: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      serverUp: attachedDatabase.typeMapping.read(DriftSqlType.bool, data['${effectivePrefix}server_up'])!,
-      databaseUp: attachedDatabase.typeMapping.read(DriftSqlType.bool, data['${effectivePrefix}database_up'])!,
+      status: $KnownHealthTable.$converterstatus.fromSql(
+        attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}status'])!,
+      ),
+      database: $KnownHealthTable.$converterdatabase.fromSql(
+        attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}database'])!,
+      ),
     );
   }
 
@@ -80,32 +70,39 @@ class $KnownHealthTable extends KnownHealth with TableInfo<$KnownHealthTable, Kn
   $KnownHealthTable createAlias(String alias) {
     return $KnownHealthTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<HealthStatus, String> $converterstatus = const _HealthStatusConverter();
+  static TypeConverter<HealthDatabase, String> $converterdatabase = const _HealthDatabaseConverter();
 }
 
 class KnownHealthData extends DataClass implements Insertable<KnownHealthData> {
   final int id;
-  final bool serverUp;
-  final bool databaseUp;
-  const KnownHealthData({required this.id, required this.serverUp, required this.databaseUp});
+  final HealthStatus status;
+  final HealthDatabase database;
+  const KnownHealthData({required this.id, required this.status, required this.database});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
-    map['server_up'] = Variable<bool>(serverUp);
-    map['database_up'] = Variable<bool>(databaseUp);
+    {
+      map['status'] = Variable<String>($KnownHealthTable.$converterstatus.toSql(status));
+    }
+    {
+      map['database'] = Variable<String>($KnownHealthTable.$converterdatabase.toSql(database));
+    }
     return map;
   }
 
   KnownHealthCompanion toCompanion(bool nullToAbsent) {
-    return KnownHealthCompanion(id: Value(id), serverUp: Value(serverUp), databaseUp: Value(databaseUp));
+    return KnownHealthCompanion(id: Value(id), status: Value(status), database: Value(database));
   }
 
   factory KnownHealthData.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return KnownHealthData(
       id: serializer.fromJson<int>(json['id']),
-      serverUp: serializer.fromJson<bool>(json['serverUp']),
-      databaseUp: serializer.fromJson<bool>(json['databaseUp']),
+      status: serializer.fromJson<HealthStatus>(json['status']),
+      database: serializer.fromJson<HealthDatabase>(json['database']),
     );
   }
   @override
@@ -113,21 +110,18 @@ class KnownHealthData extends DataClass implements Insertable<KnownHealthData> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
-      'serverUp': serializer.toJson<bool>(serverUp),
-      'databaseUp': serializer.toJson<bool>(databaseUp),
+      'status': serializer.toJson<HealthStatus>(status),
+      'database': serializer.toJson<HealthDatabase>(database),
     };
   }
 
-  KnownHealthData copyWith({int? id, bool? serverUp, bool? databaseUp}) => KnownHealthData(
-    id: id ?? this.id,
-    serverUp: serverUp ?? this.serverUp,
-    databaseUp: databaseUp ?? this.databaseUp,
-  );
+  KnownHealthData copyWith({int? id, HealthStatus? status, HealthDatabase? database}) =>
+      KnownHealthData(id: id ?? this.id, status: status ?? this.status, database: database ?? this.database);
   KnownHealthData copyWithCompanion(KnownHealthCompanion data) {
     return KnownHealthData(
       id: data.id.present ? data.id.value : this.id,
-      serverUp: data.serverUp.present ? data.serverUp.value : this.serverUp,
-      databaseUp: data.databaseUp.present ? data.databaseUp.value : this.databaseUp,
+      status: data.status.present ? data.status.value : this.status,
+      database: data.database.present ? data.database.value : this.database,
     );
   }
 
@@ -135,53 +129,52 @@ class KnownHealthData extends DataClass implements Insertable<KnownHealthData> {
   String toString() {
     return (StringBuffer('KnownHealthData(')
           ..write('id: $id, ')
-          ..write('serverUp: $serverUp, ')
-          ..write('databaseUp: $databaseUp')
+          ..write('status: $status, ')
+          ..write('database: $database')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, serverUp, databaseUp);
+  int get hashCode => Object.hash(id, status, database);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is KnownHealthData &&
           other.id == this.id &&
-          other.serverUp == this.serverUp &&
-          other.databaseUp == this.databaseUp);
+          other.status == this.status &&
+          other.database == this.database);
 }
 
 class KnownHealthCompanion extends UpdateCompanion<KnownHealthData> {
   final Value<int> id;
-  final Value<bool> serverUp;
-  final Value<bool> databaseUp;
+  final Value<HealthStatus> status;
+  final Value<HealthDatabase> database;
   const KnownHealthCompanion({
     this.id = const Value.absent(),
-    this.serverUp = const Value.absent(),
-    this.databaseUp = const Value.absent(),
+    this.status = const Value.absent(),
+    this.database = const Value.absent(),
   });
-  KnownHealthCompanion.insert({this.id = const Value.absent(), required bool serverUp, required bool databaseUp})
-    : serverUp = Value(serverUp),
-      databaseUp = Value(databaseUp);
+  KnownHealthCompanion.insert({
+    this.id = const Value.absent(),
+    required HealthStatus status,
+    required HealthDatabase database,
+  }) : status = Value(status),
+       database = Value(database);
   static Insertable<KnownHealthData> custom({
     Expression<int>? id,
-    Expression<bool>? serverUp,
-    Expression<bool>? databaseUp,
+    Expression<String>? status,
+    Expression<String>? database,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (serverUp != null) 'server_up': serverUp,
-      if (databaseUp != null) 'database_up': databaseUp,
+      if (status != null) 'status': status,
+      if (database != null) 'database': database,
     });
   }
 
-  KnownHealthCompanion copyWith({Value<int>? id, Value<bool>? serverUp, Value<bool>? databaseUp}) {
-    return KnownHealthCompanion(
-      id: id ?? this.id,
-      serverUp: serverUp ?? this.serverUp,
-      databaseUp: databaseUp ?? this.databaseUp,
-    );
+  KnownHealthCompanion copyWith({Value<int>? id, Value<HealthStatus>? status, Value<HealthDatabase>? database}) {
+    return KnownHealthCompanion(id: id ?? this.id, status: status ?? this.status, database: database ?? this.database);
   }
 
   @override
@@ -190,11 +183,11 @@ class KnownHealthCompanion extends UpdateCompanion<KnownHealthData> {
     if (id.present) {
       map['id'] = Variable<int>(id.value);
     }
-    if (serverUp.present) {
-      map['server_up'] = Variable<bool>(serverUp.value);
+    if (status.present) {
+      map['status'] = Variable<String>($KnownHealthTable.$converterstatus.toSql(status.value));
     }
-    if (databaseUp.present) {
-      map['database_up'] = Variable<bool>(databaseUp.value);
+    if (database.present) {
+      map['database'] = Variable<String>($KnownHealthTable.$converterdatabase.toSql(database.value));
     }
     return map;
   }
@@ -203,8 +196,8 @@ class KnownHealthCompanion extends UpdateCompanion<KnownHealthData> {
   String toString() {
     return (StringBuffer('KnownHealthCompanion(')
           ..write('id: $id, ')
-          ..write('serverUp: $serverUp, ')
-          ..write('databaseUp: $databaseUp')
+          ..write('status: $status, ')
+          ..write('database: $database')
           ..write(')'))
         .toString();
   }
@@ -222,13 +215,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 
 typedef $$KnownHealthTableCreateCompanionBuilder = KnownHealthCompanion Function({
   Value<int> id,
-  required bool serverUp,
-  required bool databaseUp,
+  required HealthStatus status,
+  required HealthDatabase database,
 });
 typedef $$KnownHealthTableUpdateCompanionBuilder = KnownHealthCompanion Function({
   Value<int> id,
-  Value<bool> serverUp,
-  Value<bool> databaseUp,
+  Value<HealthStatus> status,
+  Value<HealthDatabase> database,
 });
 
 class $$KnownHealthTableFilterComposer extends Composer<_$AppDatabase, $KnownHealthTable> {
@@ -241,11 +234,11 @@ class $$KnownHealthTableFilterComposer extends Composer<_$AppDatabase, $KnownHea
   });
   ColumnFilters<int> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<bool> get serverUp =>
-      $composableBuilder(column: $table.serverUp, builder: (column) => ColumnFilters(column));
+  ColumnWithTypeConverterFilters<HealthStatus, HealthStatus, String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => ColumnWithTypeConverterFilters(column));
 
-  ColumnFilters<bool> get databaseUp =>
-      $composableBuilder(column: $table.databaseUp, builder: (column) => ColumnFilters(column));
+  ColumnWithTypeConverterFilters<HealthDatabase, HealthDatabase, String> get database =>
+      $composableBuilder(column: $table.database, builder: (column) => ColumnWithTypeConverterFilters(column));
 }
 
 class $$KnownHealthTableOrderingComposer extends Composer<_$AppDatabase, $KnownHealthTable> {
@@ -258,11 +251,11 @@ class $$KnownHealthTableOrderingComposer extends Composer<_$AppDatabase, $KnownH
   });
   ColumnOrderings<int> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<bool> get serverUp =>
-      $composableBuilder(column: $table.serverUp, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<bool> get databaseUp =>
-      $composableBuilder(column: $table.databaseUp, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get database =>
+      $composableBuilder(column: $table.database, builder: (column) => ColumnOrderings(column));
 }
 
 class $$KnownHealthTableAnnotationComposer extends Composer<_$AppDatabase, $KnownHealthTable> {
@@ -275,9 +268,11 @@ class $$KnownHealthTableAnnotationComposer extends Composer<_$AppDatabase, $Know
   });
   GeneratedColumn<int> get id => $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<bool> get serverUp => $composableBuilder(column: $table.serverUp, builder: (column) => column);
+  GeneratedColumnWithTypeConverter<HealthStatus, String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
 
-  GeneratedColumn<bool> get databaseUp => $composableBuilder(column: $table.databaseUp, builder: (column) => column);
+  GeneratedColumnWithTypeConverter<HealthDatabase, String> get database =>
+      $composableBuilder(column: $table.database, builder: (column) => column);
 }
 
 class $$KnownHealthTableTableManager
@@ -305,14 +300,14 @@ class $$KnownHealthTableTableManager
           createComputedFieldComposer: () => $$KnownHealthTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            Value<bool> serverUp = const Value.absent(),
-            Value<bool> databaseUp = const Value.absent(),
-          }) => KnownHealthCompanion(id: id, serverUp: serverUp, databaseUp: databaseUp),
+            Value<HealthStatus> status = const Value.absent(),
+            Value<HealthDatabase> database = const Value.absent(),
+          }) => KnownHealthCompanion(id: id, status: status, database: database),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            required bool serverUp,
-            required bool databaseUp,
-          }) => KnownHealthCompanion.insert(id: id, serverUp: serverUp, databaseUp: databaseUp),
+            required HealthStatus status,
+            required HealthDatabase database,
+          }) => KnownHealthCompanion.insert(id: id, status: status, database: database),
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (

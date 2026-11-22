@@ -4,7 +4,7 @@ GOLANGCI_LINT := go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$
 
 .PHONY: dev down build test lint vuln generate generate-check
 
-## dev: build and run Postgres, migrations and the backend (http://localhost:8080/healthz)
+## dev: build and run Postgres, migrations and the backend (http://localhost:8080/health)
 dev:
 	docker compose up --build
 

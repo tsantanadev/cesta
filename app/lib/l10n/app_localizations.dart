@@ -152,6 +152,12 @@ abstract class AppLocalizations {
   /// **'Last known status'**
   String get healthLastKnown;
 
+  /// The health check failed for a reason other than being offline, e.g. an unreadable response or a local storage error.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check the server status.'**
+  String get healthCheckFailed;
+
   /// Button that repeats the health check.
   ///
   /// In en, this message translates to:

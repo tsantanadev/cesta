@@ -58,6 +58,19 @@ void main() {
     expect(find.text('Server is up'), findsOneWidget);
   });
 
+  testWidgets('offline after a restart, remembers a degraded server and its database being down', (tester) async {
+    final h = Harness(tester);
+    h.api.health = const Health(status: HealthStatus.degraded, database: HealthDatabase.down);
+    await h.pumpApp();
+    h.api.goOffline();
+
+    await h.pumpApp();
+
+    expect(find.text('Last known status'), findsOneWidget);
+    expect(find.text('Server is degraded'), findsOneWidget);
+    expect(find.text('Database: unreachable'), findsOneWidget);
+  });
+
   testWidgets('checking again after reconnecting shows the live status', (tester) async {
     final h = Harness(tester);
     h.api.goOffline();
@@ -70,6 +83,22 @@ void main() {
     expect(find.text("You're offline"), findsNothing);
     expect(find.text('Server is up'), findsOneWidget);
   }, variant: TargetPlatformVariant.mobile());
+
+  testWidgets('an unexpected failure says the check failed and lets the user check again', (tester) async {
+    final h = Harness(tester);
+    h.api.failure = const FormatException('malformed health response');
+
+    await h.pumpApp();
+
+    expect(find.text("Couldn't check the server status."), findsOneWidget);
+    expect(find.text('Checking the server…'), findsNothing);
+
+    h.api.failure = null;
+    await tester.tap(find.text('Check again'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Server is up'), findsOneWidget);
+  });
 
   testWidgets('stays readable in dark mode at the largest text size', (tester) async {
     final h = Harness(tester);

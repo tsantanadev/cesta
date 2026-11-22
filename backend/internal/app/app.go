@@ -1,7 +1,8 @@
 // Package app wires the modular monolith into one HTTP handler.
 //
-// main builds Deps from real adapters; Seam 1 tests build them with fakes
-// (TokenVerifier, EmailSender, Clock) and a real Postgres.
+// main builds Deps from real adapters; Seam 1 tests build them with a real
+// Postgres. External services (TokenVerifier, EmailSender, Clock) join Deps
+// with the slices that first use them.
 package app
 
 import (
@@ -12,18 +13,12 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/tsantanadev/cesta/backend/internal/httpapi"
-	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
-	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
-	"github.com/tsantanadev/cesta/backend/internal/platform/email"
 )
 
 // Deps are the external dependencies of the backend.
 type Deps struct {
-	DB            *pgxpool.Pool
-	Logger        *slog.Logger
-	TokenVerifier auth.TokenVerifier
-	EmailSender   email.Sender
-	Clock         clock.Clock
+	DB     *pgxpool.Pool
+	Logger *slog.Logger
 }
 
 // New returns the backend's HTTP handler, instrumented with OpenTelemetry.

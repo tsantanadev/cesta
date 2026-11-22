@@ -12,7 +12,7 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// healthPingTimeout bounds how long /healthz waits on the database.
+// healthPingTimeout bounds how long /health waits on the database.
 const healthPingTimeout = 2 * time.Second
 
 // Server implements StrictServerInterface. Each operation delegates to the module that owns it.

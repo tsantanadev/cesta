@@ -46,7 +46,7 @@ void main() {
     await api.getHealth();
 
     final request = adapter.requests.single;
-    expect(request.uri.toString(), 'http://api.test/healthz');
+    expect(request.uri.toString(), 'http://api.test/health');
     expect(request.headers['traceparent'], matches(traceparent));
   });
 
