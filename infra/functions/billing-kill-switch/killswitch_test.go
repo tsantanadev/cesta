@@ -88,13 +88,15 @@ func TestDoesNothingWhenBillingIsAlreadyDetached(t *testing.T) {
 	}
 }
 
-func TestRejectsAMessageThatIsNotABudgetNotification(t *testing.T) {
+func TestIgnoresAMessageThatIsNotABudgetNotification(t *testing.T) {
 	b := &fakeBilling{enabled: true}
 	h := newHandler(b)
 
+	// A malformed message will never parse, so it is acknowledged (nil) rather than
+	// retried by Pub/Sub for days.
 	for _, data := range []string{`not json`, `{"costAmount":50}`} {
-		if err := h.Handle(context.Background(), budgetEvent(t, data)); err == nil {
-			t.Errorf("Handle(%s) = nil, want error", data)
+		if err := h.Handle(context.Background(), budgetEvent(t, data)); err != nil {
+			t.Errorf("Handle(%s) = %v, want nil", data, err)
 		}
 	}
 	if len(b.detached) != 0 {

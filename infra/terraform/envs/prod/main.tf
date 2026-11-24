@@ -80,7 +80,7 @@ module "environment" {
   budget_currency             = var.budget_currency
   alert_email                 = var.alert_email
   otel_exporter_otlp_endpoint = var.otel_exporter_otlp_endpoint
-  kill_switch_enabled         = true # turn off at public launch (ADR-0005)
+  kill_switch_enabled         = true # on until public launch (issue #4)
   log_level                   = "info"
 
 }

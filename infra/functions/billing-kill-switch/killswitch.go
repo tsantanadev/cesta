@@ -43,17 +43,13 @@ type pubsubEnvelope struct {
 }
 
 // Handle detaches billing when the notification's cost has reached its budget.
+// A message that isn't a budget notification is logged and acknowledged, since
+// retrying it can't help; only Billing API failures are returned for Pub/Sub to retry.
 func (h Handler) Handle(ctx context.Context, e event.Event) error {
-	var env pubsubEnvelope
-	if err := e.DataAs(&env); err != nil {
-		return fmt.Errorf("killswitch: decode pubsub event: %w", err)
-	}
-	var n notification
-	if err := json.Unmarshal(env.Message.Data, &n); err != nil {
-		return fmt.Errorf("killswitch: decode budget notification: %w", err)
-	}
-	if n.BudgetAmount <= 0 {
-		return errors.New("killswitch: budget notification has no budgetAmount")
+	n, err := decode(e)
+	if err != nil {
+		h.Logger.ErrorContext(ctx, "ignoring message", slog.String("error", err.Error()))
+		return nil
 	}
 
 	log := h.Logger.With(slog.String("project", h.ProjectID), slog.String("budget", n.BudgetDisplayName),
@@ -75,4 +71,19 @@ func (h Handler) Handle(ctx context.Context, e event.Event) error {
 	}
 	log.WarnContext(ctx, "cost reached limit: billing detached")
 	return nil
+}
+
+func decode(e event.Event) (notification, error) {
+	var env pubsubEnvelope
+	if err := e.DataAs(&env); err != nil {
+		return notification{}, fmt.Errorf("killswitch: decode pubsub event: %w", err)
+	}
+	var n notification
+	if err := json.Unmarshal(env.Message.Data, &n); err != nil {
+		return notification{}, fmt.Errorf("killswitch: decode budget notification: %w", err)
+	}
+	if n.BudgetAmount <= 0 {
+		return notification{}, errors.New("killswitch: budget notification has no budgetAmount")
+	}
+	return n, nil
 }

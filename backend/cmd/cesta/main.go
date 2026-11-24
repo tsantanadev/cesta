@@ -100,6 +100,7 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	publicHost := os.Getenv("PUBLIC_HOST")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -125,14 +126,14 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 
 	srv := &http.Server{
 		Addr:              net.JoinHostPort("", port),
-		Handler:           app.New(app.Deps{DB: pool, Logger: logger, PublicHost: os.Getenv("PUBLIC_HOST")}),
+		Handler:           app.New(app.Deps{DB: pool, Logger: logger, PublicHost: publicHost}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()
 	logger.InfoContext(ctx, "listening", slog.String("addr", srv.Addr), slog.Bool("otlp", telemetry.Enabled()),
-		slog.String("public_host", os.Getenv("PUBLIC_HOST")))
+		slog.String("public_host", publicHost))
 
 	select {
 	case err := <-errc:

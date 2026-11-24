@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version-file: backend/go.mod
+          go-version-file: infra/functions/billing-kill-switch/go.mod # what the go126 runtime builds with
           cache-dependency-path: infra/functions/billing-kill-switch/go.sum
       - name: Lint (backend's config and golangci-lint version)
         run: |

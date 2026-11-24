@@ -60,7 +60,9 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
 3. **Hand-created secrets.**
 
    ```sh
-   gcloud services enable secretmanager.googleapis.com --project=$PROJECT
+   # The first plan needs these before Terraform can enable the rest.
+   gcloud services enable secretmanager.googleapis.com cloudresourcemanager.googleapis.com \
+     serviceusage.googleapis.com --project=$PROJECT
    # Neon: Account settings → API keys
    printf '%s' "$NEON_API_KEY" | gcloud secrets create neon-api-key --project=$PROJECT \
      --replication-policy=user-managed --locations=southamerica-east1 --data-file=-
@@ -94,12 +96,13 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
 ## Deploying
 
 - **dev:** merge to `main`. When CI passes, `deploy.yml` builds the image, runs `cesta migrate` as the `cesta-migrate` job, deploys `cesta-backend`, deploys Hosting, and runs `.github/scripts/smoke-test.sh`. The run summary shows the image digest.
-- **prod:** Actions → Deploy → Run workflow, with that digest. The image is copied by digest into prod's registry, then prod runs the same steps.
+- **prod:** Actions → Deploy → Run workflow, with that digest. The image is copied by digest into prod's registry, then prod runs the same steps. The job fails if the copy's digest differs. dev keeps only its 10 newest images, so promote before ten more merges land.
 
 ## Checks
 
 - **Bypass:** the smoke test asserts that `<run.app URL>/health` answers 404. Cloud Run's default URL can't be turned off, because Firebase Hosting rewrites use it. Instead, the backend serves only requests whose `X-Forwarded-Host` is `PUBLIC_HOST`, which Firebase Hosting sets. Anyone can forge the header, so this stops scanners and casual bypass. Firebase App Check is the real gate. If the smoke test's first request (through Hosting) gets a 404, Hosting isn't sending the header as expected: check the header the backend received in the request logs.
 - **Traces:** in Grafana Cloud → Explore → Tempo, query `{resource.service.name="cesta-backend"}`. Spans have no `client.address`, `network.peer.*` or `user_agent.original` (the backend drops them before export).
+  Cloud Run throttles the CPU between requests, so spans are exported during later requests or when the instance shuts down. Expect them to show up a little late on an idle dev, not as each request finishes.
 - **Kill switch (dev):** simulate a budget notification over the limit, then confirm billing is detached and re-link it:
 
   ```sh
