@@ -7,6 +7,7 @@ A mobile grocery shopping list app where people build Lists, share them with oth
 | `api/openapi.yaml` | The API contract. Server and client code are generated from it. |
 | `backend/` | Go backend (Postgres). Tasks live in `backend/Makefile`. |
 | `app/` | Flutter app (Android and iOS). Scripts live in `app/tool/`. |
+| `infra/`, `hosting/` | Terraform for dev and prod, the billing kill switch, Firebase Hosting config. See `infra/README.md`. |
 | `GLOSSARY.md`, `docs/adr/` | Domain language and architecture decisions. |
 
 ## Prerequisites
@@ -64,4 +65,8 @@ On a physical device, set `API_BASE_URL` to your machine's LAN address, e.g. `ht
 
 - `backend`: `make generate-check`, `make lint`, `make vuln`, `make test`
 - `app`: `tool/codegen.sh --check`, `dart format` check, `flutter analyze`, `flutter test`
-- `dependency-scan`: OSV-Scanner over `backend/go.mod` and `app/pubspec.lock`
+- `kill-switch`: lint and test `infra/functions/billing-kill-switch`
+- `terraform`: `terraform fmt -check` and `terraform validate` for dev and prod
+- `dependency-scan`: OSV-Scanner over the Go modules and `app/pubspec.lock`
+
+`.github/workflows/deploy.yml` deploys to dev after CI passes on `main`, and to prod by hand. See `infra/README.md`.
