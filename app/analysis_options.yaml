@@ -1,0 +1,47 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    # Generated code: produced by tool/gen_api.sh, gen-l10n and build_runner.
+    - lib/src/api/generated/**
+    - lib/l10n/app_localizations*.dart
+    - "**/*.g.dart"
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # Severity overrides only. CI is gated by `flutter analyze`, which already
+    # exits non-zero on any error, warning or info (lint) finding.
+    missing_required_param: error
+    missing_return: error
+
+formatter:
+  page_width: 120
+
+linter:
+  rules:
+    - always_declare_return_types
+    - avoid_dynamic_calls
+    - avoid_print
+    - avoid_redundant_argument_values
+    - avoid_relative_lib_imports
+    - avoid_slow_async_io
+    - avoid_type_to_string
+    - cancel_subscriptions
+    - directives_ordering
+    - discarded_futures
+    - prefer_const_constructors
+    - prefer_final_fields
+    - prefer_final_locals
+    - prefer_single_quotes
+    - require_trailing_commas
+    - sort_constructors_first
+    - test_types_in_equals
+    - unawaited_futures
+    - unnecessary_lambdas
+    - unnecessary_parenthesis
+    - use_super_parameters
