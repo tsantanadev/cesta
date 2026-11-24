@@ -2,8 +2,9 @@
 //
 // Export is off by default (no-op providers), so local runs and tests need no collector.
 // Setting OTEL_EXPORTER_OTLP_ENDPOINT (e.g. Grafana Cloud's OTLP gateway) turns on
-// OTLP/HTTP export of both traces and metrics. The exporters read the standard OTEL_*
-// variables themselves (OTEL_EXPORTER_OTLP_HEADERS, OTEL_SERVICE_NAME, ...).
+// OTLP/HTTP export of both traces and metrics, with personal span attributes dropped
+// (RedactingExporter). The exporters read the standard OTEL_* variables themselves
+// (OTEL_EXPORTER_OTLP_HEADERS, OTEL_SERVICE_NAME, ...).
 package telemetry
 
 import (
@@ -56,7 +57,7 @@ func Setup(ctx context.Context, serviceName, version string) (Shutdown, error) {
 	if err != nil {
 		return nil, fmt.Errorf("telemetry: trace exporter: %w", err)
 	}
-	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(traceExp), sdktrace.WithResource(res))
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(RedactingExporter(traceExp)), sdktrace.WithResource(res))
 
 	metricExp, err := otlpmetrichttp.New(ctx)
 	if err != nil {

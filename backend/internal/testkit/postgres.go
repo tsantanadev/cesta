@@ -16,7 +16,7 @@ import (
 	"github.com/tsantanadev/cesta/backend/migrations"
 )
 
-// postgresImage should match the version in docker-compose.yaml and production (Cloud SQL).
+// postgresImage should match the version in docker-compose.yaml and production (Neon, infra/terraform).
 const postgresImage = "postgres:17-alpine"
 
 const templateDB = "cesta_template"
