@@ -1,8 +1,7 @@
-# Not secret. See infra/README.md.
-project_id         = "cesta-dev"
-prod_project_id    = "cesta-prod"
-billing_account_id = "01931C-8270EA-B0DBDB"
-alert_email        = "thiago91098@gmail.com"
+# Not secret. The billing account and alert email live in the gitignored
+# private.auto.tfvars (see private.auto.tfvars.example and infra/README.md).
+project_id      = "cesta-dev"
+prod_project_id = "cesta-prod"
 
 # The billing account bills in BRL. About US$10 and US$40.
 budget_currency   = "BRL"

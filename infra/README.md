@@ -73,7 +73,7 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
      --replication-policy=user-managed --locations=southamerica-east1 --data-file=-
    ```
 
-4. **Settings.** In `terraform/envs/<env>/`, replace every `REPLACE_` value in `terraform.tfvars` and `backend.hcl`. `budget_currency`, `budget_amount` and `kill_switch_limit` are in the billing account's currency (check it with `gcloud billing accounts describe`). Ours bills in BRL. The OTLP endpoint is shown on the same Grafana Cloud page as the token; pick the `sa-east-1` stack.
+4. **Settings.** In `terraform/envs/<env>/`, check `terraform.tfvars` and `backend.hcl`, and copy `private.auto.tfvars.example` to `private.auto.tfvars` with the billing account ID and alert email. That file is gitignored because the repo is public. `budget_currency`, `budget_amount` and `kill_switch_limit` are in the billing account's currency (check it with `gcloud billing accounts describe`). Ours bills in BRL. The OTLP endpoint is shown on the same Grafana Cloud page as the token; pick the `sa-east-1` stack.
 
 5. **Apply.** You need Owner on the project and Billing Account Costs Manager (or Administrator) on the billing account, for the budgets.
 

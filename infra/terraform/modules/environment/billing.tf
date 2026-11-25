@@ -52,6 +52,17 @@ resource "google_pubsub_topic" "kill_switch" {
   depends_on = [google_project_service.apis]
 }
 
+# Cloud Billing publishes budget notifications as this Google-managed account. Billing
+# grants it on its own when the budget is created; this keeps the grant on record.
+resource "google_pubsub_topic_iam_member" "budget_publisher" {
+  count = var.kill_switch_enabled ? 1 : 0
+
+  project = var.project_id
+  topic   = google_pubsub_topic.kill_switch[0].name
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:billing-budget-alert@system.gserviceaccount.com"
+}
+
 resource "google_billing_budget" "kill_switch" {
   count = var.kill_switch_enabled ? 1 : 0
 
