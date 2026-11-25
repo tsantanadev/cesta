@@ -73,7 +73,7 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
      --replication-policy=user-managed --locations=southamerica-east1 --data-file=-
    ```
 
-4. **Settings.** In `terraform/envs/<env>/`, replace every `REPLACE_` value in `terraform.tfvars` and `backend.hcl`. `budget_currency` must be the billing account's currency (check with `gcloud billing accounts describe`); if it isn't USD, scale the amounts in `modules/environment/variables.tf` to match. The OTLP endpoint is shown on the same Grafana Cloud page as the token; pick the `sa-east-1` stack.
+4. **Settings.** In `terraform/envs/<env>/`, replace every `REPLACE_` value in `terraform.tfvars` and `backend.hcl`. `budget_currency`, `budget_amount` and `kill_switch_limit` are in the billing account's currency (check it with `gcloud billing accounts describe`). Ours bills in BRL. The OTLP endpoint is shown on the same Grafana Cloud page as the token; pick the `sa-east-1` stack.
 
 5. **Apply.** You need Owner on the project and Billing Account Costs Manager (or Administrator) on the billing account, for the budgets.
 
@@ -107,7 +107,7 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
 
   ```sh
   gcloud pubsub topics publish billing-kill-switch --project=$PROJECT \
-    --message='{"budgetDisplayName":"simulated","costAmount":21,"budgetAmount":20,"currencyCode":"USD"}'
+    --message='{"budgetDisplayName":"simulated","costAmount":201,"budgetAmount":200,"currencyCode":"BRL"}'
   gcloud billing projects describe $PROJECT            # billingEnabled: false
   gcloud logging read 'resource.labels.service_name="billing-kill-switch"' --project=$PROJECT --limit=5
   gcloud billing projects link $PROJECT --billing-account=$BILLING_ACCOUNT

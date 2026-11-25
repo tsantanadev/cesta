@@ -33,8 +33,18 @@ variable "billing_account_id" {
 }
 
 variable "budget_currency" {
-  type    = string
-  default = "USD"
+  description = "The billing account's currency. Budgets must use it."
+  type        = string
+}
+
+variable "budget_amount" {
+  description = "Monthly budget that sends email alerts at 50%, 90% and 100%, in budget_currency."
+  type        = number
+}
+
+variable "kill_switch_limit" {
+  description = "Monthly spend at which billing is detached, in budget_currency."
+  type        = number
 }
 
 variable "alert_email" {
@@ -84,6 +94,8 @@ module "environment" {
   github_repository_id        = "1467899575" # tsantanadev/cesta
   billing_account_id          = var.billing_account_id
   budget_currency             = var.budget_currency
+  budget_amount               = var.budget_amount
+  kill_switch_limit           = var.kill_switch_limit
   alert_email                 = var.alert_email
   otel_exporter_otlp_endpoint = var.otel_exporter_otlp_endpoint
   kill_switch_enabled         = true
