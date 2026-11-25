@@ -8,6 +8,7 @@
 //	DATABASE_URL                 Postgres URL (required)
 //	PORT                         HTTP port (default 8080)
 //	LOG_LEVEL                    debug, info, warn or error (default info)
+//	PUBLIC_HOST                  custom domain served by Firebase Hosting; other requests get 404 (off when unset)
 //	OTEL_EXPORTER_OTLP_ENDPOINT  enables OTLP/HTTP export of traces and metrics (off when unset)
 package main
 
@@ -99,6 +100,7 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	publicHost := os.Getenv("PUBLIC_HOST")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -124,13 +126,14 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 
 	srv := &http.Server{
 		Addr:              net.JoinHostPort("", port),
-		Handler:           app.New(app.Deps{DB: pool, Logger: logger}),
+		Handler:           app.New(app.Deps{DB: pool, Logger: logger, PublicHost: publicHost}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()
-	logger.InfoContext(ctx, "listening", slog.String("addr", srv.Addr), slog.Bool("otlp", telemetry.Enabled()))
+	logger.InfoContext(ctx, "listening", slog.String("addr", srv.Addr), slog.Bool("otlp", telemetry.Enabled()),
+		slog.String("public_host", publicHost))
 
 	select {
 	case err := <-errc:

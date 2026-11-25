@@ -1,0 +1,24 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": ["**/.gitkeep"],
+    "cleanUrls": false,
+    "trailingSlash": false,
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": { "serviceId": "cesta-backend", "region": "southamerica-east1" }
+      },
+      {
+        "source": "/health",
+        "run": { "serviceId": "cesta-backend", "region": "southamerica-east1" }
+      }
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [{ "key": "Content-Type", "value": "application/json" }]
+      }
+    ]
+  }
+}

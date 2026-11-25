@@ -36,6 +36,50 @@ jobs:
       - name: Test (incl. Seam 1, Postgres via testcontainers)
         run: make test
 
+  kill-switch:
+    name: kill-switch
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/functions/billing-kill-switch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: infra/functions/billing-kill-switch/go.mod # what the go126 runtime builds with
+          cache-dependency-path: infra/functions/billing-kill-switch/go.sum
+      - name: Lint (backend's config and golangci-lint version)
+        run: |
+          version=$(sed -n 's/^GOLANGCI_LINT_VERSION := //p' ../../../backend/Makefile)
+          go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${version}" run --config ../../../backend/.golangci.yaml ./...
+      - name: Test
+        run: go test -race -count=1 ./...
+
+  terraform:
+    name: terraform
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.2
+          terraform_wrapper: false
+      - name: Format
+        run: terraform fmt -check -recursive
+      - name: Validate dev and prod
+        run: |
+          for env in dev prod; do
+            terraform -chdir="envs/${env}" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="envs/${env}" validate
+          done
+
   app:
     name: app
     runs-on: ubuntu-latest
@@ -74,4 +118,5 @@ jobs:
         with:
           scan-args: |-
             --lockfile=backend/go.mod
+            --lockfile=infra/functions/billing-kill-switch/go.mod
             --lockfile=app/pubspec.lock
