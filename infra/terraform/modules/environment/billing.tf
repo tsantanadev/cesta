@@ -107,6 +107,25 @@ resource "google_project_iam_member" "kill_switch" {
   member  = google_service_account.kill_switch[0].member
 }
 
+# billing.projectManager only attaches and detaches billing accounts; reading a project's
+# billing info also needs resourcemanager.projects.get.
+resource "google_project_iam_custom_role" "kill_switch_project_reader" {
+  count = var.kill_switch_enabled ? 1 : 0
+
+  project     = var.project_id
+  role_id     = "killSwitchProjectReader"
+  title       = "Kill switch project reader"
+  permissions = ["resourcemanager.projects.get"]
+}
+
+resource "google_project_iam_member" "kill_switch_project_reader" {
+  count = var.kill_switch_enabled ? 1 : 0
+
+  project = var.project_id
+  role    = google_project_iam_custom_role.kill_switch_project_reader[0].id
+  member  = google_service_account.kill_switch[0].member
+}
+
 resource "google_project_iam_member" "kill_switch_builder" {
   count = var.kill_switch_enabled ? 1 : 0
 
@@ -182,7 +201,8 @@ resource "google_cloudfunctions2_function" "kill_switch" {
     service_account_email = google_service_account.kill_switch[0].email
   }
 
-  depends_on = [google_project_iam_member.kill_switch_builder]
+  # Eventarc checks the trigger's roles when the function is created.
+  depends_on = [google_project_iam_member.kill_switch_builder, google_project_iam_member.kill_switch]
 }
 
 # The trigger's service account must be allowed to invoke the function's service.

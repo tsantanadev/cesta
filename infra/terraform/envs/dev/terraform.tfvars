@@ -1,6 +1,6 @@
 # Not secret. See infra/README.md.
 project_id         = "cesta-dev"
-prod_project_id    = "" # set to "cesta-prod" once prod is applied, then apply dev again
+prod_project_id    = "cesta-prod"
 billing_account_id = "01931C-8270EA-B0DBDB"
 alert_email        = "thiago91098@gmail.com"
 
