@@ -97,8 +97,9 @@ resource "google_service_account" "kill_switch_builder" {
 
 resource "google_project_iam_member" "kill_switch" {
   for_each = var.kill_switch_enabled ? toset([
-    "roles/billing.projectManager", # read and detach the project's billing account
-    "roles/eventarc.eventReceiver", # receive the Pub/Sub trigger
+    "roles/billing.projectManager",            # read and detach the project's billing account
+    "roles/eventarc.eventReceiver",            # receive the Pub/Sub trigger
+    "roles/serviceusage.serviceUsageConsumer", # Eventarc checks the trigger's account may use the project
   ]) : toset([])
 
   project = var.project_id
