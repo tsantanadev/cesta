@@ -1,18 +1,21 @@
 # Neon serverless Postgres in São Paulo (free plan) and the connection strings the
-# backend and the migrations job read from Secret Manager.
+# backend and the migrations job read from Secret Manager. The Neon projects were
+# created in the console and imported (envs/*/main.tf), because each environment's
+# API key is scoped to its own project and can't create one.
 
 resource "neon_project" "this" {
   name       = "cesta-${var.environment}"
   region_id  = "aws-sa-east-1"
-  pg_version = 17 # keep in step with backend/internal/testkit/postgres.go
+  pg_version = 18 # keep in step with backend/internal/testkit/postgres.go
 
   # The free plan keeps at most 6 hours of history.
   history_retention_seconds = 21600
 
+  # Neon's console defaults.
   branch {
-    name          = "main"
-    database_name = "cesta"
-    role_name     = "cesta"
+    name          = "production"
+    database_name = "neondb"
+    role_name     = "neondb_owner"
   }
 }
 

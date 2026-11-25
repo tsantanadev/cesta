@@ -1,7 +1,7 @@
 # Local dev: `make dev` brings up Postgres, applies migrations and runs the backend on :8080.
 services:
   postgres:
-    image: postgres:17-alpine # keep in step with internal/testkit/postgres.go
+    image: postgres:18-alpine # keep in step with internal/testkit/postgres.go
     environment:
       POSTGRES_USER: cesta
       POSTGRES_PASSWORD: cesta
@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql # postgres 18+ keeps data in a versioned subdirectory
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cesta -d cesta"]
       interval: 2s

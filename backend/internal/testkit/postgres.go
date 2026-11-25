@@ -17,7 +17,7 @@ import (
 )
 
 // postgresImage should match the version in docker-compose.yaml and production (Neon, infra/terraform).
-const postgresImage = "postgres:17-alpine"
+const postgresImage = "postgres:18-alpine"
 
 const templateDB = "cesta_template"
 

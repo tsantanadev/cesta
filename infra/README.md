@@ -57,13 +57,13 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
    gcloud storage buckets update gs://$PROJECT-tfstate --versioning
    ```
 
-3. **Hand-created secrets.**
+3. **Neon project and hand-created secrets.** In the Neon console, create the project `cesta-<env>` in AWS São Paulo (`aws-sa-east-1`), Postgres 18, and a **project-scoped** API key for it. Terraform imports the project (the `import` block in `envs/<env>/main.tf` holds its ID); a project-scoped key can't create projects.
 
    ```sh
    # The first plan needs these before Terraform can enable the rest.
    gcloud services enable secretmanager.googleapis.com cloudresourcemanager.googleapis.com \
      serviceusage.googleapis.com --project=$PROJECT
-   # Neon: Account settings → API keys
+   # Neon: the project's Settings → API keys (scoped to this project)
    printf '%s' "$NEON_API_KEY" | gcloud secrets create neon-api-key --project=$PROJECT \
      --replication-policy=user-managed --locations=southamerica-east1 --data-file=-
    # Grafana Cloud: stack → OpenTelemetry → generate a token (write traces, metrics).
@@ -121,5 +121,6 @@ Idle, each environment sits inside the free tiers: Cloud Run and the function sc
 
 ## Known risks
 
+- `database-url` and `database-url-direct` connect as `neondb_owner` to `neondb`, Neon's defaults for a console-created project.
 - The `kislerdm/neon` provider was archived on 2026-09-11; v0.18.0 is its last release. It still works, but if the Neon API changes under it, move to Neon's own provider or manage the two projects by hand and keep only the secrets in Terraform.
 - Disabling billing (kill switch) also downgrades Firebase to the Spark plan, and Hosting's Cloud Run rewrites stop until billing is re-linked.

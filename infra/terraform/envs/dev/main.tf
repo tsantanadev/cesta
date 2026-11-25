@@ -75,7 +75,7 @@ provider "google-beta" {
   billing_project       = var.project_id
 }
 
-# The one hand-created Neon credential (infra/README.md).
+# Hand-created Neon API key, scoped to this environment's Neon project (infra/README.md).
 data "google_secret_manager_secret_version" "neon_api_key" {
   project = var.project_id
   secret  = "neon-api-key"
@@ -83,6 +83,12 @@ data "google_secret_manager_secret_version" "neon_api_key" {
 
 provider "neon" {
   api_key = data.google_secret_manager_secret_version.neon_api_key.secret_data
+}
+
+# Created in the Neon console; the API key is scoped to this project.
+import {
+  to = module.environment.neon_project.this
+  id = "small-salad-44069775"
 }
 
 module "environment" {
