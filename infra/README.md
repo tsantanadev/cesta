@@ -10,13 +10,13 @@ Cloud Run + Neon in São Paulo, Firebase in front (ADR-0003, ADR-0005). Two envi
 
 | Path | What |
 | --- | --- |
-| `terraform/modules/environment/` | Everything one environment needs: Cloud Run service and migrations job, Neon project, secrets, service accounts, CI identity (OIDC), Firebase Hosting and custom domain, budgets, kill switch. |
+| `terraform/modules/environment/` | Everything one environment needs: Cloud Run service, migrations job and daily purge job (Cloud Scheduler), Neon project, secrets, service accounts, CI identity (OIDC), Firebase Hosting and custom domain, budgets, kill switch. |
 | `terraform/envs/{dev,prod}/` | Root modules. `terraform.tfvars` and `backend.hcl` hold the (non-secret) project settings. |
 | `functions/billing-kill-switch/` | Cloud Function that detaches billing when spend reaches the hard limit. |
 | `../hosting/` | `firebase.json` (rewrites `/api/**` and `/health` to Cloud Run) and the static `.well-known` files. |
 | `../.github/workflows/deploy.yml` | Build, migrate, deploy, smoke test. |
 
-Terraform is applied by a person from a laptop. CI never runs Terraform and never sees a database credential: it authenticates through Workload Identity Federation as `cesta-deployer`, which can only push images, update the migrations job and service, and deploy Hosting.
+Terraform is applied by a person from a laptop. CI never runs Terraform and never sees a database credential: it authenticates through Workload Identity Federation as `cesta-deployer`, which can only push images, update the migrations and purge jobs and the service, and deploy Hosting.
 
 ## Secrets
 
@@ -95,7 +95,7 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
 
 ## Deploying
 
-- **dev:** merge to `main`. When CI passes, `deploy.yml` builds the image, runs `cesta migrate` as the `cesta-migrate` job, deploys `cesta-backend`, deploys Hosting, and runs `.github/scripts/smoke-test.sh`. The run summary shows the image digest.
+- **dev:** merge to `main`. When CI passes, `deploy.yml` builds the image, runs `cesta migrate` as the `cesta-migrate` job, deploys `cesta-backend`, points the `cesta-purge` job at the new image, deploys Hosting, and runs `.github/scripts/smoke-test.sh`. The run summary shows the image digest.
 - **prod:** Actions → Deploy → Run workflow, with that digest. The image is copied by digest into prod's registry, then prod runs the same steps. The job fails if the copy's digest differs. dev keeps only its 10 newest images, so promote before ten more merges land.
 
 ## Checks
