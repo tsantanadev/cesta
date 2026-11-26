@@ -58,6 +58,15 @@ type Summary struct {
 	CreatedAt   time.Time
 }
 
+// Deleted is a deleted List its Owner can still restore.
+type Deleted struct {
+	ID        uuid.UUID
+	Name      string
+	DeletedAt time.Time
+	// PurgeAt is when the List stops being restorable: DeletedAt + RestoreWindow.
+	PurgeAt time.Time
+}
+
 // Service manages Lists.
 type Service struct {
 	db         *pgxpool.Pool
@@ -88,8 +97,12 @@ func (s *Service) Create(ctx context.Context, owner, id uuid.UUID, name string) 
 			return err
 		}
 		var existingOwner uuid.UUID
-		err := tx.QueryRow(ctx, "SELECT owner_id FROM lists WHERE id = $1", id).Scan(&existingOwner)
+		var deletedAt *time.Time
+		err := tx.QueryRow(ctx, "SELECT owner_id, deleted_at FROM lists WHERE id = $1", id).
+			Scan(&existingOwner, &deletedAt)
 		switch {
+		case err == nil && existingOwner == owner && deletedAt != nil:
+			return ErrDeleted
 		case err == nil && existingOwner == owner:
 			return nil // a retry
 		case err == nil:
@@ -176,6 +189,53 @@ func (s *Service) Rename(ctx context.Context, userID, listID uuid.UUID, name str
 		return Summary{}, wrap("rename", err)
 	}
 	return s.summary(ctx, listID, userID)
+}
+
+// Delete deletes a List userID owns, for every Member at once. The Owner can
+// restore it within RestoreWindow. Deleting a deleted List changes nothing.
+func (s *Service) Delete(ctx context.Context, userID, listID uuid.UUID) (Deleted, error) {
+	l, err := s.owned(ctx, userID, listID)
+	if err != nil {
+		return Deleted{}, err
+	}
+	if l.deletedAt == nil {
+		now := s.clock.Now()
+		// deleted_at IS NULL keeps the first deletion time if two deletes race.
+		if _, err := s.db.Exec(ctx,
+			"UPDATE lists SET deleted_at = $2, updated_at = $2 WHERE id = $1 AND deleted_at IS NULL",
+			listID, now); err != nil {
+			return Deleted{}, wrap("delete", err)
+		}
+	}
+	d := Deleted{ID: listID}
+	if err := s.db.QueryRow(ctx, "SELECT name, deleted_at FROM lists WHERE id = $1", listID).
+		Scan(&d.Name, &d.DeletedAt); err != nil {
+		return Deleted{}, wrap("delete", err)
+	}
+	d.PurgeAt = d.DeletedAt.Add(RestoreWindow)
+	return d, nil
+}
+
+// RecentlyDeleted returns the Lists owner deleted and can still restore, most
+// recently deleted first. Lists other Users own never appear here.
+func (s *Service) RecentlyDeleted(ctx context.Context, owner uuid.UUID) ([]Deleted, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, name, deleted_at FROM lists
+		WHERE owner_id = $1 AND deleted_at IS NOT NULL AND deleted_at > $2
+		ORDER BY deleted_at DESC, id`, owner, s.clock.Now().Add(-RestoreWindow))
+	if err != nil {
+		return nil, wrap("recently deleted", err)
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Deleted, error) {
+		var d Deleted
+		err := row.Scan(&d.ID, &d.Name, &d.DeletedAt)
+		d.PurgeAt = d.DeletedAt.Add(RestoreWindow)
+		return d, err
+	})
+	if err != nil {
+		return nil, wrap("recently deleted", err)
+	}
+	return out, nil
 }
 
 // listRow is the state of a List the access checks need.

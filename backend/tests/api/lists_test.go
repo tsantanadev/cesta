@@ -151,3 +151,85 @@ func TestListNamesMustBeOneToSixtyVisibleCharacters(t *testing.T) {
 		t.Fatalf("Ana has %d Lists, want 1 (no invalid create succeeded)", len(lists))
 	}
 }
+
+type deletedList struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	DeletedAt time.Time `json:"deletedAt"`
+	PurgeAt   time.Time `json:"purgeAt"`
+}
+
+func decodeDeletedList(t *testing.T, res *testkit.Response) deletedList {
+	t.Helper()
+	var l deletedList
+	if err := json.Unmarshal(res.Body, &l); err != nil {
+		t.Fatalf("decode deleted List: %v\nbody: %s", err, res.Body)
+	}
+	return l
+}
+
+func recentlyDeleted(t *testing.T, c *testkit.Client) []deletedList {
+	t.Helper()
+	res := c.Get(t, "/api/deleted-lists")
+	res.RequireStatus(t, http.StatusOK)
+	var body struct {
+		Lists []deletedList `json:"lists"`
+	}
+	if err := json.Unmarshal(res.Body, &body); err != nil {
+		t.Fatalf("decode deleted Lists: %v\nbody: %s", err, res.Body)
+	}
+	return body.Lists
+}
+
+func TestDeletingAListMovesItToRecentlyDeletedForThirtyDays(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.Clock.Advance(time.Hour)
+	deletedAt := srv.Clock.Now()
+
+	res := ana.Delete(t, "/api/lists/"+groceriesID)
+
+	res.RequireStatus(t, http.StatusOK)
+	got := decodeDeletedList(t, res)
+	if got.ID != groceriesID || got.Name != "Groceries" || !got.DeletedAt.Equal(deletedAt) ||
+		!got.PurgeAt.Equal(deletedAt.Add(30*24*time.Hour)) {
+		t.Fatalf("deleted List = %+v, want Groceries deleted at %v, purged 30 days later", got, deletedAt)
+	}
+	if lists := myLists(t, ana); len(lists) != 0 {
+		t.Fatalf("Ana's Lists = %+v, want none after deleting", lists)
+	}
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 1 || deleted[0] != got {
+		t.Fatalf("Recently deleted = %+v, want just %+v", deleted, got)
+	}
+}
+
+func TestDeletingADeletedListAgainKeepsTheOriginalDeletionTime(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	first := decodeDeletedList(t, ana.Delete(t, "/api/lists/"+groceriesID))
+	srv.Clock.Advance(time.Hour)
+
+	res := ana.Delete(t, "/api/lists/"+groceriesID)
+
+	res.RequireStatus(t, http.StatusOK)
+	if again := decodeDeletedList(t, res); again != first {
+		t.Fatalf("second delete = %+v, want %+v", again, first)
+	}
+}
+
+func TestADeletedListCannotBeRenamedOrRecreated(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+
+	rename := ana.Patch(t, "/api/lists/"+groceriesID, `{"name": "Feira"}`)
+	recreate := ana.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Groceries"}`)
+
+	rename.RequireStatus(t, http.StatusConflict)
+	rename.RequireErrorCode(t, "list_deleted")
+	recreate.RequireStatus(t, http.StatusConflict)
+	recreate.RequireErrorCode(t, "list_deleted")
+}

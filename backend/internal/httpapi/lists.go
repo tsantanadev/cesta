@@ -42,6 +42,8 @@ func (s *Server) CreateList(ctx context.Context, req CreateListRequestObject) (C
 		return CreateList409JSONResponse{ConflictJSONResponse{Code: ApiErrorCodeListIdTaken, Message: "another List has this id"}}, nil
 	case errors.Is(err, lists.ErrLimitReached):
 		return CreateList409JSONResponse{ConflictJSONResponse(limitExceeded())}, nil
+	case errors.Is(err, lists.ErrDeleted):
+		return CreateList409JSONResponse{ConflictJSONResponse(listDeleted())}, nil
 	case err != nil:
 		return nil, err
 	case created:
@@ -69,23 +71,50 @@ func (s *Server) RenameList(ctx context.Context, req RenameListRequestObject) (R
 	case errors.Is(err, lists.ErrNotOwner):
 		return RenameList403JSONResponse{ForbiddenJSONResponse(notListOwner())}, nil
 	case errors.Is(err, lists.ErrDeleted):
-		return RenameList409JSONResponse{ConflictJSONResponse{Code: ApiErrorCodeListDeleted, Message: "restore the List before changing it"}}, nil
+		return RenameList409JSONResponse{ConflictJSONResponse(listDeleted())}, nil
 	case err != nil:
 		return nil, err
 	}
 	return RenameList200JSONResponse(apiListSummary(l)), nil
 }
 
-func (s *Server) DeleteList(context.Context, DeleteListRequestObject) (DeleteListResponseObject, error) {
-	return nil, errListsNotImplemented
+// DeleteList deletes a List the signed-in User owns.
+func (s *Server) DeleteList(ctx context.Context, req DeleteListRequestObject) (DeleteListResponseObject, error) {
+	u, err := signedIn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d, err := s.Lists.Delete(ctx, u.ID, req.ListId)
+	switch {
+	case errors.Is(err, lists.ErrNotFound):
+		return DeleteList404JSONResponse{NotFoundJSONResponse(listNotFound())}, nil
+	case errors.Is(err, lists.ErrNotOwner):
+		return DeleteList403JSONResponse{ForbiddenJSONResponse(notListOwner())}, nil
+	case err != nil:
+		return nil, err
+	}
+	return DeleteList200JSONResponse(apiDeletedList(d)), nil
 }
 
 func (s *Server) RestoreList(context.Context, RestoreListRequestObject) (RestoreListResponseObject, error) {
 	return nil, errListsNotImplemented
 }
 
-func (s *Server) ListDeletedLists(context.Context, ListDeletedListsRequestObject) (ListDeletedListsResponseObject, error) {
-	return nil, errListsNotImplemented
+// ListDeletedLists returns the Lists the signed-in User deleted and can still restore.
+func (s *Server) ListDeletedLists(ctx context.Context, _ ListDeletedListsRequestObject) (ListDeletedListsResponseObject, error) {
+	u, err := signedIn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	deleted, err := s.Lists.RecentlyDeleted(ctx, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := ListDeletedLists200JSONResponse{Lists: make([]DeletedList, 0, len(deleted))}
+	for _, d := range deleted {
+		out.Lists = append(out.Lists, apiDeletedList(d))
+	}
+	return out, nil
 }
 
 var errListsNotImplemented = errors.New("lists: not implemented")
@@ -95,6 +124,14 @@ func invalidListName() ApiError {
 		Code:    ApiErrorCodeInvalidListName,
 		Message: fmt.Sprintf("List name must be 1 to %d visible characters", lists.MaxNameLength),
 	}
+}
+
+func listDeleted() ApiError {
+	return ApiError{Code: ApiErrorCodeListDeleted, Message: "the List is deleted; restore it first"}
+}
+
+func apiDeletedList(d lists.Deleted) DeletedList {
+	return DeletedList{Id: d.ID, Name: d.Name, DeletedAt: d.DeletedAt, PurgeAt: d.PurgeAt}
 }
 
 func listNotFound() ApiError {
