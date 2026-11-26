@@ -58,7 +58,9 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-          docker build --build-arg "VERSION=${SHA}" --label "org.opencontainers.image.revision=${SHA}" \
+          docker build --platform linux/amd64 \
+            --build-arg "VERSION=${SHA}" \
+            --label "org.opencontainers.image.revision=${SHA}" \
             -t "${IMAGE_REPOSITORY}:${SHA}" backend
           docker push "${IMAGE_REPOSITORY}:${SHA}"
           ref=$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${SHA}")
