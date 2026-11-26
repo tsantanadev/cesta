@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tsantanadev/cesta/backend/internal/identity"
+	"github.com/tsantanadev/cesta/backend/internal/lists"
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
 	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 )
@@ -26,6 +27,7 @@ type Server struct {
 	Logger   *slog.Logger
 	Verifier auth.TokenVerifier
 	Identity *identity.Service
+	Lists    *lists.Service
 	PerIP    *ratelimit.Limiter
 	PerUser  *ratelimit.Limiter
 	// TrustedProxyHops is how many proxies in front of the backend append to

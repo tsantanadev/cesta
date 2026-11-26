@@ -73,7 +73,9 @@ jobs:
       - name: Deploy the backend
         env:
           IMAGE: ${{ steps.image.outputs.ref }}
-        run: gcloud run deploy cesta-backend --region "$REGION" --image "$IMAGE" --quiet
+        run: |
+          gcloud run deploy cesta-backend --region "$REGION" --image "$IMAGE" --quiet
+          gcloud run jobs update cesta-purge --region "$REGION" --image "$IMAGE" --quiet
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -158,7 +160,9 @@ jobs:
       - name: Deploy the backend
         env:
           IMAGE: ${{ steps.image.outputs.ref }}
-        run: gcloud run deploy cesta-backend --region "$REGION" --image "$IMAGE" --quiet
+        run: |
+          gcloud run deploy cesta-backend --region "$REGION" --image "$IMAGE" --quiet
+          gcloud run jobs update cesta-purge --region "$REGION" --image "$IMAGE" --quiet
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
