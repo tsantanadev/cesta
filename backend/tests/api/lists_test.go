@@ -64,3 +64,40 @@ func TestCreatingAListMakesTheCreatorItsOwner(t *testing.T) {
 		t.Fatalf("Ana's Lists = %+v, want just Groceries, owned by her", lists)
 	}
 }
+
+func createList(t *testing.T, c *testkit.Client, id, name string) listSummary {
+	t.Helper()
+	res := c.Post(t, "/api/lists", `{"id": "`+id+`", "name": "`+name+`"}`)
+	res.RequireStatus(t, http.StatusCreated)
+	return decodeList(t, res)
+}
+
+func TestRetryingACreateReturnsTheSameListWithoutMakingAnother(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+
+	res := ana.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Something else"}`)
+
+	res.RequireStatus(t, http.StatusOK)
+	if got := decodeList(t, res); got.ID != groceriesID || got.Name != "Groceries" {
+		t.Fatalf("retried create = %+v, want the original Groceries", got)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 {
+		t.Fatalf("Ana has %d Lists, want 1", len(lists))
+	}
+}
+
+func TestCreatingAListWithAnotherUsersListIDIsRejected(t *testing.T) {
+	srv := testkit.NewServer(t)
+	createList(t, srv.As(testkit.Ana), groceriesID, "Groceries")
+	bruno := srv.As(testkit.Bruno)
+
+	res := bruno.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Mine now"}`)
+
+	res.RequireStatus(t, http.StatusConflict)
+	res.RequireErrorCode(t, "list_id_taken")
+	if lists := myLists(t, bruno); len(lists) != 0 {
+		t.Fatalf("Bruno's Lists = %+v, want none", lists)
+	}
+}
