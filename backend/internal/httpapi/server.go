@@ -12,8 +12,9 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// healthPingTimeout bounds how long /health waits on the database.
-const healthPingTimeout = 2 * time.Second
+// healthPingTimeout bounds how long /health waits on the database, leaving room
+// for a cold Neon compute wake while still failing fast when Postgres is unreachable.
+const healthPingTimeout = 5 * time.Second
 
 // Server implements StrictServerInterface. Each operation delegates to the module that owns it.
 type Server struct {
