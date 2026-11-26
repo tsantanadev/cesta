@@ -232,6 +232,18 @@ func (s *Service) Restore(ctx context.Context, userID, listID uuid.UUID) (Summar
 	return s.summary(ctx, listID, userID)
 }
 
+// Purge removes for good every List deleted at least RestoreWindow before now,
+// with its memberships, and returns how many it removed. Reads already treat
+// such Lists as gone, so how long after the window the purge runs doesn't show.
+func (s *Service) Purge(ctx context.Context, now time.Time) (int, error) {
+	tag, err := s.db.Exec(ctx,
+		"DELETE FROM lists WHERE deleted_at IS NOT NULL AND deleted_at <= $1", now.Add(-RestoreWindow))
+	if err != nil {
+		return 0, wrap("purge", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 // RecentlyDeleted returns the Lists owner deleted and can still restore, most
 // recently deleted first. Lists other Users own never appear here.
 func (s *Service) RecentlyDeleted(ctx context.Context, owner uuid.UUID) ([]Deleted, error) {

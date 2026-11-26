@@ -47,6 +47,7 @@ type Server struct {
 	tokens *fakes.TokenVerifier
 	router routers.Router
 	dbName string
+	deps   app.Deps
 }
 
 // Option configures a test server.
@@ -81,10 +82,25 @@ func NewServer(t testing.TB, opts ...Option) *Server {
 	for _, opt := range opts {
 		opt(&deps)
 	}
+	s.deps = deps
 	hs := httptest.NewServer(app.New(deps))
 	t.Cleanup(hs.Close)
 	s.URL = hs.URL
 	return s
+}
+
+// RunPurge runs the scheduled purge of deleted Lists now, by the server's
+// Clock, the same way `cesta purge` does in production. It returns how many
+// Lists it removed.
+func (s *Server) RunPurge(t testing.TB) int {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	n, err := app.Purge(ctx, s.deps)
+	if err != nil {
+		t.Fatalf("testkit: purge: %v", err)
+	}
+	return n
 }
 
 // Get sends GET path anonymously.

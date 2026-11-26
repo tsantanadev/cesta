@@ -283,3 +283,34 @@ func TestADeletedListCannotBeRestoredOnceThirtyDaysHavePassed(t *testing.T) {
 		t.Fatalf("Recently deleted = %+v, want empty after 30 days", deleted)
 	}
 }
+
+func TestThePurgeRemovesListsDeletedThirtyDaysAgoForGood(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	const recentID = "0190a3b4-7c5d-7e6f-8a9b-000000000002"
+	createList(t, ana, groceriesID, "Groceries")
+	createList(t, ana, recentID, "Pharmacy")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+	srv.Clock.Advance(24 * time.Hour)
+	ana.Delete(t, "/api/lists/"+recentID).RequireStatus(t, http.StatusOK)
+	srv.Clock.Advance(29 * 24 * time.Hour)
+	beforePurge := ana.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Groceries"}`)
+
+	purged := srv.RunPurge(t)
+
+	if purged != 1 {
+		t.Fatalf("purge removed %d Lists, want 1 (only the one deleted 30 days ago)", purged)
+	}
+	beforePurge.RequireStatus(t, http.StatusConflict)
+	restore := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+	restore.RequireStatus(t, http.StatusNotFound)
+	restore.RequireErrorCode(t, "list_not_found")
+	// Its id is free again: nothing of the purged List is left.
+	createList(t, ana, groceriesID, "Groceries")
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 1 || deleted[0].ID != recentID {
+		t.Fatalf("Recently deleted = %+v, want just Pharmacy (deleted 29 days ago)", deleted)
+	}
+	if again := srv.RunPurge(t); again != 0 {
+		t.Fatalf("second purge removed %d Lists, want 0", again)
+	}
+}

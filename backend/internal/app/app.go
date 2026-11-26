@@ -5,6 +5,7 @@
 package app
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -53,6 +54,17 @@ type RateLimits struct {
 var DefaultRateLimits = RateLimits{
 	PerIP:   ratelimit.Rule{Burst: 120, Every: 250 * time.Millisecond},
 	PerUser: ratelimit.Rule{Burst: 60, Every: 500 * time.Millisecond},
+}
+
+// Purge removes Lists deleted more than lists.RestoreWindow ago and returns how
+// many it removed. `cesta purge` runs it daily in production; Seam 1 runs it
+// through testkit against the fake Clock.
+func Purge(ctx context.Context, d Deps) (int, error) {
+	c := d.Clock
+	if c == nil {
+		c = clock.System{}
+	}
+	return lists.NewService(d.DB, c, membership.NewService(d.DB), d.MaxListsPerUser).Purge(ctx, c.Now())
 }
 
 // New returns the backend's HTTP handler, instrumented with OpenTelemetry.
