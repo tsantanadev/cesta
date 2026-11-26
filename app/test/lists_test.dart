@@ -187,4 +187,47 @@ void main() {
       expect(find.text('This List is no longer available.'), findsOneWidget);
     });
   });
+
+  group('delete', () {
+    testWidgets('the Owner deletes a List and it leaves the Lists screen', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Pharmacy');
+      h.api.addList(ana, name: 'Feira');
+      await h.pumpApp();
+
+      await h.deleteList('Feira');
+
+      expect(find.text('Feira'), findsNothing);
+      expect(find.text('“Feira” deleted'), findsOneWidget);
+      expect(h.api.listNamesOf(ana), ['Pharmacy']);
+    });
+
+    testWidgets('Undo brings the deleted List back', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Feira');
+      await h.pumpApp();
+      await h.deleteList('Feira');
+
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Feira'), findsOneWidget);
+      expect(h.api.listNamesOf(ana), ['Feira']);
+    });
+
+    testWidgets('deleting offline says there is no connection and keeps the List', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Feira');
+      await h.pumpApp();
+      h.goOffline();
+
+      await h.deleteList('Feira');
+
+      expect(find.text("You're offline. Connect to the internet and try again."), findsOneWidget);
+      expect(find.text('Feira'), findsOneWidget);
+    });
+  });
 }
