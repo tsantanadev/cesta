@@ -16,6 +16,10 @@ export 'fake_auth_gateway.dart';
 const english = Locale('en');
 const brazilianPortuguese = Locale('pt', 'BR');
 
+/// A phone-sized screen in logical pixels (the design's frame), taller than
+/// the test default.
+const iPhone = Size(390, 844);
+
 /// Seam 2 harness: the real app with an in-memory local database, a fake API
 /// client and a fake identity provider. Each test gets its own [Harness]; [db]
 /// and [auth] can be reused across [pumpApp] calls to simulate the app
@@ -36,9 +40,16 @@ class Harness {
     ThemeMode themeMode = ThemeMode.light,
     double textScale = 1.0,
     String? initialLocation,
+    Size? screen,
   }) async {
     // Unmount any previous instance so restarts start from a clean widget tree.
     await tester.pumpWidget(const SizedBox.shrink());
+    if (screen != null) {
+      tester.view
+        ..devicePixelRatio = 1
+        ..physicalSize = screen;
+      addTearDown(tester.view.reset);
+    }
     tester.platformDispatcher.textScaleFactorTestValue = textScale;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(
@@ -57,7 +68,7 @@ class Harness {
   /// A User who has used Cesta before, with a confirmed display name.
   /// [withGoogle] makes the Google picker return them; [signedIn] starts the
   /// app with their session stored.
-  void existingUser({
+  FakeIdentity existingUser({
     required String email,
     required String password,
     required String displayName,
@@ -67,11 +78,54 @@ class Harness {
     final identity = auth.addIdentity(email: email, password: password, name: displayName, signedIn: signedIn);
     api.addUser(identity, displayName: displayName);
     if (withGoogle) auth.googleAccount = FakeGoogleAccount(email: email, name: displayName);
+    return identity;
   }
 
   /// Starts signed in as a User with a confirmed display name.
-  void signedIn({String email = 'ana@example.com', String displayName = 'Ana Souza'}) =>
+  FakeIdentity signedIn({String email = 'ana@example.com', String displayName = 'Ana Souza'}) =>
       existingUser(email: email, password: 'irrelevant', displayName: displayName, signedIn: true);
+
+  /// Creates a List named [name] from the Lists screen.
+  Future<void> createList(String name) async {
+    await tester.tap(find.text('New list').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), name);
+    await tester.tap(find.widgetWithText(CesButton, 'Create list'));
+    await tester.pumpAndSettle();
+  }
+
+  /// Opens the options of the List named [name] on the Lists screen.
+  Future<void> openListOptions(String name) async {
+    await tester.tap(find.byTooltip('Options for $name'));
+    await tester.pumpAndSettle();
+  }
+
+  /// Renames the List named [from] to [to] from its options.
+  Future<void> renameList(String from, String to) async {
+    await openListOptions(from);
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), to);
+    await tester.tap(find.widgetWithText(CesButton, 'Save'));
+    await tester.pumpAndSettle();
+  }
+
+  /// Starts the app and opens Recently deleted from the account menu.
+  Future<void> openRecentlyDeleted({Locale locale = english}) async {
+    await pumpApp(locale: locale);
+    final inEnglish = locale == english;
+    await tester.tap(find.byTooltip(inEnglish ? 'Account' : 'Conta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(inEnglish ? 'Recently deleted' : 'Excluídas recentemente'));
+    await tester.pumpAndSettle();
+  }
+
+  /// Deletes the List named [name] from its options.
+  Future<void> deleteList(String name) async {
+    await openListOptions(name);
+    await tester.tap(find.text('Delete list'));
+    await tester.pumpAndSettle();
+  }
 
   /// Both the backend and the identity provider become unreachable.
   void goOffline() {

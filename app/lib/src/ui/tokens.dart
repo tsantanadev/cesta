@@ -4,8 +4,50 @@ import 'package:material_ui/material_ui.dart';
 /// font styles; it reads them through the theme (see `CestaTheme`) and the
 /// in-house components in `components.dart`.
 abstract final class CestaColors {
-  /// Brand seed: a fresh-produce green.
-  static const seed = Color(0xFF2F7D4F);
+  /// Brand seed: Folha, the actions green.
+  static const seed = folha;
+
+  // The design palette (Figma "Cesta — App design", Foundations / Palette).
+  // Names are the design's produce words.
+
+  /// Actions: buttons, the wordmark.
+  static const folha = Color(0xFF1E6B43);
+
+  /// Text.
+  static const tinta = Color(0xFF17382A);
+
+  /// Secondary text.
+  static const tintaMuted = Color(0xFF5E7466);
+
+  /// Screen background.
+  static const alface = Color(0xFFEDF3EA);
+
+  /// Cards.
+  static const branco = Color(0xFFFFFFFF);
+
+  /// Items to buy: the count sign.
+  static const banana = Color(0xFFFFD43B);
+
+  /// Text on [banana].
+  static const onBanana = Color(0xFF17382A);
+
+  /// Bought: the "everything's bought" sign.
+  static const checked = Color(0xFFDCE5D8);
+
+  /// Destructive actions.
+  static const beterraba = Color(0xFFC8324F);
+
+  // Dark variants. The design's dark frame couldn't be read when these were
+  // chosen, so they are derived from the light palette: a deep leaf-green
+  // ground, lighter text and a lighter Folha for contrast. Banana stays.
+  static const folhaDark = Color(0xFF5FBF88);
+  static const onFolhaDark = Color(0xFF0B2918);
+  static const tintaDark = Color(0xFFE4EFE4);
+  static const tintaMutedDark = Color(0xFF9DB3A4);
+  static const alfaceDark = Color(0xFF0F1C15);
+  static const brancoDark = Color(0xFF1A2B21);
+  static const checkedDark = Color(0xFF2B3D32);
+  static const beterrabaDark = Color(0xFFF0718A);
 
   /// Status colours, used for health and sync indicators.
   static const success = Color(0xFF2E7D32);
@@ -41,9 +83,105 @@ abstract final class CestaRadii {
   static const sheet = 24.0;
 }
 
-/// The bundled typeface (assets/fonts, declared in pubspec.yaml).
+/// The bundled typefaces (assets/fonts, declared in pubspec.yaml).
 abstract final class CestaFonts {
+  /// Plus Jakarta Sans: everything but display text.
   static const family = 'PlusJakartaSans';
+
+  /// Bricolage Grotesque ExtraBold: List names, screen titles, the wordmark.
+  static const display = 'BricolageGrotesque';
+}
+
+/// Colours of the design palette that Material's [ColorScheme] has no role
+/// for, in light and dark variants.
+@immutable
+class CestaPalette extends ThemeExtension<CestaPalette> {
+  const CestaPalette({required this.toBuy, required this.onToBuy, required this.bought, required this.onBought});
+
+  static const light = CestaPalette(
+    toBuy: CestaColors.banana,
+    onToBuy: CestaColors.onBanana,
+    bought: CestaColors.checked,
+    onBought: CestaColors.folha,
+  );
+  static const dark = CestaPalette(
+    toBuy: CestaColors.banana,
+    onToBuy: CestaColors.onBanana,
+    bought: CestaColors.checkedDark,
+    onBought: CestaColors.folhaDark,
+  );
+
+  /// The sign that counts Items still to buy (Banana).
+  final Color toBuy;
+  final Color onToBuy;
+
+  /// The sign of a List with nothing left to buy (Checked).
+  final Color bought;
+  final Color onBought;
+
+  @override
+  CestaPalette copyWith({Color? toBuy, Color? onToBuy, Color? bought, Color? onBought}) => CestaPalette(
+    toBuy: toBuy ?? this.toBuy,
+    onToBuy: onToBuy ?? this.onToBuy,
+    bought: bought ?? this.bought,
+    onBought: onBought ?? this.onBought,
+  );
+
+  @override
+  CestaPalette lerp(CestaPalette? other, double t) => other == null
+      ? this
+      : CestaPalette(
+          toBuy: Color.lerp(toBuy, other.toBuy, t)!,
+          onToBuy: Color.lerp(onToBuy, other.onToBuy, t)!,
+          bought: Color.lerp(bought, other.bought, t)!,
+          onBought: Color.lerp(onBought, other.onBought, t)!,
+        );
+}
+
+/// Display text styles in Bricolage Grotesque. Sizes are in logical pixels
+/// and scale with the user's text size; colours come from the theme.
+abstract final class CestaDisplayType {
+  /// A screen's big title, e.g. "Your Lists".
+  static const screenTitle = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 40,
+    height: 1,
+    letterSpacing: -1.2,
+  );
+
+  /// A List's name on its card.
+  static const listName = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 24,
+    height: 1.05,
+    letterSpacing: -0.48,
+  );
+
+  /// The number on a count sign.
+  static const count = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 28,
+    height: 1,
+    letterSpacing: -0.56,
+  );
+
+  /// The "cesta" wordmark.
+  static const wordmark = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 22,
+    letterSpacing: -0.44,
+  );
+}
+
+/// Radii from the design beyond [CestaRadii].
+abstract final class CestaShapes {
+  static const listCard = 20.0;
+  static const sign = 4.0;
+  static const pill = 28.0;
 }
 
 /// Semantic status colours that follow light/dark mode.
@@ -83,5 +221,6 @@ TextTheme cestaTextTheme(TextTheme base) => base.copyWith(
 
 extension CestaTokensContext on BuildContext {
   CestaSpacing get spacing => Theme.of(this).extension<CestaSpacing>() ?? const CestaSpacing();
+  CestaPalette get palette => Theme.of(this).extension<CestaPalette>() ?? CestaPalette.light;
   CestaStatusColors get statusColors => Theme.of(this).extension<CestaStatusColors>() ?? CestaStatusColors.light;
 }

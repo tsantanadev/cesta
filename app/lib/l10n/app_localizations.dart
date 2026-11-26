@@ -463,6 +463,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading…'**
   String get loading;
+
+  /// Tooltip of the button that closes a bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get sheetClose;
+
+  /// Button on the Lists screen that starts creating a List.
+  ///
+  /// In en, this message translates to:
+  /// **'New list'**
+  String get listsNew;
+
+  /// Caption under the number of unchecked Items on a List's card, e.g. '9 to buy'.
+  ///
+  /// In en, this message translates to:
+  /// **'to buy'**
+  String get listsToBuy;
+
+  /// Accessible label of the sign on a List's card when it has no unchecked Items.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to buy'**
+  String get listsNothingToBuy;
+
+  /// Subtitle of a List the User owns and hasn't shared.
+  ///
+  /// In en, this message translates to:
+  /// **'Only you'**
+  String get listsOnlyYou;
+
+  /// Subtitle of a List the User owns and shared; count is the other Members.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared with {count, plural, =1{1 person} other{{count} people}}'**
+  String listsSharedWithPeople(int count);
+
+  /// Subtitle of a List another User owns and shared with the User (the User is an Editor).
+  ///
+  /// In en, this message translates to:
+  /// **'Shared with you'**
+  String get listsSharedWithYou;
+
+  /// Title of the sheet that creates a List.
+  ///
+  /// In en, this message translates to:
+  /// **'New list'**
+  String get listsNewSheetTitle;
+
+  /// Label of the List name field.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get fieldListName;
+
+  /// Button that creates the List.
+  ///
+  /// In en, this message translates to:
+  /// **'Create list'**
+  String get listsCreate;
+
+  /// Tooltip of the button on a List's card that opens its options (rename, delete).
+  ///
+  /// In en, this message translates to:
+  /// **'Options for {name}'**
+  String listsOptions(String name);
+
+  /// List option that renames the List.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get listsRename;
+
+  /// Title of the sheet that renames a List.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename list'**
+  String get listsRenameSheetTitle;
+
+  /// Button that saves a List's new name.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get listsSave;
+
+  /// List option that deletes the List (the Owner can restore it for 30 days).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete list'**
+  String get listsDelete;
+
+  /// Toast after deleting a List; it has an Undo action.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” deleted'**
+  String listsDeleted(String name);
+
+  /// Toast action that restores the List just deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get listsUndo;
+
+  /// Button that restores a deleted List.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get listsRestore;
+
+  /// Toast after restoring a deleted List.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” restored'**
+  String listsRestored(String name);
+
+  /// Title of the screen of Lists the User deleted and can still restore, and the menu item that opens it.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently deleted'**
+  String get listsRecentlyDeleted;
+
+  /// Explanation at the top of the Recently deleted screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted Lists can be restored for 30 days. After that they\'re gone for good.'**
+  String get listsRecentlyDeletedExplanation;
+
+  /// Recently deleted screen when there is nothing to restore.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing deleted in the last 30 days.'**
+  String get listsRecentlyDeletedEmpty;
+
+  /// How long a deleted List can still be restored.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =0{Gone today} =1{1 day left} other{{days} days left}}'**
+  String listsDaysLeft(int days);
+
+  /// Validation: List name blank.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get errorListNameRequired;
+
+  /// Validation: List name over 60 characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Use 60 characters or fewer.'**
+  String get errorListNameTooLong;
+
+  /// List name has characters that can't be used (e.g. control characters), or the server rejected it.
+  ///
+  /// In en, this message translates to:
+  /// **'That name can\'t be used. Try another.'**
+  String get errorListNameInvalid;
+
+  /// Creating or restoring a List failed because the User already owns 100 Lists.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve reached the limit of 100 Lists. Delete one to create another.'**
+  String get errorListLimit;
+
+  /// The List was deleted or the User is no longer a Member.
+  ///
+  /// In en, this message translates to:
+  /// **'This List is no longer available.'**
+  String get errorListNotFound;
+
+  /// Restoring failed because the 30-day window has passed.
+  ///
+  /// In en, this message translates to:
+  /// **'This List was deleted more than 30 days ago and can\'t be restored.'**
+  String get errorListRestoreExpired;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

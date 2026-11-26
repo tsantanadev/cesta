@@ -8,7 +8,18 @@ abstract final class CestaTheme {
   static ThemeData dark() => _build(Brightness.dark);
 
   static ThemeData _build(Brightness brightness) {
-    final scheme = ColorScheme.fromSeed(seedColor: CestaColors.seed, brightness: brightness);
+    final light = brightness == Brightness.light;
+    // Material roles mapped from the design palette; the seed fills the rest.
+    final scheme = ColorScheme.fromSeed(seedColor: CestaColors.seed, brightness: brightness).copyWith(
+      primary: light ? CestaColors.folha : CestaColors.folhaDark,
+      onPrimary: light ? CestaColors.branco : CestaColors.onFolhaDark,
+      surface: light ? CestaColors.alface : CestaColors.alfaceDark,
+      onSurface: light ? CestaColors.tinta : CestaColors.tintaDark,
+      onSurfaceVariant: light ? CestaColors.tintaMuted : CestaColors.tintaMutedDark,
+      surfaceContainerLowest: light ? CestaColors.branco : CestaColors.brancoDark,
+      surfaceContainerLow: light ? CestaColors.branco : CestaColors.brancoDark,
+      error: light ? CestaColors.beterraba : CestaColors.beterrabaDark,
+    );
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
@@ -24,8 +35,16 @@ abstract final class CestaTheme {
       textTheme: cestaTextTheme(base.textTheme),
       extensions: [
         const CestaSpacing(),
-        brightness == Brightness.light ? CestaStatusColors.light : CestaStatusColors.dark,
+        if (light) CestaStatusColors.light else CestaStatusColors.dark,
+        if (light) CestaPalette.light else CestaPalette.dark,
       ],
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: scheme.onSurface,
+        contentTextStyle: base.textTheme.bodyLarge?.copyWith(color: scheme.surface, fontWeight: FontWeight.w600),
+        actionTextColor: light ? CestaColors.banana : CestaColors.folha,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CestaRadii.card)),
+      ),
       cardTheme: CardThemeData(
         elevation: 0,
         color: scheme.surfaceContainerLow,

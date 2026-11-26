@@ -552,15 +552,374 @@ class SignedInUserCompanion extends UpdateCompanion<SignedInUserData> {
   }
 }
 
+class $KnownListsTable extends KnownLists with TableInfo<$KnownListsTable, KnownList> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $KnownListsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<Role, String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  ).withConverter<Role>($KnownListsTable.$converterrole);
+  static const VerificationMeta _uncheckedItemCountMeta = const VerificationMeta('uncheckedItemCount');
+  @override
+  late final GeneratedColumn<int> uncheckedItemCount = GeneratedColumn<int>(
+    'unchecked_item_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _memberCountMeta = const VerificationMeta('memberCount');
+  @override
+  late final GeneratedColumn<int> memberCount = GeneratedColumn<int>(
+    'member_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, role, uncheckedItemCount, memberCount, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'known_lists';
+  @override
+  VerificationContext validateIntegrity(Insertable<KnownList> instance, {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(_nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('unchecked_item_count')) {
+      context.handle(
+        _uncheckedItemCountMeta,
+        uncheckedItemCount.isAcceptableOrUnknown(data['unchecked_item_count']!, _uncheckedItemCountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_uncheckedItemCountMeta);
+    }
+    if (data.containsKey('member_count')) {
+      context.handle(_memberCountMeta, memberCount.isAcceptableOrUnknown(data['member_count']!, _memberCountMeta));
+    } else if (isInserting) {
+      context.missing(_memberCountMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta, createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  KnownList map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return KnownList(
+      id: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      role: $KnownListsTable.$converterrole.fromSql(
+        attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}role'])!,
+      ),
+      uncheckedItemCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unchecked_item_count'],
+      )!,
+      memberCount: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}member_count'])!,
+      createdAt: attachedDatabase.typeMapping.read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $KnownListsTable createAlias(String alias) {
+    return $KnownListsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<Role, String> $converterrole = const _RoleConverter();
+}
+
+class KnownList extends DataClass implements Insertable<KnownList> {
+  final String id;
+  final String name;
+  final Role role;
+  final int uncheckedItemCount;
+  final int memberCount;
+  final DateTime createdAt;
+  const KnownList({
+    required this.id,
+    required this.name,
+    required this.role,
+    required this.uncheckedItemCount,
+    required this.memberCount,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    {
+      map['role'] = Variable<String>($KnownListsTable.$converterrole.toSql(role));
+    }
+    map['unchecked_item_count'] = Variable<int>(uncheckedItemCount);
+    map['member_count'] = Variable<int>(memberCount);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  KnownListsCompanion toCompanion(bool nullToAbsent) {
+    return KnownListsCompanion(
+      id: Value(id),
+      name: Value(name),
+      role: Value(role),
+      uncheckedItemCount: Value(uncheckedItemCount),
+      memberCount: Value(memberCount),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory KnownList.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return KnownList(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      role: serializer.fromJson<Role>(json['role']),
+      uncheckedItemCount: serializer.fromJson<int>(json['uncheckedItemCount']),
+      memberCount: serializer.fromJson<int>(json['memberCount']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'role': serializer.toJson<Role>(role),
+      'uncheckedItemCount': serializer.toJson<int>(uncheckedItemCount),
+      'memberCount': serializer.toJson<int>(memberCount),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  KnownList copyWith({
+    String? id,
+    String? name,
+    Role? role,
+    int? uncheckedItemCount,
+    int? memberCount,
+    DateTime? createdAt,
+  }) => KnownList(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    role: role ?? this.role,
+    uncheckedItemCount: uncheckedItemCount ?? this.uncheckedItemCount,
+    memberCount: memberCount ?? this.memberCount,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  KnownList copyWithCompanion(KnownListsCompanion data) {
+    return KnownList(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      role: data.role.present ? data.role.value : this.role,
+      uncheckedItemCount: data.uncheckedItemCount.present ? data.uncheckedItemCount.value : this.uncheckedItemCount,
+      memberCount: data.memberCount.present ? data.memberCount.value : this.memberCount,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnownList(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('role: $role, ')
+          ..write('uncheckedItemCount: $uncheckedItemCount, ')
+          ..write('memberCount: $memberCount, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, role, uncheckedItemCount, memberCount, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is KnownList &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.role == this.role &&
+          other.uncheckedItemCount == this.uncheckedItemCount &&
+          other.memberCount == this.memberCount &&
+          other.createdAt == this.createdAt);
+}
+
+class KnownListsCompanion extends UpdateCompanion<KnownList> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<Role> role;
+  final Value<int> uncheckedItemCount;
+  final Value<int> memberCount;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const KnownListsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.role = const Value.absent(),
+    this.uncheckedItemCount = const Value.absent(),
+    this.memberCount = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  KnownListsCompanion.insert({
+    required String id,
+    required String name,
+    required Role role,
+    required int uncheckedItemCount,
+    required int memberCount,
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       role = Value(role),
+       uncheckedItemCount = Value(uncheckedItemCount),
+       memberCount = Value(memberCount),
+       createdAt = Value(createdAt);
+  static Insertable<KnownList> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? role,
+    Expression<int>? uncheckedItemCount,
+    Expression<int>? memberCount,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (role != null) 'role': role,
+      if (uncheckedItemCount != null) 'unchecked_item_count': uncheckedItemCount,
+      if (memberCount != null) 'member_count': memberCount,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  KnownListsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<Role>? role,
+    Value<int>? uncheckedItemCount,
+    Value<int>? memberCount,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return KnownListsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      role: role ?? this.role,
+      uncheckedItemCount: uncheckedItemCount ?? this.uncheckedItemCount,
+      memberCount: memberCount ?? this.memberCount,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (role.present) {
+      map['role'] = Variable<String>($KnownListsTable.$converterrole.toSql(role.value));
+    }
+    if (uncheckedItemCount.present) {
+      map['unchecked_item_count'] = Variable<int>(uncheckedItemCount.value);
+    }
+    if (memberCount.present) {
+      map['member_count'] = Variable<int>(memberCount.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('KnownListsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('role: $role, ')
+          ..write('uncheckedItemCount: $uncheckedItemCount, ')
+          ..write('memberCount: $memberCount, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $KnownHealthTable knownHealth = $KnownHealthTable(this);
   late final $SignedInUserTable signedInUser = $SignedInUserTable(this);
+  late final $KnownListsTable knownLists = $KnownListsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables => allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [knownHealth, signedInUser];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [knownHealth, signedInUser, knownLists];
 }
 
 typedef $$KnownHealthTableCreateCompanionBuilder = KnownHealthCompanion Function({
@@ -859,10 +1218,190 @@ typedef $$SignedInUserTableProcessedTableManager =
       SignedInUserData,
       PrefetchHooks Function()
     >;
+typedef $$KnownListsTableCreateCompanionBuilder = KnownListsCompanion Function({
+  required String id,
+  required String name,
+  required Role role,
+  required int uncheckedItemCount,
+  required int memberCount,
+  required DateTime createdAt,
+  Value<int> rowid,
+});
+typedef $$KnownListsTableUpdateCompanionBuilder = KnownListsCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<Role> role,
+  Value<int> uncheckedItemCount,
+  Value<int> memberCount,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$KnownListsTableFilterComposer extends Composer<_$AppDatabase, $KnownListsTable> {
+  $$KnownListsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnWithTypeConverterFilters<Role, Role, String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => ColumnWithTypeConverterFilters(column));
+
+  ColumnFilters<int> get uncheckedItemCount =>
+      $composableBuilder(column: $table.uncheckedItemCount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get memberCount =>
+      $composableBuilder(column: $table.memberCount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$KnownListsTableOrderingComposer extends Composer<_$AppDatabase, $KnownListsTable> {
+  $$KnownListsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get uncheckedItemCount =>
+      $composableBuilder(column: $table.uncheckedItemCount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get memberCount =>
+      $composableBuilder(column: $table.memberCount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$KnownListsTableAnnotationComposer extends Composer<_$AppDatabase, $KnownListsTable> {
+  $$KnownListsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id => $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name => $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<Role, String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<int> get uncheckedItemCount =>
+      $composableBuilder(column: $table.uncheckedItemCount, builder: (column) => column);
+
+  GeneratedColumn<int> get memberCount => $composableBuilder(column: $table.memberCount, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt => $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$KnownListsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $KnownListsTable,
+          KnownList,
+          $$KnownListsTableFilterComposer,
+          $$KnownListsTableOrderingComposer,
+          $$KnownListsTableAnnotationComposer,
+          $$KnownListsTableCreateCompanionBuilder,
+          $$KnownListsTableUpdateCompanionBuilder,
+          (KnownList, BaseReferences<_$AppDatabase, $KnownListsTable, KnownList>),
+          KnownList,
+          PrefetchHooks Function()
+        > {
+  $$KnownListsTableTableManager(_$AppDatabase db, $KnownListsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () => $$KnownListsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () => $$KnownListsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () => $$KnownListsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<Role> role = const Value.absent(),
+                Value<int> uncheckedItemCount = const Value.absent(),
+                Value<int> memberCount = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => KnownListsCompanion(
+                id: id,
+                name: name,
+                role: role,
+                uncheckedItemCount: uncheckedItemCount,
+                memberCount: memberCount,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required Role role,
+                required int uncheckedItemCount,
+                required int memberCount,
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => KnownListsCompanion.insert(
+                id: id,
+                name: name,
+                role: role,
+                uncheckedItemCount: uncheckedItemCount,
+                memberCount: memberCount,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$KnownListsTable, KnownList>(table),
+                  BaseReferences<_$AppDatabase, $KnownListsTable, KnownList>(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$KnownListsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $KnownListsTable,
+      KnownList,
+      $$KnownListsTableFilterComposer,
+      $$KnownListsTableOrderingComposer,
+      $$KnownListsTableAnnotationComposer,
+      $$KnownListsTableCreateCompanionBuilder,
+      $$KnownListsTableUpdateCompanionBuilder,
+      (KnownList, BaseReferences<_$AppDatabase, $KnownListsTable, KnownList>),
+      KnownList,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$KnownHealthTableTableManager get knownHealth => $$KnownHealthTableTableManager(_db, _db.knownHealth);
   $$SignedInUserTableTableManager get signedInUser => $$SignedInUserTableTableManager(_db, _db.signedInUser);
+  $$KnownListsTableTableManager get knownLists => $$KnownListsTableTableManager(_db, _db.knownLists);
 }

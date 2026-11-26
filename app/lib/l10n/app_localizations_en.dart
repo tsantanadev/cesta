@@ -198,4 +198,110 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get loading => 'Loading…';
+
+  @override
+  String get sheetClose => 'Close';
+
+  @override
+  String get listsNew => 'New list';
+
+  @override
+  String get listsToBuy => 'to buy';
+
+  @override
+  String get listsNothingToBuy => 'Nothing to buy';
+
+  @override
+  String get listsOnlyYou => 'Only you';
+
+  @override
+  String listsSharedWithPeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count people', one: '1 person');
+    return 'Shared with $_temp0';
+  }
+
+  @override
+  String get listsSharedWithYou => 'Shared with you';
+
+  @override
+  String get listsNewSheetTitle => 'New list';
+
+  @override
+  String get fieldListName => 'Name';
+
+  @override
+  String get listsCreate => 'Create list';
+
+  @override
+  String listsOptions(String name) {
+    return 'Options for $name';
+  }
+
+  @override
+  String get listsRename => 'Rename';
+
+  @override
+  String get listsRenameSheetTitle => 'Rename list';
+
+  @override
+  String get listsSave => 'Save';
+
+  @override
+  String get listsDelete => 'Delete list';
+
+  @override
+  String listsDeleted(String name) {
+    return '“$name” deleted';
+  }
+
+  @override
+  String get listsUndo => 'Undo';
+
+  @override
+  String get listsRestore => 'Restore';
+
+  @override
+  String listsRestored(String name) {
+    return '“$name” restored';
+  }
+
+  @override
+  String get listsRecentlyDeleted => 'Recently deleted';
+
+  @override
+  String get listsRecentlyDeletedExplanation =>
+      'Deleted Lists can be restored for 30 days. After that they\'re gone for good.';
+
+  @override
+  String get listsRecentlyDeletedEmpty => 'Nothing deleted in the last 30 days.';
+
+  @override
+  String listsDaysLeft(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days days left',
+      one: '1 day left',
+      zero: 'Gone today',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get errorListNameRequired => 'Enter a name.';
+
+  @override
+  String get errorListNameTooLong => 'Use 60 characters or fewer.';
+
+  @override
+  String get errorListNameInvalid => 'That name can\'t be used. Try another.';
+
+  @override
+  String get errorListLimit => 'You\'ve reached the limit of 100 Lists. Delete one to create another.';
+
+  @override
+  String get errorListNotFound => 'This List is no longer available.';
+
+  @override
+  String get errorListRestoreExpired => 'This List was deleted more than 30 days ago and can\'t be restored.';
 }

@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import 'api/generated/cesta_api.dart';
 import 'auth/auth_gateway.dart';
 import 'db/app_database.dart';
+import 'lists/lists_controller.dart';
 import 'router.dart';
 import 'session/session_controller.dart';
 import 'ui/theme.dart';
@@ -39,14 +40,17 @@ class CestaApp extends StatefulWidget {
 
 class _CestaAppState extends State<CestaApp> {
   late final SessionController _session;
+  late final ListsController _lists;
   late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
     _session = SessionController(auth: widget.auth, api: widget.api, db: widget.database)..start();
+    _lists = ListsController(api: widget.api, db: widget.database, session: _session);
     _router = buildRouter(
       session: _session,
+      lists: _lists,
       auth: widget.auth,
       api: widget.api,
       database: widget.database,
@@ -57,6 +61,7 @@ class _CestaAppState extends State<CestaApp> {
   @override
   void dispose() {
     _router.dispose();
+    _lists.dispose();
     _session.dispose();
     super.dispose();
   }
