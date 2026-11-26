@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:uuid/uuid.dart';
 
 import '../api/generated/cesta_api.dart';
 import '../db/app_database.dart';
@@ -44,7 +44,6 @@ class ListsController extends ChangeNotifier {
   final ApiClient _api;
   final AppDatabase _db;
   final SessionController _session;
-  final _random = Random.secure();
 
   /// The Lists the User is a Member of, newest first.
   List<ListSummary> get lists => _lists;
@@ -77,9 +76,13 @@ class ListsController extends ChangeNotifier {
     }
   }
 
-  /// Creates a List named [name], owned by the User.
-  Future<ListOutcome> create(String name) => _attempt(() async {
-    final body = ListCreate(id: _newListId(), name: ListName(name.trim()));
+  /// A new List's ID, which the client picks. Reuse it when retrying the same
+  /// create, so the server makes the List once however often it's sent.
+  static String newListId() => const Uuid().v4();
+
+  /// Creates a List named [name] with ID [id] (from [newListId]), owned by the User.
+  Future<ListOutcome> create(String id, String name) => _attempt(() async {
+    final body = ListCreate(id: id, name: ListName(name.trim()));
     return switch (await _api.createList(body: body)) {
       CreateList201(:final value) || CreateList200(:final value) => _keep(value),
       CreateList400() => ListOutcome.invalidName,
@@ -166,16 +169,6 @@ class ListsController extends ChangeNotifier {
     _lists = [...lists]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _loaded = true;
     notifyListeners();
-  }
-
-  /// A random (version 4) UUID: the client picks a new List's ID.
-  String _newListId() {
-    final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
-        '${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
   static bool _isOffline(DioException e) => switch (e.type) {

@@ -70,12 +70,13 @@ class _ListsScreenState extends State<ListsScreen> {
 
   void _create() {
     final l10n = AppLocalizations.of(context);
+    final id = ListsController.newListId(); // one per sheet, so retries don't duplicate
     unawaited(
       showCesFormSheet(
         context,
         title: l10n.listsNewSheetTitle,
         closeTooltip: l10n.sheetClose,
-        child: ListNameForm(submitLabel: l10n.listsCreate, onSubmit: _lists.create),
+        child: ListNameForm(submitLabel: l10n.listsCreate, onSubmit: (name) => _lists.create(id, name)),
       ),
     );
   }

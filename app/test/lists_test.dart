@@ -122,6 +122,21 @@ void main() {
     expect(find.text("You're offline. Connect to the internet and try again."), findsOneWidget);
   });
 
+  testWidgets('retrying a create whose answer was lost makes just one List', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    await h.pumpApp();
+    h.api.loseNextCreateResponse = true;
+    await h.createList('Pharmacy');
+    expect(find.text("You're offline. Connect to the internet and try again."), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(CesButton, 'Create list'));
+    await tester.pumpAndSettle();
+
+    expect(h.api.listNamesOf(ana), ['Pharmacy']);
+    expect(find.text('Pharmacy'), findsOneWidget);
+  });
+
   testWidgets('the Lists screen is in Brazilian Portuguese on a Portuguese phone', (tester) async {
     final h = Harness(tester);
     final ana = h.signedIn();
