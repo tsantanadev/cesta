@@ -367,3 +367,54 @@ func TestOtherUsersListsDoNotCountTowardsTheLimit(t *testing.T) {
 
 	res.RequireStatus(t, http.StatusCreated)
 }
+
+func TestAUserWhoIsNotAMemberCannotSeeOrChangeTheList(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	path := "/api/lists/" + groceriesID
+
+	attempts := map[string]*testkit.Response{
+		"rename":  bruno.Patch(t, path, `{"name": "Mine"}`),
+		"delete":  bruno.Delete(t, path),
+		"restore": bruno.Post(t, path+"/restore", ""),
+	}
+
+	for op, res := range attempts {
+		t.Run(op, func(t *testing.T) {
+			res.RequireStatus(t, http.StatusNotFound)
+			res.RequireErrorCode(t, "list_not_found")
+		})
+	}
+	if lists := myLists(t, bruno); len(lists) != 0 {
+		t.Fatalf("Bruno's Lists = %+v, want none", lists)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 || lists[0].Name != "Groceries" {
+		t.Fatalf("Ana's Lists = %+v, want Groceries unchanged", lists)
+	}
+}
+
+func TestOnlyTheOwnerSeesTheirDeletedListInRecentlyDeleted(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+
+	deleted := recentlyDeleted(t, bruno)
+
+	if len(deleted) != 0 {
+		t.Fatalf("Bruno's Recently deleted = %+v, want none", deleted)
+	}
+	restore := bruno.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+	restore.RequireStatus(t, http.StatusNotFound)
+	restore.RequireErrorCode(t, "list_not_found")
+}
+
+func TestAListThatNeverExistedIsNotFound(t *testing.T) {
+	srv := testkit.NewServer(t)
+
+	res := srv.As(testkit.Ana).Delete(t, "/api/lists/"+uuid.NewString())
+
+	res.RequireStatus(t, http.StatusNotFound)
+	res.RequireErrorCode(t, "list_not_found")
+}
