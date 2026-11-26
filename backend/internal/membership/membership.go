@@ -30,9 +30,6 @@ const (
 // ErrNotAMember is returned when the User has no Role on the List.
 var ErrNotAMember = errors.New("not a member of the list")
 
-// ErrNotOwner is returned by RequireOwner for a Member who is not the Owner.
-var ErrNotOwner = errors.New("not the owner of the list")
-
 // Membership is one List a User is a Member of.
 type Membership struct {
 	ListID uuid.UUID
@@ -81,19 +78,6 @@ func (s *Service) RoleOf(ctx context.Context, listID, userID uuid.UUID) (Role, e
 		return "", fmt.Errorf("membership: role: %w", err)
 	}
 	return Role(role), nil
-}
-
-// RequireOwner returns nil if userID is the Owner of listID, ErrNotOwner if they
-// are another kind of Member, and ErrNotAMember if they are not a Member.
-func (s *Service) RequireOwner(ctx context.Context, listID, userID uuid.UUID) error {
-	role, err := s.RoleOf(ctx, listID, userID)
-	if err != nil {
-		return err
-	}
-	if role != Owner {
-		return ErrNotOwner
-	}
-	return nil
 }
 
 // Of returns every List userID is a Member of.

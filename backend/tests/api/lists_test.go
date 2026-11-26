@@ -410,6 +410,54 @@ func TestOnlyTheOwnerSeesTheirDeletedListInRecentlyDeleted(t *testing.T) {
 	restore.RequireErrorCode(t, "list_not_found")
 }
 
+func TestAnEditorSeesTheListButCannotRenameDeleteOrRestoreIt(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.AddEditor(t, groceriesID, testkit.Bruno) // until #9 lets Owners invite Editors
+	path := "/api/lists/" + groceriesID
+
+	attempts := map[string]*testkit.Response{
+		"rename":  bruno.Patch(t, path, `{"name": "Mine"}`),
+		"delete":  bruno.Delete(t, path),
+		"restore": bruno.Post(t, path+"/restore", ""),
+	}
+
+	for op, res := range attempts {
+		t.Run(op, func(t *testing.T) {
+			res.RequireStatus(t, http.StatusForbidden)
+			res.RequireErrorCode(t, "not_list_owner")
+		})
+	}
+	if lists := myLists(t, bruno); len(lists) != 1 || lists[0].Role != "editor" || lists[0].MemberCount != 2 ||
+		lists[0].Name != "Groceries" {
+		t.Fatalf("Bruno's Lists = %+v, want Groceries as editor with 2 Members", lists)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 || lists[0].Role != "owner" || lists[0].MemberCount != 2 {
+		t.Fatalf("Ana's Lists = %+v, want Groceries as owner with 2 Members", lists)
+	}
+}
+
+func TestDeletingAListRemovesItForEditorsWithoutShowingThemRecentlyDeleted(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.AddEditor(t, groceriesID, testkit.Bruno)
+
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+
+	if lists := myLists(t, bruno); len(lists) != 0 {
+		t.Fatalf("Bruno's Lists = %+v, want none once the Owner deleted it", lists)
+	}
+	if deleted := recentlyDeleted(t, bruno); len(deleted) != 0 {
+		t.Fatalf("Bruno's Recently deleted = %+v, want none (he isn't the Owner)", deleted)
+	}
+	ana.Post(t, "/api/lists/"+groceriesID+"/restore", "").RequireStatus(t, http.StatusOK)
+	if lists := myLists(t, bruno); len(lists) != 1 {
+		t.Fatalf("Bruno's Lists = %+v, want Groceries back after the Owner restored it", lists)
+	}
+}
+
 func TestAListThatNeverExistedIsNotFound(t *testing.T) {
 	srv := testkit.NewServer(t)
 
