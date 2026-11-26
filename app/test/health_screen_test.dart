@@ -7,11 +7,11 @@ import 'harness/harness.dart';
 const serverStatus = '/server-status';
 
 void main() {
-  testWidgets('is opened from the account menu', (tester) async {
+  testWidgets('is opened from the User menu', (tester) async {
     final h = Harness(tester)..signedIn();
     await h.pumpApp();
 
-    await h.openAccountMenu();
+    await h.openUserMenu();
     await tester.tap(find.text('Server status'));
     await tester.pumpAndSettle();
 
@@ -50,6 +50,7 @@ void main() {
 
   testWidgets('offline with nothing stored, says the server could not be reached', (tester) async {
     final h = Harness(tester)..signedIn();
+    await h.pumpApp(); // the User is now stored on the device, but no server status
     h.api.goOffline();
 
     await h.pumpApp(initialLocation: serverStatus);
@@ -86,6 +87,7 @@ void main() {
 
   testWidgets('checking again after reconnecting shows the live status', (tester) async {
     final h = Harness(tester)..signedIn();
+    await h.pumpApp(); // the User is now stored on the device, but no server status
     h.api.goOffline();
     await h.pumpApp(initialLocation: serverStatus);
     h.api.goOnline();
@@ -115,12 +117,11 @@ void main() {
 
   testWidgets('stays readable in dark mode at the largest text size', (tester) async {
     final h = Harness(tester)..signedIn();
-    tester.view.physicalSize = const Size(360, 640) * tester.view.devicePixelRatio;
-    addTearDown(tester.view.reset);
 
     await h.pumpApp(
       themeMode: ThemeMode.dark,
       textScale: 3.0,
+      screen: const Size(360, 640),
       locale: brazilianPortuguese,
       initialLocation: serverStatus,
     );

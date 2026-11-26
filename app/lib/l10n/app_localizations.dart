@@ -164,11 +164,47 @@ abstract class AppLocalizations {
   /// **'Check again'**
   String get healthRetry;
 
-  /// Welcome screen line under the app name.
+  /// Big headline on the welcome screen.
   ///
   /// In en, this message translates to:
-  /// **'Shared shopping lists that work in the store, with or without signal.'**
-  String get welcomeTagline;
+  /// **'One shopping list for the whole house.'**
+  String get welcomeHeadline;
+
+  /// Line under the welcome headline.
+  ///
+  /// In en, this message translates to:
+  /// **'Add what\'s missing, see what others added, and check things off at the market.'**
+  String get welcomeSubtitle;
+
+  /// Example Item on a decorative tag on the welcome screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Oranges'**
+  String get welcomeSampleOranges;
+
+  /// Example Item on a decorative tag on the welcome screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Bread'**
+  String get welcomeSampleBread;
+
+  /// Example Item on a decorative tag on the welcome screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Coffee'**
+  String get welcomeSampleCoffee;
+
+  /// Example Item on a decorative tag on the welcome screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Eggs'**
+  String get welcomeSampleEggs;
+
+  /// Example Item on a decorative tag on the welcome screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheese'**
+  String get welcomeSampleCheese;
 
   /// Button that signs in or signs up with a Google account.
   ///
@@ -181,12 +217,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue with email'**
   String get welcomeContinueWithEmail;
-
-  /// Link from the welcome screen to the email sign-in form.
-  ///
-  /// In en, this message translates to:
-  /// **'Already have an account? Sign in'**
-  String get welcomeHaveAccount;
 
   /// Title of the email sign-in screen.
   ///
@@ -437,32 +467,44 @@ abstract class AppLocalizations {
   /// Tooltip of the button that opens the User menu (display name, sign out).
   ///
   /// In en, this message translates to:
-  /// **'Account'**
+  /// **'User menu'**
   String get userMenu;
 
-  /// Account menu item.
+  /// User menu item.
   ///
   /// In en, this message translates to:
   /// **'Change display name'**
   String get userMenuChangeDisplayName;
 
-  /// Account menu item that opens the server status screen.
+  /// User menu item that opens the server status screen.
   ///
   /// In en, this message translates to:
   /// **'Server status'**
   String get userMenuServerStatus;
 
-  /// Account menu item that signs out.
+  /// User menu item that signs out.
   ///
   /// In en, this message translates to:
   /// **'Sign out'**
   String get userMenuSignOut;
 
-  /// Shown while the app is starting or loading the account.
+  /// Shown while the app is starting or loading the signed-in User.
   ///
   /// In en, this message translates to:
   /// **'Loading…'**
   String get loading;
+
+  /// Shown after sign-in when the signed-in User could not be loaded from the server and nothing is stored on the device.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load your details.'**
+  String get userLoadFailed;
+
+  /// Retries loading the signed-in User.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get userLoadRetry;
 
   /// Tooltip of the button that closes a bottom sheet.
   ///

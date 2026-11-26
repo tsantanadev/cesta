@@ -2,14 +2,16 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 
-import '../auth/auth_gateway.dart';
+/// The signed-in User's current ID token, refreshed when [forceRefresh] is set;
+/// null when signed out. `AuthGateway.idToken` is one.
+typedef IdTokenSource = Future<String?> Function({bool forceRefresh});
 
 /// Builds the Dio transport the generated client runs on: base URL, timeouts,
-/// W3C trace context on every request and, given [auth], the signed-in User's
-/// ID token on every call the API contract marks as needing it.
+/// W3C trace context on every request and, given [idToken], the signed-in
+/// User's ID token on every call the API contract marks as needing it.
 ///
-/// Usage: `CestaApi(createApiTransport(baseUrl: ..., auth: ...)).api`.
-Dio createApiTransport({required String baseUrl, AuthGateway? auth}) {
+/// Usage: `CestaApi(createApiTransport(baseUrl: ..., idToken: auth.idToken)).api`.
+Dio createApiTransport({required String baseUrl, IdTokenSource? idToken}) {
   final dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
@@ -18,7 +20,7 @@ Dio createApiTransport({required String baseUrl, AuthGateway? auth}) {
     ),
   );
   dio.interceptors.add(TraceContextInterceptor());
-  if (auth != null) dio.interceptors.add(IdTokenInterceptor(auth, dio));
+  if (idToken != null) dio.interceptors.add(IdTokenInterceptor(idToken, dio));
   return dio;
 }
 
@@ -26,9 +28,9 @@ Dio createApiTransport({required String baseUrl, AuthGateway? auth}) {
 /// security is non-empty. When the server rejects a token with 401 (say it
 /// expired while the phone slept), it refreshes the token once and retries.
 class IdTokenInterceptor extends Interceptor {
-  IdTokenInterceptor(this._auth, this._dio);
+  IdTokenInterceptor(this._idToken, this._dio);
 
-  final AuthGateway _auth;
+  final IdTokenSource _idToken;
   final Dio _dio;
 
   static const _retriedKey = 'cesta.idTokenRetried';
@@ -41,7 +43,7 @@ class IdTokenInterceptor extends Interceptor {
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     if (_needsToken(options)) {
-      final token = await _auth.idToken();
+      final token = await _idToken();
       if (token != null) options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
@@ -56,7 +58,7 @@ class IdTokenInterceptor extends Interceptor {
       return;
     }
     try {
-      final token = await _auth.idToken(forceRefresh: true);
+      final token = await _idToken(forceRefresh: true);
       if (token == null) {
         handler.next(response);
         return;

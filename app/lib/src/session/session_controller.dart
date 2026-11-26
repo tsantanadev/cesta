@@ -18,6 +18,9 @@ enum SessionStatus {
 /// Result of [SessionController.setDisplayName].
 enum DisplayNameOutcome { saved, invalid, rateLimited, offline, failed }
 
+/// Why the signed-in User couldn't be loaded when nothing was cached.
+enum UserLoadFailure { offline, rateLimited, failed }
+
 /// The identity provider's session and the signed-in User, which the router
 /// follows.
 ///
@@ -38,9 +41,14 @@ class SessionController extends ChangeNotifier {
   User? get user => _user;
   User? _user;
 
-  /// True while the first account load for a session with nothing cached is in flight.
+  /// True while the first load of the User for a session with nothing cached is in flight.
   bool get loadingUser => _loadingUser;
   bool _loadingUser = false;
+
+  /// Why that first load failed; null while it hasn't, or once a User is known.
+  /// Without a User the app can't go on, so it offers [retryUserLoad] and sign-out.
+  UserLoadFailure? get userLoadFailure => _userLoadFailure;
+  UserLoadFailure? _userLoadFailure;
 
   AuthSession? _session;
 
@@ -52,6 +60,7 @@ class SessionController extends ChangeNotifier {
   Future<void> _onSession(AuthSession? session) async {
     if (session?.uid == _session?.uid && _status != SessionStatus.starting) return;
     _session = session;
+    _userLoadFailure = null;
     if (session == null) {
       _user = null;
       _loadingUser = false;
@@ -79,20 +88,40 @@ class SessionController extends ChangeNotifier {
     await refreshUser();
   }
 
-  /// Reloads the account from the server. Offline, the cached one stays.
+  /// Reloads the User from the server. If that fails the cached User stays;
+  /// with none cached, [userLoadFailure] says why.
   Future<void> refreshUser() async {
     final session = _session;
     if (session == null) return;
+    UserLoadFailure? failure;
     try {
-      if (await _api.getMe() case GetMe200(:final value)) await _keep(session, value);
-    } on DioException {
-      // Offline or unreachable: keep what we have.
-    } finally {
-      if (_session?.uid == session.uid && _loadingUser) {
-        _loadingUser = false;
-        notifyListeners();
+      switch (await _api.getMe()) {
+        case GetMe200(:final value):
+          await _keep(session, value);
+        case GetMe429():
+          failure = UserLoadFailure.rateLimited;
+        case GetMe401():
+          failure = UserLoadFailure.failed;
       }
+    } on DioException catch (e) {
+      failure = isOffline(e) ? UserLoadFailure.offline : UserLoadFailure.failed;
     }
+    if (_session?.uid != session.uid) return;
+    final unavailable = _user == null ? failure : null;
+    if (_loadingUser || unavailable != _userLoadFailure) {
+      _loadingUser = false;
+      _userLoadFailure = unavailable;
+      notifyListeners();
+    }
+  }
+
+  /// Tries loading the User again after [userLoadFailure].
+  Future<void> retryUserLoad() async {
+    if (_session == null) return;
+    _loadingUser = true;
+    _userLoadFailure = null;
+    notifyListeners();
+    await refreshUser();
   }
 
   /// Sets and confirms the display name. [name] should already be validated.

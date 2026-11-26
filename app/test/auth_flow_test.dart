@@ -13,6 +13,7 @@ void main() {
 
       await h.pumpApp();
 
+      expect(find.text('One shopping list for the whole house.'), findsOneWidget);
       expect(find.text('Continue with Google'), findsOneWidget);
       expect(find.text('Continue with email'), findsOneWidget);
       expect(find.text('Your Lists'), findsNothing);
@@ -23,14 +24,14 @@ void main() {
 
       await h.pumpApp(locale: brazilianPortuguese);
 
+      expect(find.text('Uma lista de compras para a casa toda.'), findsOneWidget);
       expect(find.text('Continuar com Google'), findsOneWidget);
       expect(find.text('Continuar com e-mail'), findsOneWidget);
-      expect(find.text('Já tem uma conta? Entrar'), findsOneWidget);
     });
   });
 
   group('sign in with email', () {
-    testWidgets('leads to the home screen', (tester) async {
+    testWidgets('leads to the home screen, and signing out returns to the welcome screen', (tester) async {
       final h = Harness(tester);
       h.existingUser(email: anaEmail, password: password, displayName: 'Ana Souza');
       await h.pumpApp();
@@ -39,6 +40,10 @@ void main() {
 
       expect(find.text('Your Lists'), findsOneWidget);
       expect(find.text('No Lists yet'), findsOneWidget);
+
+      await h.signOut();
+
+      expect(find.text('Continue with Google'), findsOneWidget);
     });
 
     testWidgets('a wrong password says so and stays on the sign-in screen', (tester) async {
@@ -73,7 +78,7 @@ void main() {
 
       expect(find.text('Enter your email address.'), findsOneWidget);
       expect(find.text('Enter your password.'), findsOneWidget);
-      expect(h.auth.signInAttempts, 0);
+      expect(find.byType(CesMessage), findsNothing); // nothing was sent to sign in
     });
   });
 
@@ -87,12 +92,25 @@ void main() {
       expect(find.text('What should we call you?'), findsOneWidget);
       expect(h.textInField('Display name'), 'bruno.lima');
 
-      await tester.enterText(find.widgetWithText(TextField, 'Display name'), 'Bruno');
+      await tester.enterText(field('Display name'), 'Bruno');
       await tester.tap(find.widgetWithText(CesButton, 'Continue'));
       await tester.pumpAndSettle();
 
       expect(find.text('Your Lists'), findsOneWidget);
-      expect(h.api.userFor('bruno.lima@example.com')?.displayName, 'Bruno');
+      await h.openUserMenu();
+      expect(find.text('Bruno'), findsOneWidget);
+    });
+
+    testWidgets('signing out after sign-up returns to the welcome screen', (tester) async {
+      final h = Harness(tester);
+      await h.pumpApp();
+      await h.signUpWithEmail('bruno.lima@example.com', password);
+      await tester.tap(find.widgetWithText(CesButton, 'Continue'));
+      await tester.pumpAndSettle();
+
+      await h.signOut();
+
+      expect(find.text('Continue with Google'), findsOneWidget);
     });
 
     testWidgets('an email that already has an account says so', (tester) async {
@@ -113,38 +131,37 @@ void main() {
 
       expect(find.text('Enter a valid email address.'), findsOneWidget);
       expect(find.text('Use at least 8 characters.'), findsOneWidget);
-      expect(h.auth.signUpAttempts, 0);
+      expect(find.byType(CesMessage), findsNothing); // nothing was sent to sign up
     });
   });
 
   group('sign in with Google', () {
     testWidgets('a first-time Google User confirms the name from Google, then goes home', (tester) async {
       final h = Harness(tester);
-      h.auth.googleAccount = const FakeGoogleAccount(email: anaEmail, name: 'Ana Souza');
-      await h.pumpApp();
-
-      await tester.tap(find.text('Continue with Google'));
-      await tester.pumpAndSettle();
+      await h.signInWithGoogleForTheFirstTime();
 
       expect(find.text('What should we call you?'), findsOneWidget);
       expect(h.textInField('Display name'), 'Ana Souza');
 
       await tester.tap(find.widgetWithText(CesButton, 'Continue'));
       await tester.pumpAndSettle();
-
       expect(find.text('Your Lists'), findsOneWidget);
-      expect(h.api.userFor(anaEmail)?.displayNameConfirmed, isTrue);
+
+      await h.pumpApp(); // the confirmed name sticks: no second time on the name screen
+      expect(find.text('Your Lists'), findsOneWidget);
     });
 
-    testWidgets('a returning User goes straight home', (tester) async {
+    testWidgets('a returning User goes straight home, and signing out returns to the welcome screen', (tester) async {
       final h = Harness(tester);
       h.existingUser(email: anaEmail, password: password, displayName: 'Ana Souza', withGoogle: true);
       await h.pumpApp();
 
-      await tester.tap(find.text('Continue with Google'));
-      await tester.pumpAndSettle();
-
+      await h.tap(find.text('Continue with Google'));
       expect(find.text('Your Lists'), findsOneWidget);
+
+      await h.signOut();
+
+      expect(find.text('Continue with Google'), findsOneWidget);
     });
 
     testWidgets('closing the Google account picker stays on the welcome screen without an error', (tester) async {
@@ -152,41 +169,64 @@ void main() {
       h.auth.googleAccount = null; // the User backs out of the picker
       await h.pumpApp();
 
-      await tester.tap(find.text('Continue with Google'));
-      await tester.pumpAndSettle();
+      await h.tap(find.text('Continue with Google'));
 
       expect(find.text('Continue with Google'), findsOneWidget);
       expect(find.byType(CesMessage), findsNothing);
     });
   });
 
+  group('loading a new User', () {
+    testWidgets('offline, says so and offers to try again', (tester) async {
+      final h = Harness(tester);
+      h.api.goOffline(); // signed in at the provider, but the backend can't be reached
+      await h.signInWithGoogleForTheFirstTime();
+
+      expect(find.text("You're offline. Connect to the internet and try again."), findsOneWidget);
+      expect(find.text('Your Lists'), findsNothing);
+
+      h.api.goOnline();
+      await tester.tap(find.widgetWithText(CesButton, 'Try again'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('What should we call you?'), findsOneWidget);
+    });
+
+    testWidgets('when it keeps failing, the User can sign out', (tester) async {
+      final h = Harness(tester);
+      h.api.rateLimited = true;
+      await h.signInWithGoogleForTheFirstTime();
+      expect(find.text('Too many attempts. Wait a moment and try again.'), findsOneWidget);
+
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Continue with Google'), findsOneWidget);
+    });
+  });
+
   group('display name', () {
     testWidgets('must not be blank or longer than 50 characters', (tester) async {
       final h = Harness(tester);
-      h.auth.googleAccount = const FakeGoogleAccount(email: anaEmail, name: 'Ana Souza');
-      await h.pumpApp();
-      await tester.tap(find.text('Continue with Google'));
-      await tester.pumpAndSettle();
-      final field = find.widgetWithText(TextField, 'Display name');
+      await h.signInWithGoogleForTheFirstTime();
 
-      await tester.enterText(field, '   ');
+      await tester.enterText(field('Display name'), '   ');
       await tester.tap(find.widgetWithText(CesButton, 'Continue'));
       await tester.pumpAndSettle();
       expect(find.text('Enter a name.'), findsOneWidget);
 
-      await tester.enterText(field, 'a' * 51);
+      await tester.enterText(field('Display name'), 'a' * 51);
       await tester.tap(find.widgetWithText(CesButton, 'Continue'));
       await tester.pumpAndSettle();
       expect(find.text('Use 50 characters or fewer.'), findsOneWidget);
-      expect(h.api.userFor(anaEmail)?.displayNameConfirmed, isFalse);
+
+      await h.pumpApp(); // nothing was saved: still asked for a name
+      expect(find.text('What should we call you?'), findsOneWidget);
     });
 
     testWidgets('a name the server rejects says it cannot be used', (tester) async {
       final h = Harness(tester);
-      h.auth.googleAccount = const FakeGoogleAccount(email: anaEmail, name: 'Ana Souza');
-      await h.pumpApp();
-      await tester.tap(find.text('Continue with Google'));
-      await tester.pumpAndSettle();
+      await h.signInWithGoogleForTheFirstTime();
       h.api.rejectDisplayNames = true;
 
       await tester.tap(find.widgetWithText(CesButton, 'Continue'));
@@ -197,25 +237,20 @@ void main() {
 
     testWidgets('a name with control characters is rejected before saving', (tester) async {
       final h = Harness(tester);
-      h.auth.googleAccount = const FakeGoogleAccount(email: anaEmail, name: 'Ana Souza');
-      await h.pumpApp();
-      await tester.tap(find.text('Continue with Google'));
-      await tester.pumpAndSettle();
+      await h.signInWithGoogleForTheFirstTime();
 
-      await tester.enterText(find.widgetWithText(TextField, 'Display name'), 'Ana\u0007');
+      await tester.enterText(field('Display name'), 'Ana\u0007');
       await tester.tap(find.widgetWithText(CesButton, 'Continue'));
       await tester.pumpAndSettle();
 
       expect(find.text("That name can't be used. Try another."), findsOneWidget);
-      expect(h.api.userFor(anaEmail)?.displayNameConfirmed, isFalse);
+      await h.pumpApp(); // nothing was saved: still asked for a name
+      expect(find.text('What should we call you?'), findsOneWidget);
     });
 
     testWidgets('when the server is rate limiting, says to wait', (tester) async {
       final h = Harness(tester);
-      h.auth.googleAccount = const FakeGoogleAccount(email: anaEmail, name: 'Ana Souza');
-      await h.pumpApp();
-      await tester.tap(find.text('Continue with Google'));
-      await tester.pumpAndSettle();
+      await h.signInWithGoogleForTheFirstTime();
       h.api.rateLimited = true;
 
       await tester.tap(find.widgetWithText(CesButton, 'Continue'));
@@ -224,12 +259,19 @@ void main() {
       expect(find.text('Too many attempts. Wait a moment and try again.'), findsOneWidget);
     });
 
+    testWidgets('the tag previews the name as it is typed', (tester) async {
+      final h = Harness(tester);
+      await h.signInWithGoogleForTheFirstTime();
+
+      await tester.enterText(field('Display name'), 'Marina');
+      await tester.pump();
+
+      expect(find.descendant(of: find.byType(CesItemTile), matching: find.text('Marina')), findsOneWidget);
+    });
+
     testWidgets('a new User can sign out from the name screen instead of confirming', (tester) async {
       final h = Harness(tester);
-      h.auth.googleAccount = const FakeGoogleAccount(email: anaEmail, name: 'Ana Souza');
-      await h.pumpApp();
-      await tester.tap(find.text('Continue with Google'));
-      await tester.pumpAndSettle();
+      await h.signInWithGoogleForTheFirstTime();
       h.goOffline(); // can't save the name, so signing out is the only way on
 
       await tester.tap(find.widgetWithText(CesButton, 'Continue'));
@@ -241,22 +283,21 @@ void main() {
       expect(find.text('Continue with Google'), findsOneWidget);
     });
 
-    testWidgets('can be changed later from the account menu', (tester) async {
+    testWidgets('can be changed later from the User menu', (tester) async {
       final h = Harness(tester);
       h.existingUser(email: anaEmail, password: password, displayName: 'Ana Souza', signedIn: true);
       await h.pumpApp();
 
-      await h.openAccountMenu();
+      await h.openUserMenu();
       expect(find.text('Ana Souza'), findsOneWidget);
       await tester.tap(find.text('Change display name'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Display name'), 'Aninha');
+      await tester.enterText(field('Display name'), 'Aninha');
       await tester.tap(find.widgetWithText(CesButton, 'Save'));
       await tester.pumpAndSettle();
 
       expect(find.text('Your Lists'), findsOneWidget);
-      expect(h.api.userFor(anaEmail)?.displayName, 'Aninha');
-      await h.openAccountMenu();
+      await h.openUserMenu();
       expect(find.text('Aninha'), findsOneWidget);
     });
   });
@@ -282,7 +323,7 @@ void main() {
       await h.pumpApp();
 
       expect(find.text('Your Lists'), findsOneWidget);
-      await h.openAccountMenu();
+      await h.openUserMenu();
       expect(find.text('Ana Souza'), findsOneWidget);
     });
   });
@@ -293,9 +334,7 @@ void main() {
       h.existingUser(email: anaEmail, password: password, displayName: 'Ana Souza', signedIn: true);
       await h.pumpApp();
 
-      await h.openAccountMenu();
-      await tester.tap(find.text('Sign out'));
-      await tester.pumpAndSettle();
+      await h.signOut();
 
       expect(find.text('Continue with Google'), findsOneWidget);
       await h.pumpApp();
@@ -307,14 +346,12 @@ void main() {
       h.existingUser(email: anaEmail, password: password, displayName: 'Ana Souza', signedIn: true);
       h.existingUser(email: 'bruno.lima@example.com', password: password, displayName: 'Bruno');
       await h.pumpApp();
-      await h.openAccountMenu();
-      await tester.tap(find.text('Sign out'));
-      await tester.pumpAndSettle();
+      await h.signOut();
 
       await h.signInWithEmail('bruno.lima@example.com', password);
       h.goOffline();
       await h.pumpApp();
-      await h.openAccountMenu();
+      await h.openUserMenu();
 
       expect(find.text('Bruno'), findsOneWidget);
       expect(find.text('Ana Souza'), findsNothing);
@@ -330,19 +367,19 @@ void main() {
 
       await tester.tap(find.text('Forgot password?'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Email'), anaEmail);
+      await tester.enterText(field('Email'), anaEmail);
       await tester.tap(find.widgetWithText(CesButton, 'Send reset link'));
       await tester.pumpAndSettle();
 
       expect(find.text('If an account exists for $anaEmail, we sent it a link to reset the password.'), findsOneWidget);
-      expect(h.auth.passwordResetsSentTo, [anaEmail]);
+      expect(h.auth.passwordResetsSentTo, [anaEmail]); // the email the User would receive
     });
 
     testWidgets('keeps the email typed on the sign-in screen', (tester) async {
       final h = Harness(tester);
       await h.pumpApp();
       await h.openEmailSignIn();
-      await tester.enterText(find.widgetWithText(TextField, 'Email'), anaEmail);
+      await tester.enterText(field('Email'), anaEmail);
 
       await tester.tap(find.text('Forgot password?'));
       await tester.pumpAndSettle();
@@ -353,10 +390,13 @@ void main() {
 
   testWidgets('the sign-in screens stay usable in dark mode at the largest text size', (tester) async {
     final h = Harness(tester);
-    tester.view.physicalSize = const Size(360, 640) * tester.view.devicePixelRatio;
-    addTearDown(tester.view.reset);
 
-    await h.pumpApp(themeMode: ThemeMode.dark, textScale: 3.0, locale: brazilianPortuguese);
+    await h.pumpApp(
+      themeMode: ThemeMode.dark,
+      textScale: 3.0,
+      screen: const Size(360, 640),
+      locale: brazilianPortuguese,
+    );
     expect(tester.takeException(), isNull);
     await tester.ensureVisible(find.text('Continuar com e-mail'));
     await tester.pumpAndSettle();
@@ -366,4 +406,28 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Criar conta'), findsWidgets);
   });
+
+  testWidgets(
+    'on iOS, signing in and out works with the Cupertino controls',
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    (tester) async {
+      final h = Harness(tester);
+      h.existingUser(email: anaEmail, password: password, displayName: 'Ana Souza');
+      await h.pumpApp();
+
+      await h.openEmailSignIn();
+      await tester.tap(find.widgetWithText(CesButton, 'Sign in'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter your email address.'), findsOneWidget);
+
+      await tester.enterText(field('Email'), anaEmail);
+      await tester.enterText(field('Password'), password);
+      await tester.tap(find.widgetWithText(CesButton, 'Sign in'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your Lists'), findsOneWidget);
+
+      await h.signOut(); // from an action sheet
+      expect(find.text('Continue with Google'), findsOneWidget);
+    },
+  );
 }

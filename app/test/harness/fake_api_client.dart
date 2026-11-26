@@ -1,5 +1,5 @@
 import 'package:cesta/src/api/generated/cesta_api.dart';
-import 'package:cesta/src/session/auth_messages.dart' show maxDisplayNameLength;
+import 'package:cesta/src/session/input_rules.dart' show maxDisplayNameLength;
 import 'package:dio/dio.dart';
 
 import 'fake_auth_gateway.dart';
@@ -65,6 +65,7 @@ class FakeApiClient implements ApiClient {
     _failIfOffline('/api/me');
     final identity = auth.current;
     if (identity == null) return const GetMe401(_unauthenticated);
+    if (rateLimited) return const GetMe429(ApiError(code: ApiErrorCode.rateLimited, message: 'too many requests'));
     // Like the server: create the User on first sight with a suggested name.
     if (!_users.containsKey(identity.uid)) {
       addUser(identity, displayName: identity.name ?? identity.email.split('@').first, confirmed: false);

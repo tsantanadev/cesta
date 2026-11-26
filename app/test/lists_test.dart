@@ -25,7 +25,7 @@ void main() {
     h.api.addListSharedWith(ana, name: 'Weekend feira', uncheckedItemCount: 9);
     h.api.addList(ana, name: 'Home basics');
 
-    await h.pumpApp(screen: iPhone);
+    await h.pumpApp();
 
     expect(find.text('Only you'), findsNWidgets(2));
     expect(find.text('Shared with 5 people'), findsOneWidget);
@@ -86,7 +86,7 @@ void main() {
     final ana = h.signedIn();
     h.api.addList(ana, name: 'Pharmacy');
     await h.pumpApp();
-    await h.openAccountMenu();
+    await h.openUserMenu();
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
 
@@ -366,7 +366,7 @@ void main() {
       await h.pumpApp();
       h.goOffline();
 
-      await h.openAccountMenu();
+      await h.openUserMenu();
       await tester.tap(find.text('Recently deleted'));
       await tester.pumpAndSettle();
 

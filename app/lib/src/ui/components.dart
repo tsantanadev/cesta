@@ -3,7 +3,11 @@
 /// iOS-adaptive behaviour) lives in one place.
 library;
 
-import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoButton;
+import 'dart:math' as math;
+
+import 'package:cupertino_ui/cupertino_ui.dart'
+    show CupertinoActionSheet, CupertinoActionSheetAction, CupertinoButton, CupertinoTextField, showCupertinoModalPopup;
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:material_ui/material_ui.dart';
 
 import 'icons.dart';
@@ -48,11 +52,37 @@ class CesScaffold extends StatelessWidget {
   );
 }
 
-enum _ButtonKind { primary, secondary }
+/// A form page in the design's layout (Figma "02 Your name"): [top] from the
+/// top, [bottom] (the form's actions) at the bottom of the screen, with an
+/// app bar only when there is a [title].
+class CesFormScaffold extends StatelessWidget {
+  const CesFormScaffold({super.key, this.title, required this.top, required this.bottom});
 
-/// An action button. The primary kind is a filled Material button, or a
-/// filled Cupertino button on iOS; the secondary kind is outlined. While
-/// [busy] it shows a spinner and ignores taps.
+  final String? title;
+  final List<Widget> top;
+  final List<Widget> bottom;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: title == null ? null : AppBar(title: Text(title!), centerTitle: _isCupertino(context)),
+    body: SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: CesPinnedLayout(padding: const EdgeInsets.fromLTRB(24, 8, 24, 34), top: top, bottom: bottom),
+        ),
+      ),
+    ),
+  );
+}
+
+enum _ButtonKind { primary, secondary, outline }
+
+/// An action button: a 56 dp pill (Figma Button 3:61). [CesButton] is filled
+/// with Folha; [CesButton.secondary] is filled with Branco; [CesButton.outline]
+/// is see-through with a 1.5 dp stroke, in on-brand colours on a
+/// [CesBrandScaffold]. It is a Cupertino button on iOS and a Material one
+/// elsewhere. While [busy] it shows a spinner and ignores taps.
 class CesButton extends StatelessWidget {
   const CesButton({super.key, required this.label, required this.onPressed, this.icon, this.busy = false})
     : _kind = _ButtonKind.primary;
@@ -60,39 +90,87 @@ class CesButton extends StatelessWidget {
   const CesButton.secondary({super.key, required this.label, required this.onPressed, this.icon, this.busy = false})
     : _kind = _ButtonKind.secondary;
 
+  const CesButton.outline({super.key, required this.label, required this.onPressed, this.icon, this.busy = false})
+    : _kind = _ButtonKind.outline;
+
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
   final bool busy;
   final _ButtonKind _kind;
 
+  static const _height = 56.0;
+  static const _iconGap = 10.0;
+  static const _label = TextStyle(fontFamily: CestaFonts.family, fontWeight: FontWeight.w700, fontSize: 16);
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final onBrand = CesBrandScaffold.contains(context);
+    final palette = context.palette;
+    final (Color background, Color foreground, Color? stroke) = switch (_kind) {
+      _ButtonKind.primary => (scheme.primary, scheme.onPrimary, null),
+      _ButtonKind.secondary => (scheme.surfaceContainerLowest, scheme.onSurface, null),
+      _ButtonKind.outline when onBrand => (Colors.transparent, palette.onBrand, palette.onBrand),
+      _ButtonKind.outline => (Colors.transparent, scheme.onSurface, scheme.outlineVariant),
+    };
     final onPressed = busy ? null : this.onPressed;
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (busy)
-          const SizedBox.square(dimension: 20, child: CircularProgressIndicator.adaptive(strokeWidth: 2))
+          SizedBox.square(
+            dimension: 20,
+            child: CircularProgressIndicator.adaptive(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(foreground)),
+          )
         else if (icon case final icon?)
-          Icon(icon, size: 20),
-        if (busy || icon != null) SizedBox(width: context.spacing.sm),
-        Flexible(child: Text(label, textAlign: TextAlign.center)),
+          Icon(icon, size: 20, color: foreground),
+        if (busy || icon != null) const SizedBox(width: _iconGap),
+        Flexible(
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: _label.copyWith(color: foreground),
+          ),
+        ),
       ],
     );
-    return switch (_kind) {
-      _ButtonKind.primary when _isCupertino(context) => CupertinoButton.filled(
-        onPressed: onPressed,
-        borderRadius: BorderRadius.circular(CestaRadii.button),
-        child: content,
+    final shape = StadiumBorder(side: stroke == null ? BorderSide.none : BorderSide(color: stroke, width: 1.5));
+    if (_isCupertino(context)) {
+      return DecoratedBox(
+        decoration: ShapeDecoration(shape: shape),
+        child: CupertinoButton(
+          onPressed: onPressed,
+          color: background,
+          disabledColor: background.withValues(alpha: background.a * 0.5),
+          foregroundColor: foreground,
+          minimumSize: const Size(_height, _height),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          borderRadius: BorderRadius.circular(CestaRadii.button),
+          child: content,
+        ),
+      );
+    }
+    final style = ButtonStyle(
+      backgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.disabled) ? background.withValues(alpha: background.a * 0.5) : background,
       ),
-      _ButtonKind.primary => FilledButton(onPressed: onPressed, child: content),
-      _ButtonKind.secondary => OutlinedButton(onPressed: onPressed, child: content),
+      foregroundColor: WidgetStatePropertyAll(foreground),
+      overlayColor: WidgetStatePropertyAll(foreground.withValues(alpha: 0.08)),
+      minimumSize: const WidgetStatePropertyAll(Size(_height, _height)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 24)),
+      shape: WidgetStatePropertyAll(shape),
+      side: WidgetStatePropertyAll(shape.side),
+    );
+    return switch (_kind) {
+      _ButtonKind.outline => OutlinedButton(onPressed: onPressed, style: style, child: content),
+      _ => FilledButton(onPressed: onPressed, style: style, child: content),
     };
   }
 }
 
-/// A low-emphasis, link-like action.
+/// A low-emphasis, link-like action, e.g. "Sign out" under a form (Figma:
+/// Plus Jakarta Sans Bold 15 in Folha, 44 dp tall).
 class CesLink extends StatelessWidget {
   const CesLink({super.key, required this.label, required this.onPressed});
 
@@ -100,10 +178,20 @@ class CesLink extends StatelessWidget {
   final VoidCallback? onPressed;
 
   @override
-  Widget build(BuildContext context) => TextButton(
-    onPressed: onPressed,
-    child: Text(label, textAlign: TextAlign.center),
-  );
+  Widget build(BuildContext context) {
+    final text = Text(label, textAlign: TextAlign.center);
+    if (!_isCupertino(context)) return TextButton(onPressed: onPressed, child: text);
+    return CupertinoButton(
+      onPressed: onPressed,
+      minimumSize: const Size(44, 44),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      foregroundColor: Theme.of(context).colorScheme.primary,
+      child: DefaultTextStyle.merge(
+        style: const TextStyle(fontFamily: CestaFonts.family, fontWeight: FontWeight.w700, fontSize: 15),
+        child: text,
+      ),
+    );
+  }
 }
 
 /// An icon-only action with a tooltip (which is also its accessible label).
@@ -118,7 +206,10 @@ class CesIconButton extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(icon: Icon(icon), tooltip: tooltip, onPressed: onPressed);
 }
 
-/// A labelled text field for use inside a [Form].
+/// A text field for use inside a [Form], with its [label] above it (Figma
+/// "Name field" 20:627). [CesTextField.display] shows the value large, in
+/// Bricolage, on a Folha underline, for a form's one important field such as
+/// the display name. On iOS the input is a Cupertino text field.
 class CesTextField extends StatelessWidget {
   const CesTextField({
     super.key,
@@ -132,7 +223,21 @@ class CesTextField extends StatelessWidget {
     this.helper,
     this.autofocus = false,
     this.textCapitalization = TextCapitalization.none,
-  });
+  }) : _display = false;
+
+  const CesTextField.display({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.validator,
+    this.autofillHints,
+    this.textInputAction,
+    this.onSubmitted,
+    this.autofocus = false,
+    this.textCapitalization = TextCapitalization.none,
+  }) : _display = true,
+       keyboardType = null,
+       helper = null;
 
   final String label;
   final TextEditingController controller;
@@ -144,23 +249,27 @@ class CesTextField extends StatelessWidget {
   final String? helper;
   final bool autofocus;
   final TextCapitalization textCapitalization;
+  final bool _display;
 
   @override
-  Widget build(BuildContext context) => TextFormField(
-    controller: controller,
-    validator: validator,
-    keyboardType: keyboardType,
-    autofillHints: autofillHints,
-    textInputAction: textInputAction,
-    onFieldSubmitted: onSubmitted,
-    autofocus: autofocus,
-    textCapitalization: textCapitalization,
-    autocorrect: false,
-    decoration: InputDecoration(labelText: label, helperText: helper),
+  Widget build(BuildContext context) => _LabelledField(
+    label: label,
+    child: _FieldInput(
+      controller: controller,
+      validator: validator,
+      keyboardType: keyboardType,
+      autofillHints: autofillHints,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      helper: helper,
+      autofocus: autofocus,
+      textCapitalization: textCapitalization,
+      display: _display,
+    ),
   );
 }
 
-/// A password field with a show/hide toggle.
+/// A password field with a show/hide toggle; see [CesTextField].
 class CesPasswordField extends StatefulWidget {
   const CesPasswordField({
     super.key,
@@ -193,26 +302,172 @@ class _CesPasswordFieldState extends State<CesPasswordField> {
   bool _obscured = true;
 
   @override
-  Widget build(BuildContext context) => TextFormField(
-    controller: widget.controller,
-    validator: widget.validator,
-    obscureText: _obscured,
-    enableSuggestions: false,
-    autocorrect: false,
-    keyboardType: TextInputType.visiblePassword,
-    textInputAction: TextInputAction.done,
-    onFieldSubmitted: widget.onSubmitted,
-    autofillHints: [widget.newPassword ? AutofillHints.newPassword : AutofillHints.password],
-    decoration: InputDecoration(
-      labelText: widget.label,
-      helperText: widget.helper,
-      suffixIcon: CesIconButton(
+  Widget build(BuildContext context) => _LabelledField(
+    label: widget.label,
+    child: _FieldInput(
+      controller: widget.controller,
+      validator: widget.validator,
+      obscureText: _obscured,
+      keyboardType: TextInputType.visiblePassword,
+      textInputAction: TextInputAction.done,
+      onSubmitted: widget.onSubmitted,
+      autofillHints: [widget.newPassword ? AutofillHints.newPassword : AutofillHints.password],
+      helper: widget.helper,
+      suffix: CesIconButton(
         icon: _obscured ? CesIcons.show : CesIcons.hide,
         tooltip: _obscured ? widget.showLabel : widget.hideLabel,
         onPressed: () => setState(() => _obscured = !_obscured),
       ),
     ),
   );
+}
+
+/// A field's label above its input, read out together.
+class _LabelledField extends StatelessWidget {
+  const _LabelledField({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MergeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          SizedBox(height: context.spacing.sm),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// The input of a [CesTextField] or [CesPasswordField]: a Material text field,
+/// or on iOS a Cupertino one with the error or [helper] under it.
+class _FieldInput extends StatelessWidget {
+  const _FieldInput({
+    required this.controller,
+    this.validator,
+    this.keyboardType,
+    this.autofillHints,
+    this.textInputAction,
+    this.onSubmitted,
+    this.helper,
+    this.autofocus = false,
+    this.textCapitalization = TextCapitalization.none,
+    this.obscureText = false,
+    this.suffix,
+    this.display = false,
+  });
+
+  final TextEditingController controller;
+  final FormFieldValidator<String>? validator;
+  final TextInputType? keyboardType;
+  final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  final String? helper;
+  final bool autofocus;
+  final TextCapitalization textCapitalization;
+  final bool obscureText;
+  final Widget? suffix;
+  final bool display;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final style = display
+        ? CestaDisplayType.fieldValue.copyWith(color: scheme.onSurface)
+        : theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurface);
+    if (!_isCupertino(context)) {
+      final underline = UnderlineInputBorder(borderSide: BorderSide(color: scheme.primary, width: 2));
+      return TextFormField(
+        controller: controller,
+        validator: validator,
+        keyboardType: keyboardType,
+        autofillHints: autofillHints,
+        textInputAction: textInputAction,
+        onFieldSubmitted: onSubmitted,
+        autofocus: autofocus,
+        textCapitalization: textCapitalization,
+        obscureText: obscureText,
+        enableSuggestions: !obscureText,
+        autocorrect: false,
+        style: style,
+        decoration: display
+            ? InputDecoration(
+                filled: false,
+                isDense: true,
+                contentPadding: const EdgeInsets.only(bottom: 8),
+                border: underline,
+                enabledBorder: underline,
+                focusedBorder: underline,
+                errorBorder: underline.copyWith(borderSide: BorderSide(color: scheme.error, width: 2)),
+                focusedErrorBorder: underline.copyWith(borderSide: BorderSide(color: scheme.error, width: 2)),
+              )
+            : InputDecoration(helperText: helper, suffixIcon: suffix),
+      );
+    }
+    return FormField<String>(
+      initialValue: controller.text,
+      validator: validator == null ? null : (_) => validator!(controller.text),
+      builder: (field) {
+        final border = field.hasError ? scheme.error : (display ? scheme.primary : null);
+        final note = field.errorText ?? helper;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CupertinoTextField(
+              controller: controller,
+              onChanged: field.didChange,
+              keyboardType: keyboardType,
+              autofillHints: autofillHints,
+              textInputAction: textInputAction,
+              onSubmitted: onSubmitted,
+              autofocus: autofocus,
+              textCapitalization: textCapitalization,
+              obscureText: obscureText,
+              enableSuggestions: !obscureText,
+              autocorrect: false,
+              style: style,
+              cursorColor: scheme.primary,
+              suffix: suffix,
+              padding: display ? const EdgeInsets.only(bottom: 8) : const EdgeInsets.all(14),
+              decoration: display
+                  ? BoxDecoration(
+                      border: Border(bottom: BorderSide(color: border!, width: 2)),
+                    )
+                  : BoxDecoration(
+                      color: scheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(CestaRadii.field),
+                      border: border == null ? null : Border.all(color: border, width: 1.5),
+                    ),
+            ),
+            if (note != null) ...[
+              SizedBox(height: context.spacing.xs),
+              Text(
+                note,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: field.hasError ? scheme.error : scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
 }
 
 enum CesMessageTone { error, info }
@@ -253,13 +508,13 @@ class CesMessage extends StatelessWidget {
   }
 }
 
-enum _TextKind { body, lead }
+enum _TextKind { body, intro }
 
-/// Running text on a screen. [CesText.lead] is the larger, muted line under a
-/// brand or heading, e.g. the welcome tagline.
+/// Running text on a screen. [CesText.intro] is the 16 dp line under a
+/// [CesDisplayHeading], muted (or on-brand on a [CesBrandScaffold]).
 class CesText extends StatelessWidget {
   const CesText(this.text, {super.key, this.textAlign}) : _kind = _TextKind.body;
-  const CesText.lead(this.text, {super.key, this.textAlign}) : _kind = _TextKind.lead;
+  const CesText.intro(this.text, {super.key, this.textAlign}) : _kind = _TextKind.intro;
 
   final String text;
   final TextAlign? textAlign;
@@ -268,58 +523,37 @@ class CesText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final onBrand = CesBrandScaffold.contains(context);
     final style = switch (_kind) {
       _TextKind.body => theme.textTheme.bodyLarge,
-      _TextKind.lead => theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+      _TextKind.intro => theme.textTheme.bodyLarge?.copyWith(
+        fontSize: 16,
+        height: 1.5,
+        letterSpacing: 0,
+        fontWeight: onBrand ? FontWeight.w400 : FontWeight.w500,
+        color: onBrand ? context.palette.onBrand : theme.colorScheme.onSurfaceVariant,
+      ),
     };
     return Text(text, style: style, textAlign: textAlign);
   }
 }
 
-/// Screen heading with an optional supporting line.
-class CesHeading extends StatelessWidget {
-  const CesHeading({super.key, required this.title, this.subtitle});
+/// A screen's big heading in Bricolage: 36 dp, or 40 dp when [large] (the
+/// welcome headline). On-brand on a [CesBrandScaffold].
+class CesDisplayHeading extends StatelessWidget {
+  const CesDisplayHeading(this.text, {super.key, this.large = false});
 
-  final String title;
-  final String? subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: theme.textTheme.headlineMedium),
-        if (subtitle case final subtitle?) ...[
-          SizedBox(height: context.spacing.sm),
-          Text(subtitle, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        ],
-      ],
-    );
-  }
-}
-
-/// The Cesta mark: a basket in a soft green disc, with the name below.
-class CesBrandMark extends StatelessWidget {
-  const CesBrandMark({super.key, required this.name});
-
-  final String name;
+  final String text;
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(color: theme.colorScheme.primaryContainer, shape: BoxShape.circle),
-          child: Padding(
-            padding: EdgeInsets.all(context.spacing.lg),
-            child: Icon(CesIcons.basket, size: 64, color: theme.colorScheme.onPrimaryContainer),
-          ),
-        ),
-        SizedBox(height: context.spacing.md),
-        Text(name, style: theme.textTheme.displaySmall?.copyWith(color: theme.colorScheme.primary)),
-      ],
+    final colour = CesBrandScaffold.contains(context)
+        ? context.palette.onBrand
+        : Theme.of(context).colorScheme.onSurface;
+    return Semantics(
+      header: true,
+      child: Text(text, style: (large ? CestaDisplayType.headline : CestaDisplayType.heading).copyWith(color: colour)),
     );
   }
 }
@@ -352,21 +586,45 @@ class CesEmptyState extends StatelessWidget {
   }
 }
 
-/// Shows a bottom sheet of [children] (usually a [CesSheetHeader] and [CesSheetItem]s).
-Future<void> showCesSheet(BuildContext context, {required List<Widget> children}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  builder: (context) => SafeArea(
-    child: SingleChildScrollView(
-      padding: EdgeInsets.only(bottom: context.spacing.md),
-      child: Column(mainAxisSize: MainAxisSize.min, children: children),
+/// Shows a menu of [items] about [title] (e.g. the signed-in User, or a
+/// List): a bottom sheet, or on iOS an action sheet with a Cancel button.
+Future<void> showCesSheet(BuildContext context, {String? title, String? subtitle, required List<CesSheetItem> items}) {
+  if (_isCupertino(context)) {
+    return showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: title == null ? null : Text(title),
+        message: subtitle == null ? null : Text(subtitle),
+        actions: items,
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+      ),
+    );
+  }
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: context.spacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (title != null) _SheetHeader(title: title, subtitle: subtitle),
+            ...items,
+          ],
+        ),
+      ),
     ),
-  ),
-);
+  );
+}
 
 /// Who or what a bottom sheet is about, e.g. the signed-in User.
-class CesSheetHeader extends StatelessWidget {
-  const CesSheetHeader({super.key, required this.title, this.subtitle});
+class _SheetHeader extends StatelessWidget {
+  const _SheetHeader({required this.title, this.subtitle});
 
   final String title;
   final String? subtitle;
@@ -391,7 +649,7 @@ class CesSheetHeader extends StatelessWidget {
   }
 }
 
-/// One action in a bottom sheet. Tapping it closes the sheet, then runs [onTap].
+/// One action in a [showCesSheet] menu. Tapping it closes the menu, then runs [onTap].
 class CesSheetItem extends StatelessWidget {
   const CesSheetItem({
     super.key,
@@ -408,18 +666,29 @@ class CesSheetItem extends StatelessWidget {
   /// Shown in the destructive colour, e.g. "Delete list".
   final bool destructive;
 
+  void _tap(BuildContext context) {
+    Navigator.of(context).pop();
+    onTap();
+  }
+
   @override
-  Widget build(BuildContext context) => ListTile(
-    leading: Icon(icon),
-    title: Text(label),
-    iconColor: destructive ? Theme.of(context).colorScheme.error : null,
-    textColor: destructive ? Theme.of(context).colorScheme.error : null,
-    onTap: () {
-      Navigator.of(context).pop();
-      onTap();
-    },
-    contentPadding: EdgeInsets.symmetric(horizontal: context.spacing.lg),
-  );
+  Widget build(BuildContext context) {
+    if (_isCupertino(context)) {
+      return CupertinoActionSheetAction(
+        isDestructiveAction: destructive,
+        onPressed: () => _tap(context),
+        child: Text(label),
+      );
+    }
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(label),
+      iconColor: destructive ? Theme.of(context).colorScheme.error : null,
+      textColor: destructive ? Theme.of(context).colorScheme.error : null,
+      onTap: () => _tap(context),
+      contentPadding: EdgeInsets.symmetric(horizontal: context.spacing.lg),
+    );
+  }
 }
 
 /// Indeterminate progress with a label; platform-adaptive spinner.
@@ -536,7 +805,12 @@ class CesHomeScaffold extends StatelessWidget {
                   sliver: SliverToBoxAdapter(
                     child: Row(
                       children: [
-                        Expanded(child: _Wordmark(name: brand)),
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: CesWordmark(name: brand),
+                          ),
+                        ),
                         ...actions,
                       ],
                     ),
@@ -580,28 +854,36 @@ class CesHomeScaffold extends StatelessWidget {
   }
 }
 
-/// The Cesta wordmark: the basket and the name in Bricolage.
-class _Wordmark extends StatelessWidget {
-  const _Wordmark({required this.name});
+/// The Cesta wordmark: the basket and the name in Bricolage. On a
+/// [CesBrandScaffold] the basket is Banana and the name on-brand; elsewhere
+/// both are Folha. [large] is the welcome screen's size.
+class CesWordmark extends StatelessWidget {
+  const CesWordmark({super.key, required this.name, this.large = false});
 
   final String name;
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
-    final colour = Theme.of(context).colorScheme.primary;
+    final onBrand = CesBrandScaffold.contains(context);
+    final primary = Theme.of(context).colorScheme.primary;
+    final iconColour = onBrand ? context.palette.toBuy : primary;
+    final textColour = onBrand ? context.palette.onBrand : primary;
+    final style = large ? CestaDisplayType.wordmarkLarge : CestaDisplayType.wordmark;
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(CesIcons.basket, size: 22, color: colour),
-        const SizedBox(width: 6),
+        Icon(CesIcons.basket, size: large ? 26 : 22, color: iconColour),
+        SizedBox(width: large ? 8 : 6),
         Flexible(
-          child: Text(name.toLowerCase(), style: CestaDisplayType.wordmark.copyWith(color: colour)),
+          child: Text(name.toLowerCase(), style: style.copyWith(color: textColour)),
         ),
       ],
     );
   }
 }
 
-/// A round avatar with [initials] that acts as a button, e.g. the account menu.
+/// A round avatar with [initials] that acts as a button, e.g. the User menu.
 class CesAvatarButton extends StatelessWidget {
   const CesAvatarButton({super.key, required this.initials, required this.tooltip, required this.onPressed});
 
@@ -858,6 +1140,213 @@ class _SheetCloseButton extends StatelessWidget {
         foregroundColor: scheme.onSurface,
         fixedSize: const Size(36, 36),
         minimumSize: const Size(36, 36),
+      ),
+    );
+  }
+}
+
+/// A full-bleed page on the brand surface (Figma "01 Welcome"): no app bar,
+/// light status bar icons, and components inside it ([CesButton.outline],
+/// [CesWordmark]) switch to their on-brand colours.
+class CesBrandScaffold extends StatelessWidget {
+  const CesBrandScaffold({super.key, required this.body});
+
+  final Widget body;
+
+  /// Whether [context] is inside a [CesBrandScaffold].
+  static bool contains(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_OnBrand>() != null;
+
+  @override
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+    value: SystemUiOverlayStyle.light,
+    child: Scaffold(
+      backgroundColor: context.palette.brandSurface,
+      body: _OnBrand(
+        child: DefaultTextStyle.merge(
+          style: TextStyle(color: context.palette.onBrand),
+          child: SafeArea(child: body),
+        ),
+      ),
+    ),
+  );
+}
+
+class _OnBrand extends InheritedWidget {
+  const _OnBrand({required super.child});
+
+  @override
+  bool updateShouldNotify(_OnBrand oldWidget) => false;
+}
+
+/// A page whose [top] content starts at the top and whose [bottom] actions sit
+/// at the bottom of the screen, as in the design's forms. When the content is
+/// taller than the screen (e.g. at large text sizes) the whole page scrolls.
+class CesPinnedLayout extends StatelessWidget {
+  const CesPinnedLayout({super.key, required this.top, required this.bottom, this.padding = EdgeInsets.zero});
+
+  final List<Widget> top;
+  final List<Widget> bottom;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+        child: IntrinsicHeight(
+          child: Padding(
+            padding: padding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [...top, const Spacer(), ...bottom],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// An Item as a Banana price tag (Figma "Item tile" 3:46): an [icon] and an
+/// optional [quantity] on top, the [name] at the bottom, and the hole the tag
+/// hangs from. It is drawn at a fixed size, so it doesn't grow with the text size.
+class CesItemTile extends StatelessWidget {
+  const CesItemTile({super.key, required this.name, required this.icon, this.quantity, this.size = 112});
+
+  final String name;
+  final IconData icon;
+  final String? quantity;
+  final double size;
+
+  /// Where the hanging string meets the tile, from its top-left corner.
+  static const holeCentre = Offset(56, 10);
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final ink = palette.onToBuy;
+    return MediaQuery.withNoTextScaling(
+      child: Container(
+        width: size,
+        height: size,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: palette.toBuy, borderRadius: BorderRadius.circular(CestaShapes.sign)),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(icon, size: 30, color: ink),
+                    if (quantity case final quantity?)
+                      Flexible(
+                        child: Text(
+                          quantity,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: CestaFonts.family,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: ink,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: CestaDisplayType.itemName.copyWith(color: ink),
+                ),
+              ],
+            ),
+            // The hole, in the screen's ground colour (positioned from the tile's corner, not its padding).
+            Positioned(
+              left: holeCentre.dx - 4 - 12,
+              top: holeCentre.dy - 4 - 12,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, shape: BoxShape.circle),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Where a [CesItemTile] hangs in a [CesHangingTiles] canvas: its top-left
+/// corner at ([left], [top]), turned [degrees] clockwise about that corner, as
+/// Figma positions a rotated layer.
+class CesHangingTile {
+  const CesHangingTile({required this.left, required this.top, required this.degrees, required this.tile});
+
+  final double left;
+  final double top;
+  final double degrees;
+  final CesItemTile tile;
+
+  double get _radians => degrees * math.pi / 180;
+
+  /// The tag hole in canvas coordinates.
+  Offset get hole {
+    final c = CesItemTile.holeCentre;
+    return Offset(
+      left + c.dx * math.cos(_radians) - c.dy * math.sin(_radians),
+      top + c.dx * math.sin(_radians) + c.dy * math.cos(_radians),
+    );
+  }
+}
+
+/// Item tiles hanging on strings from the top of a [canvas]-sized area, the
+/// design's decorative hero. The strings are Banana on a [CesBrandScaffold],
+/// muted elsewhere. The canvas scales down to fit narrower screens. It is
+/// decoration only, so screen readers skip it.
+class CesHangingTiles extends StatelessWidget {
+  const CesHangingTiles({super.key, required this.canvas, required this.tiles});
+
+  final Size canvas;
+  final List<CesHangingTile> tiles;
+
+  @override
+  Widget build(BuildContext context) {
+    final stringColour = CesBrandScaffold.contains(context)
+        ? context.palette.toBuy
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+    return ExcludeSemantics(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: SizedBox.fromSize(
+          size: canvas,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (final t in tiles)
+                Positioned(
+                  left: t.hole.dx - 0.75,
+                  top: -8,
+                  width: 1.5,
+                  height: t.hole.dy + 8,
+                  child: ColoredBox(color: stringColour),
+                ),
+              for (final t in tiles)
+                Positioned(
+                  left: t.left,
+                  top: t.top,
+                  child: Transform.rotate(angle: t._radians, alignment: Alignment.topLeft, child: t.tile),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

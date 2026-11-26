@@ -7,11 +7,13 @@ import 'package:material_ui/material_ui.dart';
 
 import 'fake_api_client.dart';
 import 'fake_auth_gateway.dart';
+import 'fields.dart';
 
-export 'package:cesta/src/ui/components.dart' show CesButton, CesMessage;
+export 'package:cesta/src/ui/components.dart' show CesButton, CesItemTile, CesMessage;
 
 export 'fake_api_client.dart';
 export 'fake_auth_gateway.dart';
+export 'fields.dart';
 
 const english = Locale('en');
 const brazilianPortuguese = Locale('pt', 'BR');
@@ -40,16 +42,14 @@ class Harness {
     ThemeMode themeMode = ThemeMode.light,
     double textScale = 1.0,
     String? initialLocation,
-    Size? screen,
+    Size screen = iPhone,
   }) async {
     // Unmount any previous instance so restarts start from a clean widget tree.
     await tester.pumpWidget(const SizedBox.shrink());
-    if (screen != null) {
-      tester.view
-        ..devicePixelRatio = 1
-        ..physicalSize = screen;
-      addTearDown(tester.view.reset);
-    }
+    tester.view
+      ..devicePixelRatio = 1
+      ..physicalSize = screen;
+    addTearDown(tester.view.reset);
     tester.platformDispatcher.textScaleFactorTestValue = textScale;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(
@@ -89,7 +89,7 @@ class Harness {
   Future<void> createList(String name) async {
     await tester.tap(find.text('New list').last);
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Name'), name);
+    await tester.enterText(field('Name'), name);
     await tester.tap(find.widgetWithText(CesButton, 'Create list'));
     await tester.pumpAndSettle();
   }
@@ -105,16 +105,16 @@ class Harness {
     await openListOptions(from);
     await tester.tap(find.text('Rename'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Name'), to);
+    await tester.enterText(field('Name'), to);
     await tester.tap(find.widgetWithText(CesButton, 'Save'));
     await tester.pumpAndSettle();
   }
 
-  /// Starts the app and opens Recently deleted from the account menu.
+  /// Starts the app and opens Recently deleted from the User menu.
   Future<void> openRecentlyDeleted({Locale locale = english}) async {
     await pumpApp(locale: locale);
     final inEnglish = locale == english;
-    await tester.tap(find.byTooltip(inEnglish ? 'Account' : 'Conta'));
+    await tester.tap(find.byTooltip(inEnglish ? 'User menu' : 'Menu do usuário'));
     await tester.pumpAndSettle();
     await tester.tap(find.text(inEnglish ? 'Recently deleted' : 'Excluídas recentemente'));
     await tester.pumpAndSettle();
@@ -133,34 +133,57 @@ class Harness {
     auth.offline = true;
   }
 
+  /// Scrolls [target] into view, taps it and waits for the app to settle.
+  Future<void> tap(Finder target) async {
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
+
+  /// From the welcome screen: email, then over from sign-up to sign-in.
   Future<void> openEmailSignIn() async {
+    await tap(find.text('Continue with email'));
     await tester.tap(find.text('Already have an account? Sign in'));
     await tester.pumpAndSettle();
   }
 
   Future<void> signInWithEmail(String email, String password) async {
     await openEmailSignIn();
-    await tester.enterText(find.widgetWithText(TextField, 'Email'), email);
-    await tester.enterText(find.widgetWithText(TextField, 'Password'), password);
+    await tester.enterText(field('Email'), email);
+    await tester.enterText(field('Password'), password);
     await tester.tap(find.widgetWithText(CesButton, 'Sign in'));
     await tester.pumpAndSettle();
   }
 
   Future<void> signUpWithEmail(String email, String password) async {
-    await tester.tap(find.text('Continue with email'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'Email'), email);
-    await tester.enterText(find.widgetWithText(TextField, 'Password'), password);
+    await tap(find.text('Continue with email'));
+    await tester.enterText(field('Email'), email);
+    await tester.enterText(field('Password'), password);
     await tester.tap(find.widgetWithText(CesButton, 'Create account'));
     await tester.pumpAndSettle();
   }
 
-  Future<void> openAccountMenu() async {
-    await tester.tap(find.byTooltip('Account'));
+  /// A first-time User signs in with Google as [email] and lands on the
+  /// display name screen, which suggests [name].
+  Future<void> signInWithGoogleForTheFirstTime({String email = 'ana@example.com', String name = 'Ana Souza'}) async {
+    auth.googleAccount = FakeGoogleAccount(email: email, name: name);
+    await pumpApp();
+    await tap(find.text('Continue with Google'));
+  }
+
+  Future<void> openUserMenu() async {
+    await tester.tap(find.byTooltip('User menu'));
+    await tester.pumpAndSettle();
+  }
+
+  /// Signs out from the User menu.
+  Future<void> signOut() async {
+    await openUserMenu();
+    await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
   }
 
   /// The text in the field labelled [label].
-  String textInField(String label) =>
-      tester.widget<TextField>(find.widgetWithText(TextField, label)).controller?.text ?? '';
+  String textInField(String label) => fieldController(tester, label).text;
 }

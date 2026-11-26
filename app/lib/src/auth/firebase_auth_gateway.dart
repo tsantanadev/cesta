@@ -49,26 +49,32 @@ class FirebaseAuthGateway implements AuthGateway {
   }
 
   @override
-  Future<void> sendPasswordReset({required String email}) async {
+  Future<void> sendPasswordReset({required String email}) => _guard(() async {
     try {
-      await _guard(() => _auth.sendPasswordResetEmail(email: email));
-    } on AuthFailure catch (e) {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
       // Don't reveal whether an account exists for this email.
-      if (e.detail != 'user-not-found') rethrow;
+      if (e.code != 'user-not-found') rethrow;
     }
-  }
+  });
 
   @override
   Future<void> signOut() async {
     await _auth.signOut();
     // Forget the Google account too, so the next sign-in can pick another.
-    if (_googleReady != null) await _google.signOut();
+    // After a restart google_sign_in isn't initialized yet, so do that first.
+    try {
+      await (_googleReady ??= _google.initialize());
+      await _google.signOut();
+    } on GoogleSignInException {
+      // Signed out of Cesta already; Google only remembers which account to suggest.
+    }
   }
 
   @override
   Future<String?> idToken({bool forceRefresh = false}) async => _auth.currentUser?.getIdToken(forceRefresh);
 
-  Future<void> _guard(Future<Object?> Function() call) async {
+  Future<void> _guard(Future<void> Function() call) async {
     try {
       await call();
     } on FirebaseAuthException catch (e) {

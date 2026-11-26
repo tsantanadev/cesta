@@ -9,27 +9,16 @@ abstract final class CestaTheme {
 
   static ThemeData _build(Brightness brightness) {
     final light = brightness == Brightness.light;
-    // Material roles mapped from the design palette; the seed fills the rest.
-    final scheme = ColorScheme.fromSeed(seedColor: CestaColors.seed, brightness: brightness).copyWith(
-      primary: light ? CestaColors.folha : CestaColors.folhaDark,
-      onPrimary: light ? CestaColors.onFolha : CestaColors.onFolhaDark,
-      surface: light ? CestaColors.alface : CestaColors.alfaceDark,
-      onSurface: light ? CestaColors.tinta : CestaColors.tintaDark,
-      onSurfaceVariant: light ? CestaColors.tintaMuted : CestaColors.tintaMutedDark,
-      surfaceContainerLowest: light ? CestaColors.branco : CestaColors.brancoDark,
-      surfaceContainerLow: light ? CestaColors.branco : CestaColors.brancoDark,
-      error: light ? CestaColors.beterraba : CestaColors.beterrabaDark,
-    );
+    final scheme = light ? _lightScheme : _darkScheme;
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       brightness: brightness,
       fontFamily: CestaFonts.family,
     );
-    final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(CestaRadii.button));
     // Figma Button (3:61): 56 dp pills, Plus Jakarta Sans Bold 16.
     const pill = StadiumBorder();
-    const buttonLabel = TextStyle(fontWeight: FontWeight.w700, fontSize: 16);
+    const buttonLabel = TextStyle(fontFamily: CestaFonts.family, fontWeight: FontWeight.w700, fontSize: 16);
     const buttonSize = Size(64, 56);
     final fieldBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(CestaRadii.field),
@@ -81,11 +70,15 @@ abstract final class CestaTheme {
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(minimumSize: const Size(48, 48), shape: buttonShape),
+        style: TextButton.styleFrom(
+          minimumSize: const Size(48, 44),
+          shape: pill,
+          textStyle: const TextStyle(fontFamily: CestaFonts.family, fontWeight: FontWeight.w700, fontSize: 15),
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        fillColor: scheme.surfaceContainerLowest,
         border: fieldBorder,
         enabledBorder: fieldBorder,
         focusedBorder: fieldBorder.copyWith(borderSide: BorderSide(color: scheme.primary, width: 2)),
@@ -106,4 +99,64 @@ abstract final class CestaTheme {
       ),
     );
   }
+
+  // Every Material role from the Figma palette ("Cesta color" and "Cesta
+  // color (dark)"), so nothing is derived from a seed colour.
+  static const _lightScheme = ColorScheme(
+    brightness: Brightness.light,
+    primary: CestaColors.folha,
+    onPrimary: CestaColors.onFolha,
+    primaryContainer: CestaColors.checked,
+    onPrimaryContainer: CestaColors.folha,
+    secondary: CestaColors.banana,
+    onSecondary: CestaColors.onBanana,
+    secondaryContainer: CestaColors.checked,
+    onSecondaryContainer: CestaColors.tinta,
+    error: CestaColors.beterraba,
+    onError: CestaColors.onFolha,
+    errorContainer: Color(0xFFF8DDE2),
+    onErrorContainer: CestaColors.beterraba,
+    surface: CestaColors.alface,
+    onSurface: CestaColors.tinta,
+    onSurfaceVariant: CestaColors.tintaMuted,
+    surfaceContainerLowest: CestaColors.branco,
+    surfaceContainerLow: CestaColors.branco,
+    surfaceContainer: CestaColors.branco,
+    surfaceContainerHigh: CestaColors.branco,
+    surfaceContainerHighest: CestaColors.checked,
+    outline: CestaColors.tintaMuted,
+    outlineVariant: CestaColors.checked,
+    inverseSurface: CestaColors.toast,
+    onInverseSurface: CestaColors.onToast,
+    inversePrimary: CestaColors.banana,
+  );
+
+  static const _darkScheme = ColorScheme(
+    brightness: Brightness.dark,
+    primary: CestaColors.folhaDark,
+    onPrimary: CestaColors.onFolhaDark,
+    primaryContainer: CestaColors.checkedDark,
+    onPrimaryContainer: CestaColors.folhaDark,
+    secondary: CestaColors.bananaDark,
+    onSecondary: CestaColors.onBanana,
+    secondaryContainer: CestaColors.checkedDark,
+    onSecondaryContainer: CestaColors.tintaDark,
+    error: CestaColors.beterrabaDark,
+    onError: CestaColors.onFolhaDark,
+    errorContainer: Color(0xFF3A1A22),
+    onErrorContainer: CestaColors.beterrabaDark,
+    surface: CestaColors.alfaceDark,
+    onSurface: CestaColors.tintaDark,
+    onSurfaceVariant: CestaColors.tintaMutedDark,
+    surfaceContainerLowest: CestaColors.brancoDark,
+    surfaceContainerLow: CestaColors.brancoDark,
+    surfaceContainer: CestaColors.brancoDark,
+    surfaceContainerHigh: CestaColors.brancoDark,
+    surfaceContainerHighest: CestaColors.checkedDark,
+    outline: CestaColors.tintaMutedDark,
+    outlineVariant: CestaColors.checkedDark,
+    inverseSurface: CestaColors.toast,
+    onInverseSurface: CestaColors.onToast,
+    inversePrimary: CestaColors.bananaDark,
+  );
 }

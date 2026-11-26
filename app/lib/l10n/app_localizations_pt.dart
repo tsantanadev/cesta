@@ -46,16 +46,31 @@ class AppLocalizationsPt extends AppLocalizations {
   String get healthRetry => 'Verificar novamente';
 
   @override
-  String get welcomeTagline => 'Listas de compras compartilhadas que funcionam no mercado, com ou sem sinal.';
+  String get welcomeHeadline => 'Uma lista de compras para a casa toda.';
+
+  @override
+  String get welcomeSubtitle => 'Adicione o que falta, veja o que os outros adicionaram e marque tudo no mercado.';
+
+  @override
+  String get welcomeSampleOranges => 'Laranjas';
+
+  @override
+  String get welcomeSampleBread => 'Pão';
+
+  @override
+  String get welcomeSampleCoffee => 'Café';
+
+  @override
+  String get welcomeSampleEggs => 'Ovos';
+
+  @override
+  String get welcomeSampleCheese => 'Queijo';
 
   @override
   String get welcomeContinueWithGoogle => 'Continuar com Google';
 
   @override
   String get welcomeContinueWithEmail => 'Continuar com e-mail';
-
-  @override
-  String get welcomeHaveAccount => 'Já tem uma conta? Entrar';
 
   @override
   String get signInTitle => 'Entrar';
@@ -183,7 +198,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get listsEmptyBody => 'As listas que você criar ou para as quais for convidado aparecerão aqui.';
 
   @override
-  String get userMenu => 'Conta';
+  String get userMenu => 'Menu do usuário';
 
   @override
   String get userMenuChangeDisplayName => 'Alterar nome de exibição';
@@ -196,6 +211,12 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get loading => 'Carregando…';
+
+  @override
+  String get userLoadFailed => 'Não foi possível carregar seus dados.';
+
+  @override
+  String get userLoadRetry => 'Tentar de novo';
 
   @override
   String get sheetClose => 'Fechar';

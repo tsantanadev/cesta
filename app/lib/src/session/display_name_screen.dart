@@ -2,12 +2,14 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../routes.dart';
 import '../ui/components.dart';
 import 'auth_messages.dart';
 import 'session_controller.dart';
 
-/// Sets the display name: once after sign-up ([onboarding]), prefilled with
-/// the server's suggestion, and later from the User menu.
+/// Sets the display name (Figma "02 Your name"): once after sign-up
+/// ([onboarding]), prefilled with the server's suggestion, and later from the
+/// User menu. A tag previews the name as it is typed.
 class DisplayNameScreen extends StatefulWidget {
   const DisplayNameScreen({super.key, required this.session, required this.onboarding});
 
@@ -23,6 +25,9 @@ class _DisplayNameScreenState extends State<DisplayNameScreen> {
   late final _name = TextEditingController(text: widget.session.user?.displayName ?? '');
   bool _busy = false;
   String? _error;
+
+  // The preview tag's place in the design's 342 × 196 frame.
+  static const _previewCanvas = Size(342, 196);
 
   @override
   void dispose() {
@@ -48,25 +53,37 @@ class _DisplayNameScreenState extends State<DisplayNameScreen> {
       };
     });
     // During onboarding the router moves on once the name is confirmed.
-    if (outcome == DisplayNameOutcome.saved && !widget.onboarding) context.go('/');
+    if (outcome == DisplayNameOutcome.saved && !widget.onboarding) context.go(Routes.home);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final form = Form(
+    return Form(
       key: _form,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (widget.onboarding) ...[
-            const CesGap.lg(),
-            CesHeading(title: l10n.displayNameOnboardingTitle, subtitle: l10n.displayNameExplanation),
-          ] else
-            CesText(l10n.displayNameExplanation),
+      child: CesFormScaffold(
+        title: widget.onboarding ? null : l10n.displayNameEditTitle,
+        top: [
+          ValueListenableBuilder(
+            valueListenable: _name,
+            builder: (context, value, _) => CesHangingTiles(
+              canvas: _previewCanvas,
+              tiles: [
+                CesHangingTile(
+                  left: 97,
+                  top: 44,
+                  degrees: 3,
+                  tile: CesItemTile(name: value.text.trim(), icon: CesIcons.basket, size: 148),
+                ),
+              ],
+            ),
+          ),
+          const CesGap.lg(),
+          if (widget.onboarding) ...[CesDisplayHeading(l10n.displayNameOnboardingTitle), const SizedBox(height: 10)],
+          CesText.intro(l10n.displayNameExplanation),
           const CesGap.lg(),
           if (_error case final error?) ...[CesMessage(tone: CesMessageTone.error, text: error), const CesGap.md()],
-          CesTextField(
+          CesTextField.display(
             label: l10n.fieldDisplayName,
             controller: _name,
             autofillHints: const [AutofillHints.name],
@@ -76,6 +93,8 @@ class _DisplayNameScreenState extends State<DisplayNameScreen> {
             validator: (v) => validateDisplayName(l10n, v),
           ),
           const CesGap.lg(),
+        ],
+        bottom: [
           CesButton(
             label: widget.onboarding ? l10n.displayNameContinue : l10n.displayNameSave,
             busy: _busy,
@@ -83,12 +102,11 @@ class _DisplayNameScreenState extends State<DisplayNameScreen> {
           ),
           // A new User must be able to leave without confirming, e.g. offline.
           if (widget.onboarding) ...[
-            const CesGap.sm(),
+            const CesGap.md(),
             CesLink(label: l10n.userMenuSignOut, onPressed: _busy ? null : widget.session.signOut),
           ],
         ],
       ),
     );
-    return widget.onboarding ? CesScaffold.bare(body: form) : CesScaffold(title: l10n.displayNameEditTitle, body: form);
   }
 }

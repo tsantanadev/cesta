@@ -17,7 +17,7 @@ Future<void> main() async {
   // Reads google-services.json / GoogleService-Info.plist (infra/auth-setup.sh).
   await Firebase.initializeApp();
   final auth = FirebaseAuthGateway();
-  final api = CestaApi(createApiTransport(baseUrl: apiBaseUrl, auth: auth)).api;
+  final api = CestaApi(createApiTransport(baseUrl: apiBaseUrl, idToken: auth.idToken)).api;
   final database = AppDatabase(driftDatabase(name: 'cesta'));
   runApp(CestaApp(api: api, auth: auth, database: database));
 }

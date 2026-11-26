@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../auth/auth_gateway.dart';
 import '../ui/components.dart';
 import 'auth_messages.dart';
+import 'auth_submission.dart';
 
 /// Sends a password reset email.
 class ResetPasswordScreen extends StatefulWidget {
@@ -17,11 +18,9 @@ class ResetPasswordScreen extends StatefulWidget {
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> with AuthSubmission {
   final _form = GlobalKey<FormState>();
   late final _email = TextEditingController(text: widget.initialEmail);
-  bool _busy = false;
-  String? _error;
   String? _sentTo;
 
   @override
@@ -31,25 +30,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   Future<void> _submit() async {
-    final l10n = AppLocalizations.of(context);
-    setState(() => _error = null);
+    clearError();
     if (!(_form.currentState?.validate() ?? false)) return;
-    setState(() => _busy = true);
     final email = _email.text.trim();
-    String? error;
-    String? sentTo;
-    try {
-      await widget.auth.sendPasswordReset(email: email);
-      sentTo = email;
-    } on AuthFailure catch (e) {
-      error = authFailureMessage(l10n, e);
-    }
-    if (mounted) {
-      setState(() {
-        _busy = false;
-        _error = error;
-        _sentTo = sentTo;
-      });
+    if (await submitAuth(() => widget.auth.sendPasswordReset(email: email)) && mounted) {
+      setState(() => _sentTo = email);
     }
   }
 
@@ -70,7 +55,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               const CesGap.lg(),
               CesButton(label: l10n.resetBackToSignIn, onPressed: () => context.pop()),
             ] else ...[
-              if (_error case final error?) ...[CesMessage(tone: CesMessageTone.error, text: error), const CesGap.lg()],
+              if (error case final error?) ...[CesMessage(tone: CesMessageTone.error, text: error), const CesGap.lg()],
               CesTextField(
                 label: l10n.fieldEmail,
                 controller: _email,
@@ -81,7 +66,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 validator: (v) => validateEmail(l10n, v),
               ),
               const CesGap.lg(),
-              CesButton(label: l10n.resetButton, busy: _busy, onPressed: _submit),
+              CesButton(label: l10n.resetButton, busy: busy, onPressed: _submit),
             ],
           ],
         ),

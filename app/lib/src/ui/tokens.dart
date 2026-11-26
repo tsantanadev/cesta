@@ -4,9 +4,6 @@ import 'package:material_ui/material_ui.dart';
 /// font styles; it reads them through the theme (see `CestaTheme`) and the
 /// in-house components in `components.dart`.
 abstract final class CestaColors {
-  /// Brand seed: Folha, the actions green.
-  static const seed = folha;
-
   // The design palette (Figma "Cesta — App design", Foundations / Palette).
   // Names are the design's produce words.
 
@@ -40,6 +37,12 @@ abstract final class CestaColors {
   /// Text and icons on [folha].
   static const onFolha = Color(0xFFFFFFFF);
 
+  /// The welcome screen's full-bleed ground (Figma "brand-surface").
+  static const brandSurface = Color(0xFF1E6B43);
+
+  /// Text and outlines on [brandSurface], in both modes (Figma "on-brand").
+  static const onBrand = Color(0xFFFFFFFF);
+
   // Dark variants: Figma "Cesta color (dark)" collection.
   static const bananaDark = Color(0xFFF2C934);
   static const folhaDark = Color(0xFF4CB97A);
@@ -50,12 +53,13 @@ abstract final class CestaColors {
   static const brancoDark = Color(0xFF18271F);
   static const checkedDark = Color(0xFF26382D);
   static const beterrabaDark = Color(0xFFF0647F);
+  static const brandSurfaceDark = Color(0xFF123A26);
 
   /// The Toast's ground: deep Tinta in both modes (Figma "on-banana").
   static const toast = Color(0xFF17382A);
 
-  /// Text on the Toast and on brand surfaces, in both modes (Figma "on-brand").
-  static const onToast = Color(0xFFFFFFFF);
+  /// Text on the Toast, in both modes.
+  static const onToast = onBrand;
 
   /// Status colours, used for health and sync indicators.
   static const success = Color(0xFF2E7D32);
@@ -86,7 +90,9 @@ class CestaSpacing extends ThemeExtension<CestaSpacing> {
 /// Corner radii.
 abstract final class CestaRadii {
   static const card = 16.0;
-  static const button = 12.0;
+
+  /// Buttons are 56 dp pills (Figma Button 3:61).
+  static const button = 28.0;
   static const field = 12.0;
   static const sheet = 28.0;
 }
@@ -104,19 +110,30 @@ abstract final class CestaFonts {
 /// for, in light and dark variants.
 @immutable
 class CestaPalette extends ThemeExtension<CestaPalette> {
-  const CestaPalette({required this.toBuy, required this.onToBuy, required this.bought, required this.onBought});
+  const CestaPalette({
+    required this.toBuy,
+    required this.onToBuy,
+    required this.bought,
+    required this.onBought,
+    required this.brandSurface,
+    required this.onBrand,
+  });
 
   static const light = CestaPalette(
     toBuy: CestaColors.banana,
     onToBuy: CestaColors.onBanana,
     bought: CestaColors.checked,
     onBought: CestaColors.folha,
+    brandSurface: CestaColors.brandSurface,
+    onBrand: CestaColors.onBrand,
   );
   static const dark = CestaPalette(
     toBuy: CestaColors.bananaDark,
     onToBuy: CestaColors.onBanana,
     bought: CestaColors.checkedDark,
     onBought: CestaColors.folhaDark,
+    brandSurface: CestaColors.brandSurfaceDark,
+    onBrand: CestaColors.onBrand,
   );
 
   /// The sign that counts Items still to buy (Banana).
@@ -127,12 +144,25 @@ class CestaPalette extends ThemeExtension<CestaPalette> {
   final Color bought;
   final Color onBought;
 
+  /// The welcome screen's ground, and what goes on it.
+  final Color brandSurface;
+  final Color onBrand;
+
   @override
-  CestaPalette copyWith({Color? toBuy, Color? onToBuy, Color? bought, Color? onBought}) => CestaPalette(
+  CestaPalette copyWith({
+    Color? toBuy,
+    Color? onToBuy,
+    Color? bought,
+    Color? onBought,
+    Color? brandSurface,
+    Color? onBrand,
+  }) => CestaPalette(
     toBuy: toBuy ?? this.toBuy,
     onToBuy: onToBuy ?? this.onToBuy,
     bought: bought ?? this.bought,
     onBought: onBought ?? this.onBought,
+    brandSurface: brandSurface ?? this.brandSurface,
+    onBrand: onBrand ?? this.onBrand,
   );
 
   @override
@@ -143,6 +173,8 @@ class CestaPalette extends ThemeExtension<CestaPalette> {
           onToBuy: Color.lerp(onToBuy, other.onToBuy, t)!,
           bought: Color.lerp(bought, other.bought, t)!,
           onBought: Color.lerp(onBought, other.onBought, t)!,
+          brandSurface: Color.lerp(brandSurface, other.brandSurface, t)!,
+          onBrand: Color.lerp(onBrand, other.onBrand, t)!,
         );
 }
 
@@ -182,6 +214,50 @@ abstract final class CestaDisplayType {
     fontWeight: FontWeight.w800,
     fontSize: 22,
     letterSpacing: -0.44,
+  );
+
+  /// The larger wordmark on the welcome screen.
+  static const wordmarkLarge = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 26,
+    letterSpacing: -0.52,
+  );
+
+  /// The welcome screen's headline.
+  static const headline = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 40,
+    height: 0.98,
+    letterSpacing: -1.2,
+  );
+
+  /// A form screen's heading, e.g. "What should we call you?".
+  static const heading = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 36,
+    height: 1.02,
+    letterSpacing: -0.72,
+  );
+
+  /// The value of a display field, e.g. the display name being typed.
+  static const fieldValue = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 30,
+    height: 1.1,
+    letterSpacing: -0.6,
+  );
+
+  /// An Item's name on its tile.
+  static const itemName = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 16.5,
+    height: 1,
+    letterSpacing: -0.165,
   );
 }
 

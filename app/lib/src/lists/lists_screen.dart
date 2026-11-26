@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../api/generated/cesta_api.dart';
+import '../routes.dart';
 import '../session/session_controller.dart';
 import '../ui/components.dart';
 import 'list_messages.dart';
@@ -45,8 +46,9 @@ class _ListsScreenState extends State<ListsScreen> {
     unawaited(
       showCesSheet(
         context,
-        children: [
-          if (user != null) CesSheetHeader(title: user.displayName, subtitle: user.email),
+        title: user?.displayName,
+        subtitle: user?.email,
+        items: [
           CesSheetItem(
             icon: CesIcons.recentlyDeleted,
             label: l10n.listsRecentlyDeleted,
@@ -55,12 +57,12 @@ class _ListsScreenState extends State<ListsScreen> {
           CesSheetItem(
             icon: CesIcons.edit,
             label: l10n.userMenuChangeDisplayName,
-            onTap: () => unawaited(context.push('/me/name')),
+            onTap: () => unawaited(context.push(Routes.changeDisplayName)),
           ),
           CesSheetItem(
             icon: CesIcons.server,
             label: l10n.userMenuServerStatus,
-            onTap: () => unawaited(context.push('/server-status')),
+            onTap: () => unawaited(context.push(Routes.serverStatus)),
           ),
           CesSheetItem(
             icon: CesIcons.signOut,
@@ -73,7 +75,7 @@ class _ListsScreenState extends State<ListsScreen> {
   }
 
   Future<void> _openRecentlyDeleted() async {
-    await context.push('/lists/deleted');
+    await context.push(Routes.recentlyDeleted);
     await _refresh(); // pick up Lists restored there
   }
 
@@ -95,8 +97,8 @@ class _ListsScreenState extends State<ListsScreen> {
     unawaited(
       showCesSheet(
         context,
-        children: [
-          CesSheetHeader(title: list.name),
+        title: list.name,
+        items: [
           CesSheetItem(icon: CesIcons.edit, label: l10n.listsRename, onTap: () => _rename(list)),
           CesSheetItem(
             icon: CesIcons.delete,
