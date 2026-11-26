@@ -43,7 +43,7 @@ flutter run                                                      # iOS simulator
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080      # Android emulator (10.0.2.2 is the host machine)
 ```
 
-On a physical device, set `API_BASE_URL` to your machine's LAN address, e.g. `http://192.168.1.10:8080`.
+On a physical Android device, run `adb reverse tcp:8080 tcp:8080` and the default URL works over USB. On an iPhone, run `tool/run-iphone.sh`: it sets up signing with your Apple team, finds the phone and points the app at `http://<your Mac>.local:8080`. Debug builds allow plain HTTP to `*.local` hosts (`ios/scripts/cesta_build_phase.sh`); release builds don't.
 
 Sign-in needs the Firebase config files (`android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist`), which `infra/auth-setup.sh dev` writes. Without them the app builds but stops at startup. The local backend (`make dev`) accepts ID tokens from the `cesta-dev` Firebase project.
 

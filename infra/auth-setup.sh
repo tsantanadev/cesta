@@ -320,7 +320,7 @@ fi
 note "These are public client identifiers, not secrets: commit them."
 pause
 
-stage "iOS: URL scheme and Xcode target"
+stage "iOS: Google sign-in URL scheme"
 REVERSED=$("$PB" -c 'Print :REVERSED_CLIENT_ID' "$IOS_PLIST" 2>/dev/null || true)
 CLIENT_ID=$("$PB" -c 'Print :CLIENT_ID' "$IOS_PLIST" 2>/dev/null || true)
 if [[ -z "$REVERSED" || -z "$CLIENT_ID" ]]; then
@@ -337,16 +337,14 @@ else
   "$PB" -c "Add :GIDClientID string $CLIENT_ID" "$INFO_PLIST"
   step "Info.plist: Google sign-in URL scheme and GIDClientID set."
 fi
-say "The plist must be part of the Runner target, which only Xcode can do safely:"
-open_url "$ROOT/app/ios/Runner.xcworkspace"
-step "In the Project navigator, right-click the Runner folder → 'Add Files to \"Runner\"…'."
-step "Pick app/ios/Runner/GoogleService-Info.plist. Leave 'Copy items if needed' off, tick target Runner, click Add."
-pause "Press Enter once the file shows in Runner"
+note "The Runner build phase (app/ios/scripts/cesta_build_phase.sh) bundles the plist; no Xcode step needed."
+pause
 
 stage "Try it"
 say "Sign in once with each method against the local backend (it accepts tokens from cesta-dev):"
 step "Terminal 1: cd backend && make dev"
-step "Terminal 2: cd app && flutter run   (Android emulator: --dart-define=API_BASE_URL=http://10.0.2.2:8080)"
+step "Terminal 2: cd app && flutter run   (iOS Simulator; Android emulator: --dart-define=API_BASE_URL=http://10.0.2.2:8080)"
+step "iPhone: app/tool/run-iphone.sh"
 step "Create an account with email + password, confirm the name, sign out."
 step "Continue with Google, sign out. Forgot password? → check the email arrives."
 note "After the next deploy, check per-IP rate limiting sees real client addresses: if users"

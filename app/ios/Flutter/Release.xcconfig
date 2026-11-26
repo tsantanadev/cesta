@@ -1,1 +1,3 @@
 #include "Generated.xcconfig"
+// Your Apple team for signing device builds (git-ignored; app/tool/iphone-setup.sh writes it).
+#include? "Signing.xcconfig"

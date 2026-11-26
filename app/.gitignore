@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Per-developer iOS signing team (app/tool/iphone-setup.sh)
+/ios/Flutter/Signing.xcconfig
