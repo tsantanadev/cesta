@@ -196,4 +196,110 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get loading => 'Carregando…';
+
+  @override
+  String get sheetClose => 'Fechar';
+
+  @override
+  String get listsNew => 'Nova lista';
+
+  @override
+  String get listsToBuy => 'a comprar';
+
+  @override
+  String get listsNothingToBuy => 'Nada a comprar';
+
+  @override
+  String get listsOnlyYou => 'Só você';
+
+  @override
+  String listsSharedWithPeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count pessoas', one: '1 pessoa');
+    return 'Compartilhada com $_temp0';
+  }
+
+  @override
+  String get listsSharedWithYou => 'Compartilhada com você';
+
+  @override
+  String get listsNewSheetTitle => 'Nova lista';
+
+  @override
+  String get fieldListName => 'Nome';
+
+  @override
+  String get listsCreate => 'Criar lista';
+
+  @override
+  String listsOptions(String name) {
+    return 'Opções de $name';
+  }
+
+  @override
+  String get listsRename => 'Renomear';
+
+  @override
+  String get listsRenameSheetTitle => 'Renomear lista';
+
+  @override
+  String get listsSave => 'Salvar';
+
+  @override
+  String get listsDelete => 'Excluir lista';
+
+  @override
+  String listsDeleted(String name) {
+    return '“$name” excluída';
+  }
+
+  @override
+  String get listsUndo => 'Desfazer';
+
+  @override
+  String get listsRestore => 'Restaurar';
+
+  @override
+  String listsRestored(String name) {
+    return '“$name” restaurada';
+  }
+
+  @override
+  String get listsRecentlyDeleted => 'Excluídas recentemente';
+
+  @override
+  String get listsRecentlyDeletedExplanation =>
+      'Listas excluídas podem ser restauradas por 30 dias. Depois disso, somem de vez.';
+
+  @override
+  String get listsRecentlyDeletedEmpty => 'Nada excluído nos últimos 30 dias.';
+
+  @override
+  String listsDaysLeft(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'Faltam $days dias',
+      one: 'Falta 1 dia',
+      zero: 'Some hoje',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get errorListNameRequired => 'Digite um nome.';
+
+  @override
+  String get errorListNameTooLong => 'Use até 60 caracteres.';
+
+  @override
+  String get errorListNameInvalid => 'Esse nome não pode ser usado. Tente outro.';
+
+  @override
+  String get errorListLimit => 'Você atingiu o limite de 100 listas. Exclua uma para criar outra.';
+
+  @override
+  String get errorListNotFound => 'Esta lista não está mais disponível.';
+
+  @override
+  String get errorListRestoreExpired => 'Esta lista foi excluída há mais de 30 dias e não pode ser restaurada.';
 }

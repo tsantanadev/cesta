@@ -393,16 +393,27 @@ class CesSheetHeader extends StatelessWidget {
 
 /// One action in a bottom sheet. Tapping it closes the sheet, then runs [onTap].
 class CesSheetItem extends StatelessWidget {
-  const CesSheetItem({super.key, required this.icon, required this.label, required this.onTap});
+  const CesSheetItem({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
+  /// Shown in the destructive colour, e.g. "Delete list".
+  final bool destructive;
+
   @override
   Widget build(BuildContext context) => ListTile(
     leading: Icon(icon),
     title: Text(label),
+    iconColor: destructive ? Theme.of(context).colorScheme.error : null,
+    textColor: destructive ? Theme.of(context).colorScheme.error : null,
     onTap: () {
       Navigator.of(context).pop();
       onTap();
@@ -480,6 +491,330 @@ class CesStatusCard extends StatelessWidget {
     );
   }
 }
+
+/// The home page layout from the design: the wordmark and [actions] on top,
+/// a big [title], then [items] as a column of cards, or [empty] when there
+/// are none. [floatingAction] floats bottom-right, e.g. a [CesFab].
+class CesHomeScaffold extends StatelessWidget {
+  const CesHomeScaffold({
+    super.key,
+    required this.brand,
+    required this.title,
+    required this.items,
+    required this.empty,
+    this.actions = const [],
+    this.floatingAction,
+  });
+
+  /// The app's name, shown as the wordmark.
+  final String brand;
+  final String title;
+  final List<Widget> items;
+  final Widget empty;
+  final List<Widget> actions;
+  final Widget? floatingAction;
+
+  // Gaps from the design that sit off the 4 dp scale.
+  static const _gutter = 20.0;
+  static const _cardGap = 10.0;
+  static const _fabClearance = 96.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final spacing = context.spacing;
+    return Scaffold(
+      floatingActionButton: floatingAction,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(_gutter, spacing.sm, spacing.sm, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Row(
+                      children: [
+                        Expanded(child: _Wordmark(name: brand)),
+                        ...actions,
+                      ],
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(_gutter, spacing.lg, _gutter, _gutter),
+                  sliver: SliverToBoxAdapter(
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        title,
+                        style: CestaDisplayType.screenTitle.copyWith(color: theme.colorScheme.onSurface),
+                      ),
+                    ),
+                  ),
+                ),
+                if (items.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(spacing.lg, 0, spacing.lg, _fabClearance),
+                      child: Center(child: empty),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(spacing.md, 0, spacing.md, _fabClearance),
+                    sliver: SliverList.separated(
+                      itemCount: items.length,
+                      itemBuilder: (_, i) => items[i],
+                      separatorBuilder: (_, _) => const SizedBox(height: _cardGap),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The Cesta wordmark: the basket and the name in Bricolage.
+class _Wordmark extends StatelessWidget {
+  const _Wordmark({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = Theme.of(context).colorScheme.primary;
+    return Row(
+      children: [
+        Icon(CesIcons.basket, size: 22, color: colour),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(name.toLowerCase(), style: CestaDisplayType.wordmark.copyWith(color: colour)),
+        ),
+      ],
+    );
+  }
+}
+
+/// A round avatar with [initials] that acts as a button, e.g. the account menu.
+class CesAvatarButton extends StatelessWidget {
+  const CesAvatarButton({super.key, required this.initials, required this.tooltip, required this.onPressed});
+
+  final String initials;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Container(
+        width: 32,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: palette.toBuy,
+          shape: BoxShape.circle,
+          border: Border.all(color: Theme.of(context).colorScheme.surfaceContainerLowest, width: 2),
+        ),
+        child: Text(
+          initials,
+          textScaler: TextScaler.noScaling,
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: palette.onToBuy),
+        ),
+      ),
+    );
+  }
+}
+
+/// A card for one List: its [name], a [subtitle] and [trailing] widgets
+/// (e.g. a [CesCountSign] and an options button).
+class CesListCard extends StatelessWidget {
+  const CesListCard({super.key, required this.name, required this.subtitle, this.trailing = const []});
+
+  final String name;
+  final String subtitle;
+  final List<Widget> trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(CestaShapes.listCard),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 18, trailing.isEmpty ? context.spacing.md : context.spacing.xs, 18),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: CestaDisplayType.listName.copyWith(color: theme.colorScheme.onSurface)),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            for (final w in trailing) ...[SizedBox(width: context.spacing.sm), w],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The sign on a List's card: how many Items are still to buy, on Banana,
+/// like a price tag; with nothing to buy, a check on the "bought" colour.
+class CesCountSign extends StatelessWidget {
+  const CesCountSign({super.key, required this.count, required this.caption, required this.nothingLabel});
+
+  final int count;
+
+  /// Under the number, e.g. "to buy".
+  final String caption;
+
+  /// Accessible label when [count] is 0.
+  final String nothingLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final empty = count == 0;
+    final foreground = empty ? palette.onBought : palette.onToBuy;
+    return Semantics(
+      label: empty ? nothingLabel : '$count $caption',
+      excludeSemantics: true,
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 60, minHeight: 64),
+        padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
+        decoration: BoxDecoration(
+          color: empty ? palette.bought : palette.toBuy,
+          borderRadius: BorderRadius.circular(CestaShapes.sign),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            // The nail hole the sign hangs from.
+            Positioned(
+              top: -9,
+              child: Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, shape: BoxShape.circle),
+              ),
+            ),
+            if (empty)
+              Icon(CesIcons.check, size: 24, color: foreground)
+            else
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$count', style: CestaDisplayType.count.copyWith(color: foreground)),
+                  Text(
+                    caption,
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 10, color: foreground),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The page's main action as a pill floating bottom-right, e.g. "New list".
+class CesFab extends StatelessWidget {
+  const CesFab({super.key, required this.label, required this.icon, required this.onPressed});
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FloatingActionButton.extended(
+      onPressed: onPressed,
+      backgroundColor: scheme.primary,
+      foregroundColor: scheme.onPrimary,
+      shape: const StadiumBorder(),
+      extendedPadding: EdgeInsets.symmetric(horizontal: context.spacing.lg),
+      icon: Icon(icon, size: 20),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+    );
+  }
+}
+
+/// Shows a short message at the bottom of the screen (the design's Toast),
+/// with an optional action such as "Undo".
+void showCesToast(BuildContext context, {required String message, String? actionLabel, VoidCallback? onAction}) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(message),
+        persist: false,
+        duration: const Duration(seconds: 6),
+        action: actionLabel == null ? null : SnackBarAction(label: actionLabel, onPressed: onAction ?? () {}),
+      ),
+    );
+}
+
+/// Shows a bottom sheet with a [title], a close button and [child] (usually
+/// a form), kept above the keyboard.
+Future<void> showCesFormSheet(
+  BuildContext context, {
+  required String title,
+  required String closeTooltip,
+  required Widget child,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  builder: (context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(context.spacing.lg, 0, context.spacing.lg, context.spacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
+                CesIconButton(
+                  icon: CesIcons.close,
+                  tooltip: closeTooltip,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            SizedBox(height: context.spacing.md),
+            child,
+          ],
+        ),
+      ),
+    ),
+  ),
+);
 
 /// Vertical gap from the spacing scale.
 class CesGap extends StatelessWidget {

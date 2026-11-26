@@ -19,6 +19,13 @@ abstract final class CesIcons {
   static const positive = IconData(0xe184, fontFamily: _fill);
   static const warning = IconData(0xe4e0, fontFamily: _fill);
   static const offline = IconData(0xe1b6, fontFamily: _regular);
+  static const plus = IconData(0xe3d4, fontFamily: _bold);
+  static const check = IconData(0xe182, fontFamily: _bold);
+  static const more = IconData(0xe1fe, fontFamily: _bold);
+  static const close = IconData(0xe4f6, fontFamily: _regular);
+  static const delete = IconData(0xe4a6, fontFamily: _regular);
+  static const restore = IconData(0xe038, fontFamily: _regular);
+  static const recentlyDeleted = IconData(0xe1a0, fontFamily: _regular);
 
   static const _regular = 'PhosphorRegular';
   static const _bold = 'PhosphorBold';

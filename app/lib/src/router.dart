@@ -4,7 +4,8 @@ import 'api/generated/cesta_api.dart';
 import 'auth/auth_gateway.dart';
 import 'db/app_database.dart';
 import 'health/health_screen.dart';
-import 'home/home_screen.dart';
+import 'lists/lists_controller.dart';
+import 'lists/lists_screen.dart';
 import 'session/display_name_screen.dart';
 import 'session/email_auth_screen.dart';
 import 'session/reset_password_screen.dart';
@@ -50,6 +51,7 @@ String? sessionRedirect(SessionController session, Uri uri) {
 
 GoRouter buildRouter({
   required SessionController session,
+  required ListsController lists,
   required AuthGateway auth,
   required ApiClient api,
   required AppDatabase database,
@@ -82,7 +84,7 @@ GoRouter buildRouter({
     ),
     GoRoute(
       path: '/',
-      builder: (_, _) => HomeScreen(session: session),
+      builder: (_, _) => ListsScreen(session: session, lists: lists),
     ),
     GoRoute(
       path: '/me/name',

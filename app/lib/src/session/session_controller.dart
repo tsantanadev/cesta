@@ -57,6 +57,7 @@ class SessionController extends ChangeNotifier {
       _status = SessionStatus.signedOut;
       notifyListeners();
       await _db.clearSignedInUser();
+      await _db.clearKnownLists();
       return;
     }
 
@@ -66,7 +67,10 @@ class SessionController extends ChangeNotifier {
       _user = cached.user;
     } else {
       _user = null;
-      if (cached != null) await _db.clearSignedInUser();
+      if (cached != null) {
+        await _db.clearSignedInUser();
+        await _db.clearKnownLists(); // another User's Lists
+      }
     }
     _loadingUser = _user == null;
     _status = SessionStatus.signedIn;

@@ -1,0 +1,149 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
+
+import 'harness/harness.dart';
+
+void main() {
+  testWidgets('creating a List shows it on the Lists screen', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    await h.pumpApp();
+
+    await h.createList('Weekend feira');
+
+    expect(find.text('Weekend feira'), findsOneWidget);
+    expect(find.text('Only you'), findsOneWidget);
+    expect(find.text('No Lists yet'), findsNothing);
+    expect(h.api.listNamesOf(ana), ['Weekend feira']);
+  });
+
+  testWidgets('shows owned and shared Lists, with what is left to buy', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.addList(ana, name: 'Pharmacy', uncheckedItemCount: 2);
+    h.api.addList(ana, name: 'Barbecue on Saturday', uncheckedItemCount: 14, otherMembers: 5);
+    h.api.addListSharedWith(ana, name: 'Weekend feira', uncheckedItemCount: 9);
+    h.api.addList(ana, name: 'Home basics');
+
+    await h.pumpApp(screen: iPhone);
+
+    expect(find.text('Only you'), findsNWidgets(2));
+    expect(find.text('Shared with 5 people'), findsOneWidget);
+    expect(find.text('Shared with you'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('14 to buy')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('9 to buy')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Nothing to buy')), findsOneWidget);
+  });
+
+  testWidgets('a List shared with the User has no rename or delete', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.addListSharedWith(ana, name: 'Weekend feira');
+
+    await h.pumpApp();
+
+    expect(find.text('Weekend feira'), findsOneWidget);
+    expect(find.byTooltip('Options for Weekend feira'), findsNothing);
+  });
+
+  testWidgets('offline, the Lists seen last time are still shown', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.addList(ana, name: 'Pharmacy');
+    await h.pumpApp();
+
+    h.goOffline();
+    await h.pumpApp();
+
+    expect(find.text('Pharmacy'), findsOneWidget);
+  });
+
+  testWidgets('signing out forgets the Lists on the device', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.addList(ana, name: 'Pharmacy');
+    await h.pumpApp();
+    await h.openAccountMenu();
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+
+    h.goOffline();
+    h.auth.offline = false;
+    final bruno = h.existingUser(email: 'bruno@example.com', password: 'secret123', displayName: 'Bruno');
+    await h.signInWithEmail(bruno.email, 'secret123');
+
+    expect(find.text('Pharmacy'), findsNothing);
+  });
+
+  testWidgets('a List needs a name', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    await h.pumpApp();
+
+    await h.createList('   ');
+
+    expect(find.text('Enter a name.'), findsOneWidget);
+    expect(h.api.listNamesOf(ana), isEmpty);
+  });
+
+  testWidgets('a List name can be at most 60 characters', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    await h.pumpApp();
+
+    await h.createList('x' * 61);
+
+    expect(find.text('Use 60 characters or fewer.'), findsOneWidget);
+    expect(h.api.listNamesOf(ana), isEmpty);
+  });
+
+  testWidgets('the 101st List is refused with an explanation', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    for (var i = 0; i < 100; i++) {
+      h.api.addList(ana, name: 'List $i');
+    }
+    await h.pumpApp();
+
+    await h.createList('One too many');
+
+    expect(find.text("You've reached the limit of 100 Lists. Delete one to create another."), findsOneWidget);
+    expect(h.api.listNamesOf(ana), isNot(contains('One too many')));
+  });
+
+  testWidgets('creating a List offline says there is no connection', (tester) async {
+    final h = Harness(tester);
+    h.signedIn();
+    await h.pumpApp();
+    h.goOffline();
+
+    await h.createList('Pharmacy');
+
+    expect(find.text("You're offline. Connect to the internet and try again."), findsOneWidget);
+  });
+
+  testWidgets('the Lists screen is in Brazilian Portuguese on a Portuguese phone', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.addList(ana, name: 'Feira', uncheckedItemCount: 3, otherMembers: 1);
+
+    await h.pumpApp(locale: brazilianPortuguese);
+
+    expect(find.text('Suas listas'), findsOneWidget);
+    expect(find.text('Compartilhada com 1 pessoa'), findsOneWidget);
+    expect(find.text('a comprar'), findsOneWidget);
+    expect(find.text('Nova lista'), findsOneWidget);
+  });
+
+  testWidgets('the Lists screen stays usable in dark mode at the largest text size', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.addList(ana, name: 'Barbecue on Saturday with the whole family', uncheckedItemCount: 120, otherMembers: 4);
+
+    await h.pumpApp(themeMode: ThemeMode.dark, textScale: 2.0);
+    await h.createList('Pharmacy');
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Pharmacy'), findsOneWidget);
+  });
+}

@@ -1,0 +1,206 @@
+import 'dart:async';
+
+import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
+
+import '../../l10n/app_localizations.dart';
+import '../api/generated/cesta_api.dart';
+import '../session/session_controller.dart';
+import '../ui/components.dart';
+import 'list_name_form.dart';
+import 'lists_controller.dart';
+
+/// Home: the Lists the User owns or was shared, and the User menu.
+class ListsScreen extends StatefulWidget {
+  const ListsScreen({super.key, required this.session, required this.lists});
+
+  final SessionController session;
+  final ListsController lists;
+
+  @override
+  State<ListsScreen> createState() => _ListsScreenState();
+}
+
+class _ListsScreenState extends State<ListsScreen> {
+  ListsController get _lists => widget.lists;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_lists.refresh());
+  }
+
+  void _openUserMenu() {
+    final l10n = AppLocalizations.of(context);
+    final user = widget.session.user;
+    unawaited(
+      showCesSheet(
+        context,
+        children: [
+          if (user != null) CesSheetHeader(title: user.displayName, subtitle: user.email),
+          CesSheetItem(
+            icon: CesIcons.recentlyDeleted,
+            label: l10n.listsRecentlyDeleted,
+            onTap: () => unawaited(_openRecentlyDeleted()),
+          ),
+          CesSheetItem(
+            icon: CesIcons.edit,
+            label: l10n.userMenuChangeDisplayName,
+            onTap: () => unawaited(context.push('/me/name')),
+          ),
+          CesSheetItem(
+            icon: CesIcons.server,
+            label: l10n.userMenuServerStatus,
+            onTap: () => unawaited(context.push('/server-status')),
+          ),
+          CesSheetItem(
+            icon: CesIcons.signOut,
+            label: l10n.userMenuSignOut,
+            onTap: () => unawaited(widget.session.signOut()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openRecentlyDeleted() async {
+    await context.push('/lists/deleted');
+    await _lists.refresh(); // pick up Lists restored there
+  }
+
+  void _create() {
+    final l10n = AppLocalizations.of(context);
+    unawaited(
+      showCesFormSheet(
+        context,
+        title: l10n.listsNewSheetTitle,
+        closeTooltip: l10n.sheetClose,
+        child: ListNameForm(submitLabel: l10n.listsCreate, onSubmit: _lists.create),
+      ),
+    );
+  }
+
+  void _openOptions(ListSummary list) {
+    final l10n = AppLocalizations.of(context);
+    unawaited(
+      showCesSheet(
+        context,
+        children: [
+          CesSheetHeader(title: list.name),
+          CesSheetItem(icon: CesIcons.edit, label: l10n.listsRename, onTap: () => _rename(list)),
+          CesSheetItem(
+            icon: CesIcons.delete,
+            label: l10n.listsDelete,
+            destructive: true,
+            onTap: () => unawaited(_delete(list)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _rename(ListSummary list) {
+    final l10n = AppLocalizations.of(context);
+    unawaited(
+      showCesFormSheet(
+        context,
+        title: l10n.listsRenameSheetTitle,
+        closeTooltip: l10n.sheetClose,
+        child: ListNameForm(
+          initialName: list.name,
+          submitLabel: l10n.listsSave,
+          onSubmit: (name) => _lists.rename(list, name),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _delete(ListSummary list) async {
+    final outcome = await _lists.delete(list);
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    if (outcome != ListOutcome.done) {
+      showCesToast(context, message: listOutcomeMessage(l10n, outcome));
+      return;
+    }
+    showCesToast(
+      context,
+      message: l10n.listsDeleted(list.name),
+      actionLabel: l10n.listsUndo,
+      onAction: () => unawaited(_undoDelete(list)),
+    );
+  }
+
+  Future<void> _undoDelete(ListSummary list) async {
+    final outcome = await _lists.restore(list.id);
+    if (!mounted || outcome == ListOutcome.done) return;
+    showCesToast(context, message: listOutcomeMessage(AppLocalizations.of(context), outcome));
+  }
+
+  String _subtitle(AppLocalizations l10n, ListSummary list) => switch (list.role) {
+    Role.editor => l10n.listsSharedWithYou,
+    Role.owner when list.memberCount > 1 => l10n.listsSharedWithPeople(list.memberCount - 1),
+    Role.owner => l10n.listsOnlyYou,
+  };
+
+  static String _initials(String name) {
+    final words = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).take(2);
+    return words.map((w) => String.fromCharCode(w.runes.first).toUpperCase()).join();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([_lists, widget.session]),
+      builder: (context, _) => CesHomeScaffold(
+        brand: l10n.appTitle,
+        title: l10n.homeTitle,
+        actions: [
+          CesAvatarButton(
+            initials: _initials(widget.session.user?.displayName ?? ''),
+            tooltip: l10n.userMenu,
+            onPressed: _openUserMenu,
+          ),
+        ],
+        empty: _lists.loaded
+            ? CesEmptyState(icon: CesIcons.basket, title: l10n.homeEmptyTitle, body: l10n.homeEmptyBody)
+            : const SizedBox.shrink(),
+        items: [
+          for (final list in _lists.lists)
+            CesListCard(
+              key: ValueKey(list.id),
+              name: list.name,
+              subtitle: _subtitle(l10n, list),
+              trailing: [
+                CesCountSign(
+                  count: list.uncheckedItemCount,
+                  caption: l10n.listsToBuy,
+                  nothingLabel: l10n.listsNothingToBuy,
+                ),
+                if (list.role == Role.owner)
+                  CesIconButton(
+                    icon: CesIcons.more,
+                    tooltip: l10n.listsOptions(list.name),
+                    onPressed: () => _openOptions(list),
+                  ),
+              ],
+            ),
+        ],
+        floatingAction: CesFab(label: l10n.listsNew, icon: CesIcons.plus, onPressed: _create),
+      ),
+    );
+  }
+}
+
+/// What to tell the User when a change to a List didn't go through.
+String listOutcomeMessage(AppLocalizations l10n, ListOutcome outcome) => switch (outcome) {
+  ListOutcome.done => '',
+  ListOutcome.invalidName => l10n.errorListNameInvalid,
+  ListOutcome.limitReached => l10n.errorListLimit,
+  ListOutcome.notFound => l10n.errorListNotFound,
+  ListOutcome.expired => l10n.errorListRestoreExpired,
+  ListOutcome.rateLimited => l10n.errorTooManyAttempts,
+  ListOutcome.offline => l10n.errorOffline,
+  ListOutcome.failed => l10n.errorUnknown,
+};
