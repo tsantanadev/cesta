@@ -86,11 +86,9 @@ func New(d Deps) http.Handler {
 	api := &httpapi.Server{
 		DB:               d.DB,
 		Logger:           d.Logger,
-		Verifier:         d.TokenVerifier,
-		Identity:         identity.NewService(d.DB, c),
+		Identity:         identity.NewService(d.DB, c, d.TokenVerifier, ratelimit.New(limits.PerUser, c)),
 		Lists:            newLists(d, c),
 		PerIP:            ratelimit.New(limits.PerIP, c),
-		PerUser:          ratelimit.New(limits.PerUser, c),
 		TrustedProxyHops: d.TrustedProxyHops,
 	}
 	return hosting.OnlyVia(d.PublicHost, otelhttp.NewHandler(api.Handler(), "http.server"))
