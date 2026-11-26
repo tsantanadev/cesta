@@ -2,6 +2,7 @@
 //
 //	cesta serve    run the HTTP API (default)
 //	cesta migrate  apply pending database migrations, then exit
+//	cesta purge    remove Lists deleted more than 30 days ago, then exit (run daily)
 //
 // Configuration comes from the environment:
 //
@@ -60,8 +61,10 @@ func run(cmd string, logger *slog.Logger) error {
 		return serve(ctx, logger)
 	case "migrate":
 		return migrate(ctx, logger)
+	case "purge":
+		return purge(ctx, logger)
 	default:
-		return fmt.Errorf("unknown command %q (want serve or migrate)", cmd)
+		return fmt.Errorf("unknown command %q (want serve, migrate or purge)", cmd)
 	}
 }
 
@@ -96,6 +99,24 @@ func migrate(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 	logger.InfoContext(ctx, "migrations applied")
+	return nil
+}
+
+func purge(ctx context.Context, logger *slog.Logger) error {
+	url, err := databaseURL()
+	if err != nil {
+		return err
+	}
+	pool, err := db.Open(ctx, url)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	n, err := app.Purge(ctx, app.Deps{DB: pool, Logger: logger})
+	if err != nil {
+		return err
+	}
+	logger.InfoContext(ctx, "purged deleted lists", slog.Int("lists", n))
 	return nil
 }
 

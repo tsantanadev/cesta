@@ -47,6 +47,7 @@ type Server struct {
 	tokens *fakes.TokenVerifier
 	router routers.Router
 	dbName string
+	deps   app.Deps
 }
 
 // Option configures a test server.
@@ -81,10 +82,25 @@ func NewServer(t testing.TB, opts ...Option) *Server {
 	for _, opt := range opts {
 		opt(&deps)
 	}
+	s.deps = deps
 	hs := httptest.NewServer(app.New(deps))
 	t.Cleanup(hs.Close)
 	s.URL = hs.URL
 	return s
+}
+
+// RunPurge runs the scheduled purge of deleted Lists now, by the server's
+// Clock, the same way `cesta purge` does in production. It returns how many
+// Lists it removed.
+func (s *Server) RunPurge(t testing.TB) int {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	n, err := app.Purge(ctx, s.deps)
+	if err != nil {
+		t.Fatalf("testkit: purge: %v", err)
+	}
+	return n
 }
 
 // Get sends GET path anonymously.
@@ -132,6 +148,22 @@ func (c *Client) Get(t testing.TB, path string) *Response {
 func (c *Client) Patch(t testing.TB, path, body string) *Response {
 	t.Helper()
 	return c.srv.do(t, c, http.MethodPatch, path, []byte(body))
+}
+
+// Post sends POST path with a JSON body, or with no body when body is "".
+func (c *Client) Post(t testing.TB, path, body string) *Response {
+	t.Helper()
+	var b []byte
+	if body != "" {
+		b = []byte(body)
+	}
+	return c.srv.do(t, c, http.MethodPost, path, b)
+}
+
+// Delete sends DELETE path.
+func (c *Client) Delete(t testing.TB, path string) *Response {
+	t.Helper()
+	return c.srv.do(t, c, http.MethodDelete, path, nil)
 }
 
 func (s *Server) do(t testing.TB, c *Client, method, path string, body []byte) *Response {

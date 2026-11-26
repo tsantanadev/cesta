@@ -1,0 +1,527 @@
+package api_test
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
+	"github.com/tsantanadev/cesta/backend/internal/testkit"
+)
+
+type listSummary struct {
+	ID                 string    `json:"id"`
+	Name               string    `json:"name"`
+	Role               string    `json:"role"`
+	UncheckedItemCount int       `json:"uncheckedItemCount"`
+	MemberCount        int       `json:"memberCount"`
+	CreatedAt          time.Time `json:"createdAt"`
+}
+
+func decodeList(t *testing.T, res *testkit.Response) listSummary {
+	t.Helper()
+	var l listSummary
+	if err := json.Unmarshal(res.Body, &l); err != nil {
+		t.Fatalf("decode List: %v\nbody: %s", err, res.Body)
+	}
+	return l
+}
+
+func myLists(t *testing.T, c *testkit.Client) []listSummary {
+	t.Helper()
+	res := c.Get(t, "/api/lists")
+	res.RequireStatus(t, http.StatusOK)
+	var body struct {
+		Lists []listSummary `json:"lists"`
+	}
+	if err := json.Unmarshal(res.Body, &body); err != nil {
+		t.Fatalf("decode Lists: %v\nbody: %s", err, res.Body)
+	}
+	return body.Lists
+}
+
+const groceriesID = "0190a3b4-7c5d-7e6f-8a9b-0c1d2e3f4a5b"
+
+func TestCreatingAListMakesTheCreatorItsOwner(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+
+	res := ana.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "  Groceries "}`)
+
+	res.RequireStatus(t, http.StatusCreated)
+	created := decodeList(t, res)
+	if !created.CreatedAt.Equal(srv.Clock.Now()) {
+		t.Fatalf("createdAt = %v, want %v", created.CreatedAt, srv.Clock.Now())
+	}
+	created.CreatedAt = time.Time{}
+	want := listSummary{ID: groceriesID, Name: "Groceries", Role: "owner", UncheckedItemCount: 0, MemberCount: 1}
+	if created != want {
+		t.Fatalf("created List = %+v, want %+v", created, want)
+	}
+	lists := myLists(t, ana)
+	if len(lists) != 1 || lists[0].ID != groceriesID || lists[0].Name != "Groceries" || lists[0].Role != "owner" ||
+		lists[0].MemberCount != 1 {
+		t.Fatalf("Ana's Lists = %+v, want just Groceries, owned by her", lists)
+	}
+}
+
+func createList(t *testing.T, c *testkit.Client, id, name string) listSummary {
+	t.Helper()
+	res := c.Post(t, "/api/lists", `{"id": "`+id+`", "name": "`+name+`"}`)
+	res.RequireStatus(t, http.StatusCreated)
+	return decodeList(t, res)
+}
+
+func TestRetryingACreateReturnsTheSameListWithoutMakingAnother(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+
+	res := ana.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Something else"}`)
+
+	res.RequireStatus(t, http.StatusOK)
+	if got := decodeList(t, res); got.ID != groceriesID || got.Name != "Groceries" {
+		t.Fatalf("retried create = %+v, want the original Groceries", got)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 {
+		t.Fatalf("Ana has %d Lists, want 1", len(lists))
+	}
+}
+
+func TestCreatingAListWithAnotherUsersListIDIsRejected(t *testing.T) {
+	srv := testkit.NewServer(t)
+	createList(t, srv.As(testkit.Ana), groceriesID, "Groceries")
+	bruno := srv.As(testkit.Bruno)
+
+	res := bruno.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Mine now"}`)
+
+	res.RequireStatus(t, http.StatusConflict)
+	res.RequireErrorCode(t, "list_id_taken")
+	if lists := myLists(t, bruno); len(lists) != 0 {
+		t.Fatalf("Bruno's Lists = %+v, want none", lists)
+	}
+}
+
+func TestTheOwnerCanRenameAList(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+
+	res := ana.Patch(t, "/api/lists/"+groceriesID, `{"name": " Feira de sábado "}`)
+
+	res.RequireStatus(t, http.StatusOK)
+	if got := decodeList(t, res); got.Name != "Feira de sábado" || got.Role != "owner" {
+		t.Fatalf("renamed List = %+v, want name Feira de sábado, role owner", got)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 || lists[0].Name != "Feira de sábado" {
+		t.Fatalf("Ana's Lists = %+v, want the renamed List", lists)
+	}
+}
+
+func TestListNamesMustBeOneToSixtyVisibleCharacters(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	invalid := map[string]string{
+		"empty":           ``,
+		"only spaces":     `   `,
+		"control char":    `Feira\u0007`,
+		"sixty-one runes": strings.Repeat("é", 61),
+	}
+
+	for label, name := range invalid {
+		t.Run(label, func(t *testing.T) {
+			create := ana.Post(t, "/api/lists", `{"id": "`+uuid.NewString()+`", "name": "`+name+`"}`)
+			rename := ana.Patch(t, "/api/lists/"+groceriesID, `{"name": "`+name+`"}`)
+
+			create.RequireStatus(t, http.StatusBadRequest)
+			create.RequireErrorCode(t, "invalid_list_name")
+			rename.RequireStatus(t, http.StatusBadRequest)
+			rename.RequireErrorCode(t, "invalid_list_name")
+		})
+	}
+	sixty := strings.Repeat("é", 60)
+	if got := decodeList(t, ana.Patch(t, "/api/lists/"+groceriesID, `{"name": "`+sixty+`"}`)); got.Name != sixty {
+		t.Fatalf("name = %q, want 60 accented characters accepted", got.Name)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 {
+		t.Fatalf("Ana has %d Lists, want 1 (no invalid create succeeded)", len(lists))
+	}
+}
+
+type deletedList struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	DeletedAt time.Time `json:"deletedAt"`
+	PurgeAt   time.Time `json:"purgeAt"`
+}
+
+func decodeDeletedList(t *testing.T, res *testkit.Response) deletedList {
+	t.Helper()
+	var l deletedList
+	if err := json.Unmarshal(res.Body, &l); err != nil {
+		t.Fatalf("decode deleted List: %v\nbody: %s", err, res.Body)
+	}
+	return l
+}
+
+func recentlyDeleted(t *testing.T, c *testkit.Client) []deletedList {
+	t.Helper()
+	res := c.Get(t, "/api/deleted-lists")
+	res.RequireStatus(t, http.StatusOK)
+	var body struct {
+		Lists []deletedList `json:"lists"`
+	}
+	if err := json.Unmarshal(res.Body, &body); err != nil {
+		t.Fatalf("decode deleted Lists: %v\nbody: %s", err, res.Body)
+	}
+	return body.Lists
+}
+
+func TestDeletingAListMovesItToRecentlyDeletedForThirtyDays(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.Clock.Advance(time.Hour)
+	deletedAt := srv.Clock.Now()
+
+	res := ana.Delete(t, "/api/lists/"+groceriesID)
+
+	res.RequireStatus(t, http.StatusOK)
+	got := decodeDeletedList(t, res)
+	if got.ID != groceriesID || got.Name != "Groceries" || !got.DeletedAt.Equal(deletedAt) ||
+		!got.PurgeAt.Equal(deletedAt.Add(30*24*time.Hour)) {
+		t.Fatalf("deleted List = %+v, want Groceries deleted at %v, purged 30 days later", got, deletedAt)
+	}
+	if lists := myLists(t, ana); len(lists) != 0 {
+		t.Fatalf("Ana's Lists = %+v, want none after deleting", lists)
+	}
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 1 || deleted[0] != got {
+		t.Fatalf("Recently deleted = %+v, want just %+v", deleted, got)
+	}
+}
+
+func TestDeletingADeletedListAgainKeepsTheOriginalDeletionTime(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	first := decodeDeletedList(t, ana.Delete(t, "/api/lists/"+groceriesID))
+	srv.Clock.Advance(time.Hour)
+
+	res := ana.Delete(t, "/api/lists/"+groceriesID)
+
+	res.RequireStatus(t, http.StatusOK)
+	if again := decodeDeletedList(t, res); again != first {
+		t.Fatalf("second delete = %+v, want %+v", again, first)
+	}
+}
+
+func TestADeletedListCannotBeRenamedOrRecreated(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+
+	rename := ana.Patch(t, "/api/lists/"+groceriesID, `{"name": "Feira"}`)
+	recreate := ana.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Groceries"}`)
+
+	rename.RequireStatus(t, http.StatusConflict)
+	rename.RequireErrorCode(t, "list_deleted")
+	recreate.RequireStatus(t, http.StatusConflict)
+	recreate.RequireErrorCode(t, "list_deleted")
+}
+
+func TestADeletedListCanBeRestoredOnDayTwentyNine(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+	srv.Clock.Advance(29 * 24 * time.Hour)
+
+	res := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+
+	res.RequireStatus(t, http.StatusOK)
+	if got := decodeList(t, res); got.ID != groceriesID || got.Name != "Groceries" || got.Role != "owner" {
+		t.Fatalf("restored List = %+v, want Groceries owned by Ana", got)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 || lists[0].ID != groceriesID {
+		t.Fatalf("Ana's Lists = %+v, want Groceries back", lists)
+	}
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 0 {
+		t.Fatalf("Recently deleted = %+v, want empty after restoring", deleted)
+	}
+}
+
+func TestRestoringAListThatIsNotDeletedChangesNothing(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	created := createList(t, ana, groceriesID, "Groceries")
+
+	res := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+
+	res.RequireStatus(t, http.StatusOK)
+	if got := decodeList(t, res); !got.CreatedAt.Equal(created.CreatedAt) || got.Name != created.Name {
+		t.Fatalf("restored List = %+v, want unchanged %+v", got, created)
+	}
+}
+
+func TestADeletedListCannotBeRestoredOnceThirtyDaysHavePassed(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+	srv.Clock.Advance(30 * 24 * time.Hour)
+
+	res := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+
+	res.RequireStatus(t, http.StatusNotFound)
+	res.RequireErrorCode(t, "list_not_found")
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 0 {
+		t.Fatalf("Recently deleted = %+v, want empty after 30 days", deleted)
+	}
+}
+
+func TestThePurgeRemovesListsDeletedThirtyDaysAgoForGood(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	const recentID = "0190a3b4-7c5d-7e6f-8a9b-000000000002"
+	createList(t, ana, groceriesID, "Groceries")
+	createList(t, ana, recentID, "Pharmacy")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+	srv.Clock.Advance(24 * time.Hour)
+	ana.Delete(t, "/api/lists/"+recentID).RequireStatus(t, http.StatusOK)
+	srv.Clock.Advance(29 * 24 * time.Hour)
+	beforePurge := ana.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Groceries"}`)
+
+	purged := srv.RunPurge(t)
+
+	if purged != 1 {
+		t.Fatalf("purge removed %d Lists, want 1 (only the one deleted 30 days ago)", purged)
+	}
+	beforePurge.RequireStatus(t, http.StatusConflict)
+	restore := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+	restore.RequireStatus(t, http.StatusNotFound)
+	restore.RequireErrorCode(t, "list_not_found")
+	// Its id is free again: nothing of the purged List is left.
+	createList(t, ana, groceriesID, "Groceries")
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 1 || deleted[0].ID != recentID {
+		t.Fatalf("Recently deleted = %+v, want just Pharmacy (deleted 29 days ago)", deleted)
+	}
+	if again := srv.RunPurge(t); again != 0 {
+		t.Fatalf("second purge removed %d Lists, want 0", again)
+	}
+}
+
+// generous lets one User send a few hundred requests in a burst.
+func generousRateLimits() testkit.Option {
+	plenty := ratelimit.Rule{Burst: 1000, Every: time.Millisecond}
+	return testkit.WithRateLimits(plenty, plenty)
+}
+
+func TestTheHundredAndFirstListIsRejected(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	ana := srv.As(testkit.Ana)
+	for range 100 {
+		createList(t, ana, uuid.NewString(), "Groceries")
+	}
+
+	res := ana.Post(t, "/api/lists", `{"id": "`+uuid.NewString()+`", "name": "One too many"}`)
+
+	res.RequireStatus(t, http.StatusConflict)
+	res.RequireErrorCode(t, "limit_exceeded")
+	if lists := myLists(t, ana); len(lists) != 100 {
+		t.Fatalf("Ana has %d Lists, want 100", len(lists))
+	}
+}
+
+func TestDeletedListsDoNotCountTowardsTheLimitUntilRestored(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	for range 99 {
+		createList(t, ana, uuid.NewString(), "Groceries")
+	}
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+
+	createList(t, ana, uuid.NewString(), "Takes the free place")
+	restore := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+
+	restore.RequireStatus(t, http.StatusConflict)
+	restore.RequireErrorCode(t, "limit_exceeded")
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 1 || deleted[0].ID != groceriesID {
+		t.Fatalf("Recently deleted = %+v, want Groceries still there", deleted)
+	}
+}
+
+func TestOtherUsersListsDoNotCountTowardsTheLimit(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	for range 100 {
+		createList(t, srv.As(testkit.Ana), uuid.NewString(), "Groceries")
+	}
+
+	res := srv.As(testkit.Bruno).Post(t, "/api/lists", `{"id": "`+uuid.NewString()+`", "name": "Feira"}`)
+
+	res.RequireStatus(t, http.StatusCreated)
+}
+
+func TestAUserWhoIsNotAMemberCannotSeeOrChangeTheList(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	path := "/api/lists/" + groceriesID
+
+	attempts := map[string]*testkit.Response{
+		"rename":  bruno.Patch(t, path, `{"name": "Mine"}`),
+		"delete":  bruno.Delete(t, path),
+		"restore": bruno.Post(t, path+"/restore", ""),
+	}
+
+	for op, res := range attempts {
+		t.Run(op, func(t *testing.T) {
+			res.RequireStatus(t, http.StatusNotFound)
+			res.RequireErrorCode(t, "list_not_found")
+		})
+	}
+	if lists := myLists(t, bruno); len(lists) != 0 {
+		t.Fatalf("Bruno's Lists = %+v, want none", lists)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 || lists[0].Name != "Groceries" {
+		t.Fatalf("Ana's Lists = %+v, want Groceries unchanged", lists)
+	}
+}
+
+func TestOnlyTheOwnerSeesTheirDeletedListInRecentlyDeleted(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+
+	deleted := recentlyDeleted(t, bruno)
+
+	if len(deleted) != 0 {
+		t.Fatalf("Bruno's Recently deleted = %+v, want none", deleted)
+	}
+	restore := bruno.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+	restore.RequireStatus(t, http.StatusNotFound)
+	restore.RequireErrorCode(t, "list_not_found")
+}
+
+func TestAnEditorSeesTheListButCannotRenameDeleteOrRestoreIt(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.AddEditor(t, groceriesID, testkit.Bruno) // until #9 lets Owners invite Editors
+	path := "/api/lists/" + groceriesID
+
+	attempts := map[string]*testkit.Response{
+		"rename":  bruno.Patch(t, path, `{"name": "Mine"}`),
+		"delete":  bruno.Delete(t, path),
+		"restore": bruno.Post(t, path+"/restore", ""),
+	}
+
+	for op, res := range attempts {
+		t.Run(op, func(t *testing.T) {
+			res.RequireStatus(t, http.StatusForbidden)
+			res.RequireErrorCode(t, "not_list_owner")
+		})
+	}
+	if lists := myLists(t, bruno); len(lists) != 1 || lists[0].Role != "editor" || lists[0].MemberCount != 2 ||
+		lists[0].Name != "Groceries" {
+		t.Fatalf("Bruno's Lists = %+v, want Groceries as editor with 2 Members", lists)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 || lists[0].Role != "owner" || lists[0].MemberCount != 2 {
+		t.Fatalf("Ana's Lists = %+v, want Groceries as owner with 2 Members", lists)
+	}
+}
+
+func TestDeletingAListRemovesItForEditorsWithoutShowingThemRecentlyDeleted(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.AddEditor(t, groceriesID, testkit.Bruno)
+
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+
+	if lists := myLists(t, bruno); len(lists) != 0 {
+		t.Fatalf("Bruno's Lists = %+v, want none once the Owner deleted it", lists)
+	}
+	if deleted := recentlyDeleted(t, bruno); len(deleted) != 0 {
+		t.Fatalf("Bruno's Recently deleted = %+v, want none (he isn't the Owner)", deleted)
+	}
+	ana.Post(t, "/api/lists/"+groceriesID+"/restore", "").RequireStatus(t, http.StatusOK)
+	if lists := myLists(t, bruno); len(lists) != 1 {
+		t.Fatalf("Bruno's Lists = %+v, want Groceries back after the Owner restored it", lists)
+	}
+}
+
+func TestListEndpointsRequireSigningIn(t *testing.T) {
+	srv := testkit.NewServer(t)
+	anon := srv.Anonymous()
+	path := "/api/lists/" + groceriesID
+
+	attempts := map[string]*testkit.Response{
+		"list":             anon.Get(t, "/api/lists"),
+		"create":           anon.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Groceries"}`),
+		"rename":           anon.Patch(t, path, `{"name": "Feira"}`),
+		"delete":           anon.Delete(t, path),
+		"restore":          anon.Post(t, path+"/restore", ""),
+		"recently deleted": anon.Get(t, "/api/deleted-lists"),
+	}
+
+	for op, res := range attempts {
+		t.Run(op, func(t *testing.T) {
+			res.RequireStatus(t, http.StatusUnauthorized)
+			res.RequireErrorCode(t, "unauthenticated")
+		})
+	}
+}
+
+func TestListsAreShownNewestFirst(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	first := createList(t, ana, uuid.NewString(), "First")
+	srv.Clock.Advance(time.Minute)
+	second := createList(t, ana, uuid.NewString(), "Second")
+
+	lists := myLists(t, ana)
+
+	if len(lists) != 2 || lists[0].ID != second.ID || lists[1].ID != first.ID {
+		t.Fatalf("Ana's Lists = %+v, want Second then First", lists)
+	}
+}
+
+func TestConcurrentCreatesCannotExceedTheLimit(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	ana := srv.As(testkit.Ana)
+	for range 98 {
+		createList(t, ana, uuid.NewString(), "Groceries")
+	}
+	const n = 6
+	statuses := make([]int, n)
+	var wg sync.WaitGroup
+
+	for i := range n {
+		wg.Go(func() {
+			statuses[i] = ana.Post(t, "/api/lists", `{"id": "`+uuid.NewString()+`", "name": "Race"}`).Status
+		})
+	}
+	wg.Wait()
+
+	if lists := myLists(t, ana); len(lists) != 100 {
+		t.Fatalf("Ana has %d Lists, want exactly 100 (statuses %v)", len(lists), statuses)
+	}
+}
+
+func TestAListThatNeverExistedIsNotFound(t *testing.T) {
+	srv := testkit.NewServer(t)
+
+	res := srv.As(testkit.Ana).Delete(t, "/api/lists/"+uuid.NewString())
+
+	res.RequireStatus(t, http.StatusNotFound)
+	res.RequireErrorCode(t, "list_not_found")
+}
