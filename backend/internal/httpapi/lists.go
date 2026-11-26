@@ -96,8 +96,24 @@ func (s *Server) DeleteList(ctx context.Context, req DeleteListRequestObject) (D
 	return DeleteList200JSONResponse(apiDeletedList(d)), nil
 }
 
-func (s *Server) RestoreList(context.Context, RestoreListRequestObject) (RestoreListResponseObject, error) {
-	return nil, errListsNotImplemented
+// RestoreList restores a deleted List the signed-in User owns.
+func (s *Server) RestoreList(ctx context.Context, req RestoreListRequestObject) (RestoreListResponseObject, error) {
+	u, err := signedIn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	l, err := s.Lists.Restore(ctx, u.ID, req.ListId)
+	switch {
+	case errors.Is(err, lists.ErrNotFound):
+		return RestoreList404JSONResponse{NotFoundJSONResponse(listNotFound())}, nil
+	case errors.Is(err, lists.ErrNotOwner):
+		return RestoreList403JSONResponse{ForbiddenJSONResponse(notListOwner())}, nil
+	case errors.Is(err, lists.ErrLimitReached):
+		return RestoreList409JSONResponse{ConflictJSONResponse(limitExceeded())}, nil
+	case err != nil:
+		return nil, err
+	}
+	return RestoreList200JSONResponse(apiListSummary(l)), nil
 }
 
 // ListDeletedLists returns the Lists the signed-in User deleted and can still restore.
@@ -116,8 +132,6 @@ func (s *Server) ListDeletedLists(ctx context.Context, _ ListDeletedListsRequest
 	}
 	return out, nil
 }
-
-var errListsNotImplemented = errors.New("lists: not implemented")
 
 func invalidListName() ApiError {
 	return ApiError{

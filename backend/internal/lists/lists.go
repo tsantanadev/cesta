@@ -216,6 +216,22 @@ func (s *Service) Delete(ctx context.Context, userID, listID uuid.UUID) (Deleted
 	return d, nil
 }
 
+// Restore brings back a List userID owns and deleted less than RestoreWindow
+// ago, for every Member. Restoring a List that isn't deleted changes nothing.
+func (s *Service) Restore(ctx context.Context, userID, listID uuid.UUID) (Summary, error) {
+	l, err := s.owned(ctx, userID, listID)
+	if err != nil {
+		return Summary{}, err
+	}
+	if l.deletedAt != nil {
+		if _, err := s.db.Exec(ctx,
+			"UPDATE lists SET deleted_at = NULL, updated_at = $2 WHERE id = $1", listID, s.clock.Now()); err != nil {
+			return Summary{}, wrap("restore", err)
+		}
+	}
+	return s.summary(ctx, listID, userID)
+}
+
 // RecentlyDeleted returns the Lists owner deleted and can still restore, most
 // recently deleted first. Lists other Users own never appear here.
 func (s *Service) RecentlyDeleted(ctx context.Context, owner uuid.UUID) ([]Deleted, error) {

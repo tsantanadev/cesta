@@ -233,3 +233,53 @@ func TestADeletedListCannotBeRenamedOrRecreated(t *testing.T) {
 	recreate.RequireStatus(t, http.StatusConflict)
 	recreate.RequireErrorCode(t, "list_deleted")
 }
+
+func TestADeletedListCanBeRestoredOnDayTwentyNine(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+	srv.Clock.Advance(29 * 24 * time.Hour)
+
+	res := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+
+	res.RequireStatus(t, http.StatusOK)
+	if got := decodeList(t, res); got.ID != groceriesID || got.Name != "Groceries" || got.Role != "owner" {
+		t.Fatalf("restored List = %+v, want Groceries owned by Ana", got)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 || lists[0].ID != groceriesID {
+		t.Fatalf("Ana's Lists = %+v, want Groceries back", lists)
+	}
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 0 {
+		t.Fatalf("Recently deleted = %+v, want empty after restoring", deleted)
+	}
+}
+
+func TestRestoringAListThatIsNotDeletedChangesNothing(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	created := createList(t, ana, groceriesID, "Groceries")
+
+	res := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+
+	res.RequireStatus(t, http.StatusOK)
+	if got := decodeList(t, res); !got.CreatedAt.Equal(created.CreatedAt) || got.Name != created.Name {
+		t.Fatalf("restored List = %+v, want unchanged %+v", got, created)
+	}
+}
+
+func TestADeletedListCannotBeRestoredOnceThirtyDaysHavePassed(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+	srv.Clock.Advance(30 * 24 * time.Hour)
+
+	res := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+
+	res.RequireStatus(t, http.StatusNotFound)
+	res.RequireErrorCode(t, "list_not_found")
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 0 {
+		t.Fatalf("Recently deleted = %+v, want empty after 30 days", deleted)
+	}
+}
