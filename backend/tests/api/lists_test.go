@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -455,6 +456,64 @@ func TestDeletingAListRemovesItForEditorsWithoutShowingThemRecentlyDeleted(t *te
 	ana.Post(t, "/api/lists/"+groceriesID+"/restore", "").RequireStatus(t, http.StatusOK)
 	if lists := myLists(t, bruno); len(lists) != 1 {
 		t.Fatalf("Bruno's Lists = %+v, want Groceries back after the Owner restored it", lists)
+	}
+}
+
+func TestListEndpointsRequireSigningIn(t *testing.T) {
+	srv := testkit.NewServer(t)
+	anon := srv.Anonymous()
+	path := "/api/lists/" + groceriesID
+
+	attempts := map[string]*testkit.Response{
+		"list":             anon.Get(t, "/api/lists"),
+		"create":           anon.Post(t, "/api/lists", `{"id": "`+groceriesID+`", "name": "Groceries"}`),
+		"rename":           anon.Patch(t, path, `{"name": "Feira"}`),
+		"delete":           anon.Delete(t, path),
+		"restore":          anon.Post(t, path+"/restore", ""),
+		"recently deleted": anon.Get(t, "/api/deleted-lists"),
+	}
+
+	for op, res := range attempts {
+		t.Run(op, func(t *testing.T) {
+			res.RequireStatus(t, http.StatusUnauthorized)
+			res.RequireErrorCode(t, "unauthenticated")
+		})
+	}
+}
+
+func TestListsAreShownNewestFirst(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	first := createList(t, ana, uuid.NewString(), "First")
+	srv.Clock.Advance(time.Minute)
+	second := createList(t, ana, uuid.NewString(), "Second")
+
+	lists := myLists(t, ana)
+
+	if len(lists) != 2 || lists[0].ID != second.ID || lists[1].ID != first.ID {
+		t.Fatalf("Ana's Lists = %+v, want Second then First", lists)
+	}
+}
+
+func TestConcurrentCreatesCannotExceedTheLimit(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	ana := srv.As(testkit.Ana)
+	for range 98 {
+		createList(t, ana, uuid.NewString(), "Groceries")
+	}
+	const n = 6
+	statuses := make([]int, n)
+	var wg sync.WaitGroup
+
+	for i := range n {
+		wg.Go(func() {
+			statuses[i] = ana.Post(t, "/api/lists", `{"id": "`+uuid.NewString()+`", "name": "Race"}`).Status
+		})
+	}
+	wg.Wait()
+
+	if lists := myLists(t, ana); len(lists) != 100 {
+		t.Fatalf("Ana has %d Lists, want exactly 100 (statuses %v)", len(lists), statuses)
 	}
 }
 
