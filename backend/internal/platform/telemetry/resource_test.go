@@ -39,6 +39,7 @@ func TestResourceNamesTheServiceAndVersion(t *testing.T) {
 
 func TestResourceLetsTheEnvironmentOverrideTheServiceName(t *testing.T) {
 	t.Setenv("OTEL_SERVICE_NAME", "cesta-backend-canary")
+	t.Setenv("OTEL_RESOURCE_ATTRIBUTES", "")
 
 	attrs := resourceAttrs(t)
 
