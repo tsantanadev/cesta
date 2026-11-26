@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -38,13 +37,6 @@ type Membership struct {
 	MemberCount int
 }
 
-// Querier runs queries, on the pool or inside a transaction.
-type Querier interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
-
 // Service answers who is a Member of a List.
 type Service struct {
 	db *pgxpool.Pool
@@ -55,10 +47,10 @@ func NewService(db *pgxpool.Pool) *Service {
 	return &Service{db: db}
 }
 
-// Grant makes userID a Member of listID with role, as of at. It runs on q so the
-// caller can make it part of a larger transaction.
-func (s *Service) Grant(ctx context.Context, q Querier, listID, userID uuid.UUID, role Role, at time.Time) error {
-	if _, err := q.Exec(ctx,
+// Grant makes userID a Member of listID with role, as of at, inside the
+// caller's transaction tx.
+func (s *Service) Grant(ctx context.Context, tx pgx.Tx, listID, userID uuid.UUID, role Role, at time.Time) error {
+	if _, err := tx.Exec(ctx,
 		"INSERT INTO list_members (list_id, user_id, role, joined_at) VALUES ($1, $2, $3, $4)",
 		listID, userID, string(role), at); err != nil {
 		return fmt.Errorf("membership: grant: %w", err)
@@ -80,13 +72,13 @@ func (s *Service) RoleOf(ctx context.Context, listID, userID uuid.UUID) (Role, e
 	return Role(role), nil
 }
 
-// Of returns every List userID is a Member of.
-func (s *Service) Of(ctx context.Context, userID uuid.UUID) ([]Membership, error) {
+// Memberships returns every List userID is a Member of, with their Role on it.
+func (s *Service) Memberships(ctx context.Context, userID uuid.UUID) ([]Membership, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT m.list_id, m.role, (SELECT count(*) FROM list_members c WHERE c.list_id = m.list_id)
 		FROM list_members m WHERE m.user_id = $1`, userID)
 	if err != nil {
-		return nil, fmt.Errorf("membership: of: %w", err)
+		return nil, fmt.Errorf("membership: memberships: %w", err)
 	}
 	ms, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Membership, error) {
 		var m Membership
@@ -96,7 +88,7 @@ func (s *Service) Of(ctx context.Context, userID uuid.UUID) ([]Membership, error
 		return m, err
 	})
 	if err != nil {
-		return nil, fmt.Errorf("membership: of: %w", err)
+		return nil, fmt.Errorf("membership: memberships: %w", err)
 	}
 	return ms, nil
 }

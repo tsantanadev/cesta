@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/tsantanadev/cesta/backend/internal/membership"
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
@@ -29,7 +30,10 @@ func (s *Server) AddEditor(t testing.TB, listID string, id auth.Identity) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	members := membership.NewService(s.deps.DB)
-	if err := members.Grant(ctx, s.deps.DB, uuid.MustParse(listID), me.ID, membership.Editor, s.Clock.Now()); err != nil {
+	err := pgx.BeginFunc(ctx, s.deps.DB, func(tx pgx.Tx) error {
+		return members.Grant(ctx, tx, uuid.MustParse(listID), me.ID, membership.Editor, s.Clock.Now())
+	})
+	if err != nil {
 		t.Fatalf("testkit: add Editor: %v", err)
 	}
 }

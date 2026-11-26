@@ -9,10 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -20,6 +17,7 @@ import (
 
 	"github.com/tsantanadev/cesta/backend/internal/membership"
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
+	"github.com/tsantanadev/cesta/backend/internal/platform/names"
 )
 
 // MaxNameLength is the longest List name, in characters.
@@ -31,18 +29,18 @@ const DefaultMaxPerUser = 100
 var (
 	// ErrInvalidName is returned for a name that is empty after trimming, longer
 	// than MaxNameLength or contains control characters.
-	ErrInvalidName = errors.New("invalid list name")
+	ErrInvalidName error = listError("invalid list name")
 	// ErrIDTaken is returned when creating a List with an ID another User's List has.
-	ErrIDTaken = errors.New("list id taken")
+	ErrIDTaken error = listError("list id taken")
 	// ErrLimitReached is returned when the User already owns the most Lists allowed.
-	ErrLimitReached = errors.New("list limit reached")
+	ErrLimitReached error = listError("list limit reached")
 	// ErrNotFound is returned when the List doesn't exist, is gone for good, or
 	// the User is not a Member of it. The three are indistinguishable on purpose.
-	ErrNotFound = errors.New("list not found")
+	ErrNotFound error = listError("list not found")
 	// ErrNotOwner is returned when a Member who is not the Owner tries an Owner-only change.
-	ErrNotOwner = errors.New("not the list owner")
+	ErrNotOwner error = listError("not the list owner")
 	// ErrDeleted is returned for a change to a deleted List other than restoring it.
-	ErrDeleted = errors.New("list deleted")
+	ErrDeleted error = listError("list deleted")
 )
 
 // RestoreWindow is how long after deletion the Owner can restore a List. After
@@ -134,7 +132,7 @@ func (s *Service) Create(ctx context.Context, owner, id uuid.UUID, name string) 
 
 // Mine returns every List userID is a Member of that is not deleted, newest first.
 func (s *Service) Mine(ctx context.Context, userID uuid.UUID) ([]Summary, error) {
-	ms, err := s.members.Of(ctx, userID)
+	ms, err := s.members.Memberships(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -371,26 +369,21 @@ func (s *Service) summary(ctx context.Context, listID, userID uuid.UUID) (Summar
 	return l, nil
 }
 
+// listError is the type of this package's sentinel errors, so wrap can pass
+// every one of them through without keeping a list.
+type listError string
+
+func (e listError) Error() string { return string(e) }
+
 // wrap adds context to unexpected errors and passes sentinel errors through.
 func wrap(what string, err error) error {
-	for _, sentinel := range []error{ErrInvalidName, ErrIDTaken, ErrLimitReached, ErrNotFound, ErrNotOwner, ErrDeleted} {
-		if errors.Is(err, sentinel) {
-			return err
-		}
+	if _, ok := errors.AsType[listError](err); ok {
+		return err
 	}
 	return fmt.Errorf("lists: %s: %w", what, err)
 }
 
 // normalizeName trims name and reports whether it is acceptable.
 func normalizeName(name string) (string, bool) {
-	name = strings.TrimSpace(name)
-	if name == "" || utf8.RuneCountInString(name) > MaxNameLength || !utf8.ValidString(name) {
-		return "", false
-	}
-	for _, r := range name {
-		if unicode.IsControl(r) {
-			return "", false
-		}
-	}
-	return name, true
+	return names.Normalize(name, MaxNameLength)
 }
