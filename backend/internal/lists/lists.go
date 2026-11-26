@@ -92,7 +92,8 @@ func (s *Service) Create(ctx context.Context, owner, id uuid.UUID, name string) 
 	}
 	now := s.clock.Now()
 	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		// Serialise this owner's creates so two at the limit can't both succeed.
+		// Lock the owner first so a retry racing the original create sees it
+		// (requireRoomFor takes the same lock again, which is a no-op).
 		if _, err := tx.Exec(ctx, "SELECT 1 FROM users WHERE id = $1 FOR UPDATE", owner); err != nil {
 			return err
 		}
@@ -110,13 +111,8 @@ func (s *Service) Create(ctx context.Context, owner, id uuid.UUID, name string) 
 		case !errors.Is(err, pgx.ErrNoRows):
 			return err
 		}
-		var owned int
-		if err := tx.QueryRow(ctx,
-			"SELECT count(*) FROM lists WHERE owner_id = $1 AND deleted_at IS NULL", owner).Scan(&owned); err != nil {
+		if err := s.requireRoomFor(ctx, tx, owner); err != nil {
 			return err
-		}
-		if owned >= s.maxPerUser {
-			return ErrLimitReached
 		}
 		tag, err := tx.Exec(ctx, `
 			INSERT INTO lists (id, owner_id, name, created_at, updated_at) VALUES ($1, $2, $3, $4, $4)
@@ -224,12 +220,37 @@ func (s *Service) Restore(ctx context.Context, userID, listID uuid.UUID) (Summar
 		return Summary{}, err
 	}
 	if l.deletedAt != nil {
-		if _, err := s.db.Exec(ctx,
-			"UPDATE lists SET deleted_at = NULL, updated_at = $2 WHERE id = $1", listID, s.clock.Now()); err != nil {
+		err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+			if err := s.requireRoomFor(ctx, tx, userID); err != nil {
+				return err
+			}
+			_, err := tx.Exec(ctx,
+				"UPDATE lists SET deleted_at = NULL, updated_at = $2 WHERE id = $1", listID, s.clock.Now())
+			return err
+		})
+		if err != nil {
 			return Summary{}, wrap("restore", err)
 		}
 	}
 	return s.summary(ctx, listID, userID)
+}
+
+// requireRoomFor returns ErrLimitReached if owner already owns the most Lists
+// allowed. It locks owner's row until tx ends, so two creates or restores at
+// the limit can't both pass.
+func (s *Service) requireRoomFor(ctx context.Context, tx pgx.Tx, owner uuid.UUID) error {
+	if _, err := tx.Exec(ctx, "SELECT 1 FROM users WHERE id = $1 FOR UPDATE", owner); err != nil {
+		return err
+	}
+	var owned int
+	if err := tx.QueryRow(ctx,
+		"SELECT count(*) FROM lists WHERE owner_id = $1 AND deleted_at IS NULL", owner).Scan(&owned); err != nil {
+		return err
+	}
+	if owned >= s.maxPerUser {
+		return ErrLimitReached
+	}
+	return nil
 }
 
 // Purge removes for good every List deleted at least RestoreWindow before now,

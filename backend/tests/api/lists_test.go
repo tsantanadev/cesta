@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 	"github.com/tsantanadev/cesta/backend/internal/testkit"
 )
 
@@ -313,4 +314,56 @@ func TestThePurgeRemovesListsDeletedThirtyDaysAgoForGood(t *testing.T) {
 	if again := srv.RunPurge(t); again != 0 {
 		t.Fatalf("second purge removed %d Lists, want 0", again)
 	}
+}
+
+// generous lets one User send a few hundred requests in a burst.
+func generousRateLimits() testkit.Option {
+	plenty := ratelimit.Rule{Burst: 1000, Every: time.Millisecond}
+	return testkit.WithRateLimits(plenty, plenty)
+}
+
+func TestTheHundredAndFirstListIsRejected(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	ana := srv.As(testkit.Ana)
+	for range 100 {
+		createList(t, ana, uuid.NewString(), "Groceries")
+	}
+
+	res := ana.Post(t, "/api/lists", `{"id": "`+uuid.NewString()+`", "name": "One too many"}`)
+
+	res.RequireStatus(t, http.StatusConflict)
+	res.RequireErrorCode(t, "limit_exceeded")
+	if lists := myLists(t, ana); len(lists) != 100 {
+		t.Fatalf("Ana has %d Lists, want 100", len(lists))
+	}
+}
+
+func TestDeletedListsDoNotCountTowardsTheLimitUntilRestored(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	for range 99 {
+		createList(t, ana, uuid.NewString(), "Groceries")
+	}
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+
+	createList(t, ana, uuid.NewString(), "Takes the free place")
+	restore := ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+
+	restore.RequireStatus(t, http.StatusConflict)
+	restore.RequireErrorCode(t, "limit_exceeded")
+	if deleted := recentlyDeleted(t, ana); len(deleted) != 1 || deleted[0].ID != groceriesID {
+		t.Fatalf("Recently deleted = %+v, want Groceries still there", deleted)
+	}
+}
+
+func TestOtherUsersListsDoNotCountTowardsTheLimit(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	for range 100 {
+		createList(t, srv.As(testkit.Ana), uuid.NewString(), "Groceries")
+	}
+
+	res := srv.As(testkit.Bruno).Post(t, "/api/lists", `{"id": "`+uuid.NewString()+`", "name": "Feira"}`)
+
+	res.RequireStatus(t, http.StatusCreated)
 }
