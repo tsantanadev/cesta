@@ -134,6 +134,22 @@ func (c *Client) Patch(t testing.TB, path, body string) *Response {
 	return c.srv.do(t, c, http.MethodPatch, path, []byte(body))
 }
 
+// Post sends POST path with a JSON body, or with no body when body is "".
+func (c *Client) Post(t testing.TB, path, body string) *Response {
+	t.Helper()
+	var b []byte
+	if body != "" {
+		b = []byte(body)
+	}
+	return c.srv.do(t, c, http.MethodPost, path, b)
+}
+
+// Delete sends DELETE path.
+func (c *Client) Delete(t testing.TB, path string) *Response {
+	t.Helper()
+	return c.srv.do(t, c, http.MethodDelete, path, nil)
+}
+
 func (s *Server) do(t testing.TB, c *Client, method, path string, body []byte) *Response {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

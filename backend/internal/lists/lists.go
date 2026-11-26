@@ -1,0 +1,188 @@
+// Package lists owns Lists: creating, naming, deleting and restoring them, and
+// purging deleted ones after RestoreWindow. Items arrive with #7.
+//
+// Who may see or change a List is decided by package membership; this package
+// asks it and never reads list_members itself. Users are known only by ID.
+package lists
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/tsantanadev/cesta/backend/internal/membership"
+	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
+)
+
+// MaxNameLength is the longest List name, in characters.
+const MaxNameLength = 60
+
+// DefaultMaxPerUser is how many Lists a User can own that are not deleted.
+const DefaultMaxPerUser = 100
+
+var (
+	// ErrInvalidName is returned for a name that is empty after trimming, longer
+	// than MaxNameLength or contains control characters.
+	ErrInvalidName = errors.New("invalid list name")
+	// ErrIDTaken is returned when creating a List with an ID another User's List has.
+	ErrIDTaken = errors.New("list id taken")
+	// ErrLimitReached is returned when the User already owns the most Lists allowed.
+	ErrLimitReached = errors.New("list limit reached")
+)
+
+// Summary is a List as one of its Members sees it.
+type Summary struct {
+	ID          uuid.UUID
+	Name        string
+	Role        membership.Role
+	MemberCount int
+	CreatedAt   time.Time
+}
+
+// Service manages Lists.
+type Service struct {
+	db         *pgxpool.Pool
+	clock      clock.Clock
+	members    *membership.Service
+	maxPerUser int
+}
+
+// NewService returns a Service backed by db. maxPerUser <= 0 means DefaultMaxPerUser.
+func NewService(db *pgxpool.Pool, c clock.Clock, members *membership.Service, maxPerUser int) *Service {
+	if maxPerUser <= 0 {
+		maxPerUser = DefaultMaxPerUser
+	}
+	return &Service{db: db, clock: c, members: members, maxPerUser: maxPerUser}
+}
+
+// Create makes a List with the client-chosen id, owned by owner. Retrying with
+// an id owner already has returns that List unchanged and created false.
+func (s *Service) Create(ctx context.Context, owner, id uuid.UUID, name string) (sum Summary, created bool, err error) {
+	name, ok := normalizeName(name)
+	if !ok {
+		return Summary{}, false, ErrInvalidName
+	}
+	now := s.clock.Now()
+	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		// Serialise this owner's creates so two at the limit can't both succeed.
+		if _, err := tx.Exec(ctx, "SELECT 1 FROM users WHERE id = $1 FOR UPDATE", owner); err != nil {
+			return err
+		}
+		var existingOwner uuid.UUID
+		err := tx.QueryRow(ctx, "SELECT owner_id FROM lists WHERE id = $1", id).Scan(&existingOwner)
+		switch {
+		case err == nil && existingOwner == owner:
+			return nil // a retry
+		case err == nil:
+			return ErrIDTaken
+		case !errors.Is(err, pgx.ErrNoRows):
+			return err
+		}
+		var owned int
+		if err := tx.QueryRow(ctx,
+			"SELECT count(*) FROM lists WHERE owner_id = $1 AND deleted_at IS NULL", owner).Scan(&owned); err != nil {
+			return err
+		}
+		if owned >= s.maxPerUser {
+			return ErrLimitReached
+		}
+		tag, err := tx.Exec(ctx, `
+			INSERT INTO lists (id, owner_id, name, created_at, updated_at) VALUES ($1, $2, $3, $4, $4)
+			ON CONFLICT (id) DO NOTHING`, id, owner, name, now)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrIDTaken // another User created it concurrently
+		}
+		created = true
+		return s.members.Grant(ctx, tx, id, owner, membership.Owner, now)
+	})
+	if err != nil {
+		return Summary{}, false, wrap("create", err)
+	}
+	sum, err = s.summary(ctx, id, owner)
+	return sum, created, err
+}
+
+// Mine returns every List userID is a Member of that is not deleted, newest first.
+func (s *Service) Mine(ctx context.Context, userID uuid.UUID) ([]Summary, error) {
+	ms, err := s.members.Of(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	byList := make(map[uuid.UUID]membership.Membership, len(ms))
+	ids := make([]uuid.UUID, 0, len(ms))
+	for _, m := range ms {
+		byList[m.ListID] = m
+		ids = append(ids, m.ListID)
+	}
+	rows, err := s.db.Query(ctx, `
+		SELECT id, name, created_at FROM lists
+		WHERE id = ANY($1) AND deleted_at IS NULL
+		ORDER BY created_at DESC, id`, ids)
+	if err != nil {
+		return nil, wrap("mine", err)
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Summary, error) {
+		var l Summary
+		if err := row.Scan(&l.ID, &l.Name, &l.CreatedAt); err != nil {
+			return Summary{}, err
+		}
+		m := byList[l.ID]
+		l.Role, l.MemberCount = m.Role, m.MemberCount
+		return l, nil
+	})
+	if err != nil {
+		return nil, wrap("mine", err)
+	}
+	return out, nil
+}
+
+// summary returns listID as userID sees it.
+func (s *Service) summary(ctx context.Context, listID, userID uuid.UUID) (Summary, error) {
+	role, err := s.members.RoleOf(ctx, listID, userID)
+	if err != nil {
+		return Summary{}, err
+	}
+	count, err := s.members.Count(ctx, listID)
+	if err != nil {
+		return Summary{}, err
+	}
+	l := Summary{ID: listID, Role: role, MemberCount: count}
+	if err := s.db.QueryRow(ctx, "SELECT name, created_at FROM lists WHERE id = $1", listID).
+		Scan(&l.Name, &l.CreatedAt); err != nil {
+		return Summary{}, wrap("read", err)
+	}
+	return l, nil
+}
+
+// wrap adds context to unexpected errors and passes sentinel errors through.
+func wrap(what string, err error) error {
+	if errors.Is(err, ErrInvalidName) || errors.Is(err, ErrIDTaken) || errors.Is(err, ErrLimitReached) {
+		return err
+	}
+	return fmt.Errorf("lists: %s: %w", what, err)
+}
+
+// normalizeName trims name and reports whether it is acceptable.
+func normalizeName(name string) (string, bool) {
+	name = strings.TrimSpace(name)
+	if name == "" || utf8.RuneCountInString(name) > MaxNameLength || !utf8.ValidString(name) {
+		return "", false
+	}
+	for _, r := range name {
+		if unicode.IsControl(r) {
+			return "", false
+		}
+	}
+	return name, true
+}

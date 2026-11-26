@@ -14,6 +14,8 @@ import (
 
 	"github.com/tsantanadev/cesta/backend/internal/httpapi"
 	"github.com/tsantanadev/cesta/backend/internal/identity"
+	"github.com/tsantanadev/cesta/backend/internal/lists"
+	"github.com/tsantanadev/cesta/backend/internal/membership"
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
 	"github.com/tsantanadev/cesta/backend/internal/platform/hosting"
@@ -35,6 +37,9 @@ type Deps struct {
 	// PublicHost is the custom domain Firebase Hosting serves the API on. When set,
 	// requests that didn't come through it get 404 (see package hosting).
 	PublicHost string
+	// MaxListsPerUser is how many Lists a User can own that are not deleted.
+	// 0 means lists.DefaultMaxPerUser.
+	MaxListsPerUser int
 }
 
 // RateLimits are the per-client-IP and per-User request limits.
@@ -66,6 +71,7 @@ func New(d Deps) http.Handler {
 		Logger:           d.Logger,
 		Verifier:         d.TokenVerifier,
 		Identity:         identity.NewService(d.DB, c),
+		Lists:            lists.NewService(d.DB, c, membership.NewService(d.DB), d.MaxListsPerUser),
 		PerIP:            ratelimit.New(limits.PerIP, c),
 		PerUser:          ratelimit.New(limits.PerUser, c),
 		TrustedProxyHops: d.TrustedProxyHops,
