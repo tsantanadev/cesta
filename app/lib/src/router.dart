@@ -6,6 +6,7 @@ import 'db/app_database.dart';
 import 'health/health_screen.dart';
 import 'lists/lists_controller.dart';
 import 'lists/lists_screen.dart';
+import 'lists/recently_deleted_screen.dart';
 import 'session/display_name_screen.dart';
 import 'session/email_auth_screen.dart';
 import 'session/reset_password_screen.dart';
@@ -85,6 +86,10 @@ GoRouter buildRouter({
     GoRoute(
       path: '/',
       builder: (_, _) => ListsScreen(session: session, lists: lists),
+    ),
+    GoRoute(
+      path: '/lists/deleted',
+      builder: (_, _) => RecentlyDeletedScreen(lists: lists),
     ),
     GoRoute(
       path: '/me/name',

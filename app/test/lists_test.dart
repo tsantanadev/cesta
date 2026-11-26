@@ -230,4 +230,94 @@ void main() {
       expect(find.text('Feira'), findsOneWidget);
     });
   });
+
+  group('recently deleted', () {
+    testWidgets('shows the Lists the Owner deleted and how long they can be restored', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Feira', deletedAgo: const Duration(days: 3));
+      h.api.addList(ana, name: 'Old party', deletedAgo: const Duration(days: 29, hours: 1));
+      h.api.addList(ana, name: 'Long gone', deletedAgo: const Duration(days: 31));
+      h.api.addList(ana, name: 'Pharmacy');
+
+      await h.openRecentlyDeleted();
+
+      expect(find.text('Feira'), findsOneWidget);
+      expect(find.text('27 days left'), findsOneWidget);
+      expect(find.text('Old party'), findsOneWidget);
+      expect(find.text('1 day left'), findsOneWidget);
+      expect(find.text('Long gone'), findsNothing);
+      expect(find.text('Pharmacy'), findsNothing);
+    });
+
+    testWidgets('restoring a List puts it back on the Lists screen', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Feira', deletedAgo: const Duration(days: 3));
+      await h.openRecentlyDeleted();
+
+      await tester.tap(find.widgetWithText(CesButton, 'Restore'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nothing deleted in the last 30 days.'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your Lists'), findsOneWidget);
+      expect(find.text('Feira'), findsOneWidget);
+      expect(h.api.listNamesOf(ana), ['Feira']);
+    });
+
+    testWidgets("doesn't show Lists other Users deleted", (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      final sharedId = h.api.addListSharedWith(ana, name: 'Their feira');
+      h.api.deleteListNow(sharedId);
+
+      await h.openRecentlyDeleted();
+
+      expect(find.text('Their feira'), findsNothing);
+      expect(find.text('Nothing deleted in the last 30 days.'), findsOneWidget);
+    });
+
+    testWidgets('restoring past the limit of 100 Lists says so', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Feira', deletedAgo: const Duration(days: 3));
+      for (var i = 0; i < 100; i++) {
+        h.api.addList(ana, name: 'List $i');
+      }
+      await h.openRecentlyDeleted();
+
+      await tester.tap(find.widgetWithText(CesButton, 'Restore'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("You've reached the limit of 100 Lists. Delete one to create another."), findsOneWidget);
+      expect(find.text('Feira'), findsOneWidget);
+    });
+
+    testWidgets('offline, says there is no connection', (tester) async {
+      final h = Harness(tester);
+      h.signedIn();
+      await h.pumpApp();
+      h.goOffline();
+
+      await h.openAccountMenu();
+      await tester.tap(find.text('Recently deleted'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("You're offline. Connect to the internet and try again."), findsOneWidget);
+    });
+
+    testWidgets('is in Brazilian Portuguese on a Portuguese phone', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Feira', deletedAgo: const Duration(days: 3));
+
+      await h.openRecentlyDeleted(locale: brazilianPortuguese);
+
+      expect(find.text('Excluídas recentemente'), findsOneWidget);
+      expect(find.text('Faltam 27 dias'), findsOneWidget);
+      expect(find.widgetWithText(CesButton, 'Restaurar'), findsOneWidget);
+    });
+  });
 }

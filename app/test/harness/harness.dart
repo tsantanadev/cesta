@@ -110,6 +110,16 @@ class Harness {
     await tester.pumpAndSettle();
   }
 
+  /// Starts the app and opens Recently deleted from the account menu.
+  Future<void> openRecentlyDeleted({Locale locale = english}) async {
+    await pumpApp(locale: locale);
+    final inEnglish = locale == english;
+    await tester.tap(find.byTooltip(inEnglish ? 'Account' : 'Conta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(inEnglish ? 'Recently deleted' : 'Excluídas recentemente'));
+    await tester.pumpAndSettle();
+  }
+
   /// Deletes the List named [name] from its options.
   Future<void> deleteList(String name) async {
     await openListOptions(name);
