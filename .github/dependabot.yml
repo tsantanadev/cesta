@@ -1,0 +1,93 @@
+# Weekly, grouped dependency updates.
+#
+# Grouping keeps PR noise low and avoids churning through dev Artifact Registry's
+# 10-image retention window (every merge to main triggers a dev deploy).
+#
+# Terraform providers (infra/terraform/) are intentionally omitted: Terraform is
+# applied by hand, declares providers across three directories (envs/dev, envs/prod,
+# modules/environment) with `-lockfile=readonly` in CI, and pins the archived
+# kislerdm/neon provider.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "gomod"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      # Isolated because bumping oapi-codegen can require re-running `make generate`.
+      codegen:
+        patterns:
+          - "github.com/oapi-codegen/*"
+      go-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "github.com/oapi-codegen/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "gomod"
+    directory: "/infra/functions/billing-kill-switch"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    groups:
+      kill-switch-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "pub"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      # Isolated because bumping codegen packages can require re-running `tool/codegen.sh`.
+      codegen:
+        patterns:
+          - "drift*"
+          - "build_runner"
+          - "swagger_parser"
+      pub-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "drift*"
+          - "build_runner"
+          - "swagger_parser"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    groups:
+      docker-base-images:
+        patterns:
+          - "*"
+    ignore:
+      # Kept in step with internal/testkit/postgres.go and Neon Postgres 18.
+      - dependency-name: "postgres"

@@ -1,0 +1,23 @@
+# VCS & OS metadata
+.git
+.gitignore
+.DS_Store
+
+# Local dev, lint & codegen config
+Dockerfile
+.dockerignore
+docker-compose.yaml
+Makefile
+.golangci.yaml
+internal/httpapi/oapi-codegen.yaml
+
+# Tests & test harness
+tests/
+internal/testkit/
+**/*_test.go
+
+# Local artifacts & env files
+*.out
+coverage.*
+.env
+.env.*
