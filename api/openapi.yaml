@@ -69,7 +69,168 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "429":
           $ref: "#/components/responses/RateLimited"
+  /api/lists:
+    get:
+      operationId: listLists
+      summary: The Lists the signed-in User is a Member of
+      description: >-
+        Every List the User owns or was shared with, except deleted ones, with the
+        User's Role and how many unchecked Items each has. Newest first.
+      responses:
+        "200":
+          description: The User's Lists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSummaries"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      operationId: createList
+      summary: Create a List owned by the signed-in User
+      description: >-
+        The client picks the List's ID, so a retried request is safe: sending an ID
+        the User already owns returns that List with 200 and changes nothing. The
+        creator becomes the List's Owner. A User can own at most 100 Lists that are
+        not deleted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListCreate"
+      responses:
+        "200":
+          description: The List already existed with this ID (a retried request)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSummary"
+        "201":
+          description: The new List
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/lists/{listId}:
+    parameters:
+      - $ref: "#/components/parameters/ListId"
+    patch:
+      operationId: renameList
+      summary: Rename a List (Owner only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListRename"
+      responses:
+        "200":
+          description: The renamed List
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      operationId: deleteList
+      summary: Delete a List (Owner only)
+      description: >-
+        The List disappears for every Member at once. The Owner can restore it for
+        30 days; after that it is purged. Deleting a List that is already deleted
+        returns it unchanged.
+      responses:
+        "200":
+          description: The deleted List, with when it will be purged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/lists/{listId}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ListId"
+    post:
+      operationId: restoreList
+      summary: Restore a deleted List (Owner only, within 30 days)
+      description: >-
+        Brings the List back for every Member. Restoring a List that isn't deleted
+        changes nothing. Restoring counts towards the limit of 100 Lists.
+      responses:
+        "200":
+          description: The restored List
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/deleted-lists:
+    get:
+      operationId: listDeletedLists
+      summary: Lists the signed-in User deleted and can still restore
+      description: Only Lists the User owns, deleted less than 30 days ago. Most recently deleted first.
+      responses:
+        "200":
+          description: The User's recently deleted Lists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedLists"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 components:
+  parameters:
+    ListId:
+      name: listId
+      in: path
+      required: true
+      description: The List's ID (a UUID chosen by the client that created it).
+      schema:
+        type: string
+        format: uuid
   securitySchemes:
     firebaseIdToken:
       type: http
@@ -101,6 +262,24 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: Only the List's Owner can do this
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: No such List, or the signed-in User is not a Member of it
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Conflict:
+      description: The request conflicts with the List's state or a limit (see code)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
   schemas:
     ApiError:
       type: object
@@ -109,7 +288,18 @@ components:
         code:
           type: string
           description: Stable machine-readable reason.
-          enum: [unauthenticated, rate_limited, invalid_request, invalid_display_name, internal]
+          enum:
+            - unauthenticated
+            - rate_limited
+            - invalid_request
+            - invalid_display_name
+            - invalid_list_name
+            - list_not_found
+            - not_list_owner
+            - list_deleted
+            - list_id_taken
+            - limit_exceeded
+            - internal
         message:
           type: string
           description: Human-readable explanation, in English, for logs and debugging.
@@ -148,3 +338,82 @@ components:
         database:
           type: string
           enum: [up, down]
+    ListCreate:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Chosen by the client, so the List can be created offline and retried safely.
+        name:
+          $ref: "#/components/schemas/ListName"
+    ListRename:
+      type: object
+      required: [name]
+      properties:
+        name:
+          $ref: "#/components/schemas/ListName"
+    ListName:
+      type: string
+      minLength: 1
+      maxLength: 60
+      description: Trimmed; must contain at least one visible character and no control characters.
+    Role:
+      type: string
+      enum: [owner, editor]
+      description: The signed-in User's Role on the List.
+    ListSummary:
+      type: object
+      required: [id, name, role, uncheckedItemCount, memberCount, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        uncheckedItemCount:
+          type: integer
+          minimum: 0
+          description: Items on the List that are not checked.
+        memberCount:
+          type: integer
+          minimum: 1
+          description: Members of the List, including the Owner.
+        createdAt:
+          type: string
+          format: date-time
+    ListSummaries:
+      type: object
+      required: [lists]
+      properties:
+        lists:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListSummary"
+    DeletedList:
+      type: object
+      required: [id, name, deletedAt, purgeAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        deletedAt:
+          type: string
+          format: date-time
+        purgeAt:
+          type: string
+          format: date-time
+          description: When the List stops being restorable and is removed for good (30 days after deletedAt).
+    DeletedLists:
+      type: object
+      required: [lists]
+      properties:
+        lists:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeletedList"

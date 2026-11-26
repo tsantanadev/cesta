@@ -6,6 +6,12 @@ enum ApiErrorCode {
   rateLimited("rate_limited"),
   invalidRequest("invalid_request"),
   invalidDisplayName("invalid_display_name"),
+  invalidListName("invalid_list_name"),
+  listNotFound("list_not_found"),
+  notListOwner("not_list_owner"),
+  listDeleted("list_deleted"),
+  listIdTaken("list_id_taken"),
+  limitExceeded("limit_exceeded"),
   internal("internal");
 
   const ApiErrorCode(this.value);
