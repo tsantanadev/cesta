@@ -37,17 +37,25 @@ abstract final class CestaColors {
   /// Destructive actions.
   static const beterraba = Color(0xFFC8324F);
 
-  // Dark variants. The design's dark frame couldn't be read when these were
-  // chosen, so they are derived from the light palette: a deep leaf-green
-  // ground, lighter text and a lighter Folha for contrast. Banana stays.
-  static const folhaDark = Color(0xFF5FBF88);
-  static const onFolhaDark = Color(0xFF0B2918);
-  static const tintaDark = Color(0xFFE4EFE4);
-  static const tintaMutedDark = Color(0xFF9DB3A4);
-  static const alfaceDark = Color(0xFF0F1C15);
-  static const brancoDark = Color(0xFF1A2B21);
-  static const checkedDark = Color(0xFF2B3D32);
-  static const beterrabaDark = Color(0xFFF0718A);
+  /// Text and icons on [folha].
+  static const onFolha = Color(0xFFFFFFFF);
+
+  // Dark variants: Figma "Cesta color (dark)" collection.
+  static const bananaDark = Color(0xFFF2C934);
+  static const folhaDark = Color(0xFF4CB97A);
+  static const onFolhaDark = Color(0xFF0F2318);
+  static const tintaDark = Color(0xFFE4EEE6);
+  static const tintaMutedDark = Color(0xFF93A89A);
+  static const alfaceDark = Color(0xFF0E1A14);
+  static const brancoDark = Color(0xFF18271F);
+  static const checkedDark = Color(0xFF26382D);
+  static const beterrabaDark = Color(0xFFF0647F);
+
+  /// The Toast's ground: deep Tinta in both modes (Figma "on-banana").
+  static const toast = Color(0xFF17382A);
+
+  /// Text on the Toast and on brand surfaces, in both modes (Figma "on-brand").
+  static const onToast = Color(0xFFFFFFFF);
 
   /// Status colours, used for health and sync indicators.
   static const success = Color(0xFF2E7D32);
@@ -80,7 +88,7 @@ abstract final class CestaRadii {
   static const card = 16.0;
   static const button = 12.0;
   static const field = 12.0;
-  static const sheet = 24.0;
+  static const sheet = 28.0;
 }
 
 /// The bundled typefaces (assets/fonts, declared in pubspec.yaml).
@@ -105,7 +113,7 @@ class CestaPalette extends ThemeExtension<CestaPalette> {
     onBought: CestaColors.folha,
   );
   static const dark = CestaPalette(
-    toBuy: CestaColors.banana,
+    toBuy: CestaColors.bananaDark,
     onToBuy: CestaColors.onBanana,
     bought: CestaColors.checkedDark,
     onBought: CestaColors.folhaDark,

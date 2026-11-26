@@ -12,7 +12,7 @@ abstract final class CestaTheme {
     // Material roles mapped from the design palette; the seed fills the rest.
     final scheme = ColorScheme.fromSeed(seedColor: CestaColors.seed, brightness: brightness).copyWith(
       primary: light ? CestaColors.folha : CestaColors.folhaDark,
-      onPrimary: light ? CestaColors.branco : CestaColors.onFolhaDark,
+      onPrimary: light ? CestaColors.onFolha : CestaColors.onFolhaDark,
       surface: light ? CestaColors.alface : CestaColors.alfaceDark,
       onSurface: light ? CestaColors.tinta : CestaColors.tintaDark,
       onSurfaceVariant: light ? CestaColors.tintaMuted : CestaColors.tintaMutedDark,
@@ -27,6 +27,10 @@ abstract final class CestaTheme {
       fontFamily: CestaFonts.family,
     );
     final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(CestaRadii.button));
+    // Figma Button (3:61): 56 dp pills, Plus Jakarta Sans Bold 16.
+    const pill = StadiumBorder();
+    const buttonLabel = TextStyle(fontWeight: FontWeight.w700, fontSize: 16);
+    const buttonSize = Size(64, 56);
     final fieldBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(CestaRadii.field),
       borderSide: BorderSide.none,
@@ -40,9 +44,16 @@ abstract final class CestaTheme {
       ],
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: scheme.onSurface,
-        contentTextStyle: base.textTheme.bodyLarge?.copyWith(color: scheme.surface, fontWeight: FontWeight.w600),
-        actionTextColor: light ? CestaColors.banana : CestaColors.folha,
+        // Figma Toast (4:362).
+        backgroundColor: CestaColors.toast,
+        contentTextStyle: const TextStyle(
+          fontFamily: CestaFonts.family,
+          color: CestaColors.onToast,
+          fontWeight: FontWeight.w500,
+          fontSize: 15,
+        ),
+        actionTextColor: light ? CestaColors.banana : CestaColors.bananaDark,
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CestaRadii.card)),
       ),
       cardTheme: CardThemeData(
@@ -51,14 +62,22 @@ abstract final class CestaTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(CestaRadii.card)),
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(minimumSize: const Size(64, 52), shape: buttonShape),
+        style: FilledButton.styleFrom(
+          minimumSize: buttonSize,
+          shape: pill,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          textStyle: buttonLabel,
+        ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(64, 52),
-          shape: buttonShape,
+          minimumSize: buttonSize,
+          shape: pill,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          textStyle: buttonLabel,
           foregroundColor: scheme.onSurface,
-          side: BorderSide(color: scheme.outlineVariant),
+          backgroundColor: scheme.surfaceContainerLow,
+          side: BorderSide(color: light ? CestaColors.checked : CestaColors.checkedDark, width: 1.5),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -76,7 +95,10 @@ abstract final class CestaTheme {
         helperMaxLines: 3,
       ),
       bottomSheetTheme: BottomSheetThemeData(
+        // Figma sheet (9:436): Checked grabber, 28 dp top corners.
         showDragHandle: true,
+        dragHandleSize: const Size(40, 4),
+        dragHandleColor: light ? CestaColors.checked : CestaColors.checkedDark,
         backgroundColor: scheme.surfaceContainerLow,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(CestaRadii.sheet)),

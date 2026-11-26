@@ -771,6 +771,7 @@ void showCesToast(BuildContext context, {required String message, String? action
     ..showSnackBar(
       SnackBar(
         content: Text(message),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
         persist: false,
         duration: const Duration(seconds: 6),
         action: actionLabel == null ? null : SnackBarAction(label: actionLabel, onPressed: onAction ?? () {}),
@@ -799,12 +800,13 @@ Future<void> showCesFormSheet(
           children: [
             Row(
               children: [
-                Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
-                CesIconButton(
-                  icon: CesIcons.close,
-                  tooltip: closeTooltip,
-                  onPressed: () => Navigator.of(context).pop(),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 17),
+                  ),
                 ),
+                _SheetCloseButton(tooltip: closeTooltip),
               ],
             ),
             SizedBox(height: context.spacing.md),
@@ -837,3 +839,26 @@ class CesGap extends StatelessWidget {
 }
 
 enum _GapSize { sm, md, lg, xl }
+
+/// The round close button of a form sheet (Figma 9:440): 36 dp, Alface ground.
+class _SheetCloseButton extends StatelessWidget {
+  const _SheetCloseButton({required this.tooltip});
+
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: () => Navigator.of(context).pop(),
+      icon: const Icon(CesIcons.close, size: 16),
+      style: IconButton.styleFrom(
+        backgroundColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
+        fixedSize: const Size(36, 36),
+        minimumSize: const Size(36, 36),
+      ),
+    );
+  }
+}
