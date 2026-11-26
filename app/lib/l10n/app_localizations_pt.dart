@@ -174,13 +174,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get errorDisplayNameInvalid => 'Esse nome não pode ser usado. Tente outro.';
 
   @override
-  String get homeTitle => 'Suas listas';
+  String get listsTitle => 'Suas listas';
 
   @override
-  String get homeEmptyTitle => 'Nenhuma lista ainda';
+  String get listsEmptyTitle => 'Nenhuma lista ainda';
 
   @override
-  String get homeEmptyBody => 'As listas que você criar ou para as quais for convidado aparecerão aqui.';
+  String get listsEmptyBody => 'As listas que você criar ou para as quais for convidado aparecerão aqui.';
 
   @override
   String get userMenu => 'Conta';
@@ -267,11 +267,14 @@ class AppLocalizationsPt extends AppLocalizations {
   String get listsRecentlyDeleted => 'Excluídas recentemente';
 
   @override
-  String get listsRecentlyDeletedExplanation =>
-      'Listas excluídas podem ser restauradas por 30 dias. Depois disso, somem de vez.';
+  String listsRecentlyDeletedExplanation(int days) {
+    return 'Listas excluídas podem ser restauradas por $days dias. Depois disso, somem de vez.';
+  }
 
   @override
-  String get listsRecentlyDeletedEmpty => 'Nada excluído nos últimos 30 dias.';
+  String listsRecentlyDeletedEmpty(int days) {
+    return 'Nada excluído nos últimos $days dias.';
+  }
 
   @override
   String listsDaysLeft(int days) {
@@ -289,17 +292,24 @@ class AppLocalizationsPt extends AppLocalizations {
   String get errorListNameRequired => 'Digite um nome.';
 
   @override
-  String get errorListNameTooLong => 'Use até 60 caracteres.';
+  String errorListNameTooLong(int max) {
+    return 'Use até $max caracteres.';
+  }
 
   @override
   String get errorListNameInvalid => 'Esse nome não pode ser usado. Tente outro.';
 
   @override
-  String get errorListLimit => 'Você atingiu o limite de 100 listas. Exclua uma para criar outra.';
+  String errorListLimit(int limit) {
+    return 'Você atingiu o limite de $limit listas. Exclua uma para criar outra.';
+  }
 
   @override
   String get errorListNotFound => 'Esta lista não está mais disponível.';
 
   @override
-  String get errorListRestoreExpired => 'Esta lista foi excluída há mais de 30 dias e não pode ser restaurada.';
+  String get errorListDeleted => 'Esta lista foi excluída. Você pode restaurá-la em Excluídas recentemente.';
+
+  @override
+  String get errorListNotRestorable => 'Esta lista não está mais disponível e não pode ser restaurada.';
 }

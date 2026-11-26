@@ -176,13 +176,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorDisplayNameInvalid => 'That name can\'t be used. Try another.';
 
   @override
-  String get homeTitle => 'Your Lists';
+  String get listsTitle => 'Your Lists';
 
   @override
-  String get homeEmptyTitle => 'No Lists yet';
+  String get listsEmptyTitle => 'No Lists yet';
 
   @override
-  String get homeEmptyBody => 'Lists you create or are invited to will show up here.';
+  String get listsEmptyBody => 'Lists you create or are invited to will show up here.';
 
   @override
   String get userMenu => 'Account';
@@ -269,11 +269,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get listsRecentlyDeleted => 'Recently deleted';
 
   @override
-  String get listsRecentlyDeletedExplanation =>
-      'Deleted Lists can be restored for 30 days. After that they\'re gone for good.';
+  String listsRecentlyDeletedExplanation(int days) {
+    return 'Deleted Lists can be restored for $days days. After that they\'re gone for good.';
+  }
 
   @override
-  String get listsRecentlyDeletedEmpty => 'Nothing deleted in the last 30 days.';
+  String listsRecentlyDeletedEmpty(int days) {
+    return 'Nothing deleted in the last $days days.';
+  }
 
   @override
   String listsDaysLeft(int days) {
@@ -291,17 +294,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorListNameRequired => 'Enter a name.';
 
   @override
-  String get errorListNameTooLong => 'Use 60 characters or fewer.';
+  String errorListNameTooLong(int max) {
+    return 'Use $max characters or fewer.';
+  }
 
   @override
   String get errorListNameInvalid => 'That name can\'t be used. Try another.';
 
   @override
-  String get errorListLimit => 'You\'ve reached the limit of 100 Lists. Delete one to create another.';
+  String errorListLimit(int limit) {
+    return 'You\'ve reached the limit of $limit Lists. Delete one to create another.';
+  }
 
   @override
   String get errorListNotFound => 'This List is no longer available.';
 
   @override
-  String get errorListRestoreExpired => 'This List was deleted more than 30 days ago and can\'t be restored.';
+  String get errorListDeleted => 'This List was deleted. You can restore it from Recently deleted.';
+
+  @override
+  String get errorListNotRestorable => 'This List is no longer available and can\'t be restored.';
 }

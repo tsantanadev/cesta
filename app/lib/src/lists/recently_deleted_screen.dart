@@ -5,10 +5,10 @@ import 'package:material_ui/material_ui.dart';
 import '../../l10n/app_localizations.dart';
 import '../api/generated/cesta_api.dart';
 import '../ui/components.dart';
+import 'list_messages.dart';
 import 'lists_controller.dart';
-import 'lists_screen.dart';
 
-/// The Lists the User deleted in the last 30 days, which they can restore.
+/// The Lists the User deleted within the Restore window, which they can restore.
 /// Only the Owner of a List can delete it, so only Owners see anything here.
 class RecentlyDeletedScreen extends StatefulWidget {
   const RecentlyDeletedScreen({super.key, required this.lists});
@@ -20,12 +20,12 @@ class RecentlyDeletedScreen extends StatefulWidget {
 }
 
 class _RecentlyDeletedScreenState extends State<RecentlyDeletedScreen> {
-  /// Null while loading or when loading failed ([_loadOutcome] says why).
+  /// Null while loading or when loading failed ([_loadFailure] says why).
   List<DeletedList>? _deleted;
-  ListOutcome? _loadOutcome;
+  ListFailure? _loadFailure;
 
   /// Why the last restore failed, if it did.
-  ListOutcome? _restoreOutcome;
+  ListFailure? _restoreFailure;
   String? _restoring;
 
   @override
@@ -35,29 +35,29 @@ class _RecentlyDeletedScreenState extends State<RecentlyDeletedScreen> {
   }
 
   Future<void> _load() async {
-    final (deleted, outcome) = await widget.lists.recentlyDeleted();
+    final (deleted, failure) = await widget.lists.recentlyDeleted();
     if (!mounted) return;
     setState(() {
       _deleted = deleted;
-      _loadOutcome = outcome;
+      _loadFailure = failure;
     });
   }
 
   Future<void> _restore(DeletedList list) async {
     setState(() {
       _restoring = list.id;
-      _restoreOutcome = null;
+      _restoreFailure = null;
     });
-    final outcome = await widget.lists.restore(list.id);
+    final failure = await widget.lists.restore(list.id);
     if (!mounted) return;
     setState(() {
       _restoring = null;
-      if (outcome == ListOutcome.done || outcome == ListOutcome.expired) {
+      if (failure == null || failure == ListFailure.notRestorable) {
         _deleted = _deleted?.where((l) => l.id != list.id).toList();
       }
-      if (outcome != ListOutcome.done) _restoreOutcome = outcome;
+      _restoreFailure = failure;
     });
-    if (outcome == ListOutcome.done) {
+    if (failure == null) {
       showCesToast(context, message: AppLocalizations.of(context).listsRestored(list.name));
     }
   }
@@ -76,18 +76,18 @@ class _RecentlyDeletedScreenState extends State<RecentlyDeletedScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CesText(l10n.listsRecentlyDeletedExplanation),
+          CesText(l10n.listsRecentlyDeletedExplanation(restoreWindow.inDays)),
           const CesGap.lg(),
-          if (_restoreOutcome case final outcome?) ...[
-            CesMessage(tone: CesMessageTone.error, text: listOutcomeMessage(l10n, outcome)),
+          if (_restoreFailure case final failure?) ...[
+            CesMessage(tone: CesMessageTone.error, text: listFailureMessage(l10n, failure)),
             const CesGap.md(),
           ],
-          if (deleted == null && _loadOutcome == null)
+          if (deleted == null && _loadFailure == null)
             CesProgress(label: l10n.loading)
           else if (deleted == null)
-            CesMessage(tone: CesMessageTone.error, text: listOutcomeMessage(l10n, _loadOutcome!))
+            CesMessage(tone: CesMessageTone.error, text: listFailureMessage(l10n, _loadFailure!))
           else if (deleted.isEmpty)
-            CesText(l10n.listsRecentlyDeletedEmpty)
+            CesText(l10n.listsRecentlyDeletedEmpty(restoreWindow.inDays))
           else
             for (final list in deleted) ...[
               CesListCard(

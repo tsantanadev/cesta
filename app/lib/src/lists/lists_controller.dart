@@ -5,27 +5,36 @@ import 'package:material_ui/material_ui.dart';
 import 'package:uuid/uuid.dart';
 
 import '../api/generated/cesta_api.dart';
+import '../api/network.dart';
 import '../db/app_database.dart';
 import '../session/session_controller.dart';
 
 /// The longest List name the server accepts, in characters.
 const maxListNameLength = 60;
 
-/// Result of a change to a List (create, rename, delete, restore).
-enum ListOutcome {
-  done,
+/// How many Lists a User can own that are not deleted, as the server enforces.
+const maxListsPerUser = 100;
 
+/// How long after deletion the Owner can still restore a List (the Restore window).
+const restoreWindow = Duration(days: 30);
+
+/// Why a change to a List (create, rename, delete, restore) or a load didn't
+/// go through. Operations return null when they did.
+enum ListFailure {
   /// The server rejected the name.
   invalidName,
 
-  /// The User already owns 100 Lists.
+  /// The User already owns [maxListsPerUser] Lists.
   limitReached,
 
-  /// The List is gone, or the User is no longer a Member.
+  /// The List is gone for good, or the User is no longer a Member.
   notFound,
 
-  /// The List was deleted more than 30 days ago.
-  expired,
+  /// The List was deleted (and can still be restored from Recently deleted).
+  deleted,
+
+  /// Restoring found the List gone; the app can't tell why.
+  notRestorable,
   rateLimited,
   offline,
   failed,
@@ -35,7 +44,8 @@ enum ListOutcome {
 /// the User makes to them.
 ///
 /// Lists come from the API and are cached on the device, so the Lists screen
-/// still shows them offline. Changes need the network.
+/// still shows them offline. Changes need the network until #7 moves them to
+/// the outbox.
 class ListsController extends ChangeNotifier {
   ListsController({required this._api, required this._db, required this._session}) {
     _session.addListener(_onSessionChanged);
@@ -61,19 +71,24 @@ class ListsController extends ChangeNotifier {
     }
   }
 
-  /// Shows the cached Lists, then reloads them from the server.
-  Future<void> refresh() async {
+  /// Shows the cached Lists, then reloads them from the server. On failure
+  /// the cached Lists stay, and the result says why.
+  Future<ListFailure?> refresh() async {
     if (!_loaded) {
       _show(await _db.readKnownLists());
     }
-    try {
-      if (await _api.listLists() case ListLists200(:final value)) {
-        await _db.saveKnownLists(value.lists);
-        _show(value.lists);
+    return _attempt(() async {
+      switch (await _api.listLists()) {
+        case ListLists200(:final value):
+          await _db.saveKnownLists(value.lists);
+          _show(value.lists);
+          return null;
+        case ListLists429():
+          return ListFailure.rateLimited;
+        case ListLists401():
+          return ListFailure.failed;
       }
-    } on DioException {
-      // Offline or unreachable: keep the cached Lists.
-    }
+    });
   }
 
   /// A new List's ID, which the client picks. Reuse it when retrying the same
@@ -81,88 +96,90 @@ class ListsController extends ChangeNotifier {
   static String newListId() => const Uuid().v4();
 
   /// Creates a List named [name] with ID [id] (from [newListId]), owned by the User.
-  Future<ListOutcome> create(String id, String name) => _attempt(() async {
+  Future<ListFailure?> create(String id, String name) => _attempt(() async {
     final body = ListCreate(id: id, name: ListName(name.trim()));
     return switch (await _api.createList(body: body)) {
       CreateList201(:final value) || CreateList200(:final value) => _keep(value),
-      CreateList400() => ListOutcome.invalidName,
+      CreateList400() => ListFailure.invalidName,
       CreateList409(:final value) => _conflict(value),
-      CreateList429() => ListOutcome.rateLimited,
-      CreateList401() => ListOutcome.failed,
+      CreateList429() => ListFailure.rateLimited,
+      CreateList401() => ListFailure.failed,
     };
   });
 
-  Future<ListOutcome> rename(ListSummary list, String name) => _attempt(() async {
+  Future<ListFailure?> rename(ListSummary list, String name) => _attempt(() async {
     final result = await _api.renameList(
       listId: list.id,
       body: ListRename(name: ListName(name.trim())),
     );
     return switch (result) {
       RenameList200(:final value) => _keep(value),
-      RenameList400() => ListOutcome.invalidName,
-      RenameList404() || RenameList409() => _gone(list.id),
-      RenameList429() => ListOutcome.rateLimited,
-      RenameList401() || RenameList403() => ListOutcome.failed,
+      RenameList400() => ListFailure.invalidName,
+      RenameList404() => _gone(list.id, ListFailure.notFound),
+      RenameList409() => _gone(list.id, ListFailure.deleted),
+      RenameList429() => ListFailure.rateLimited,
+      RenameList401() || RenameList403() => ListFailure.failed,
     };
   });
 
-  Future<ListOutcome> delete(ListSummary list) => _attempt(() async {
+  Future<ListFailure?> delete(ListSummary list) => _attempt(() async {
     return switch (await _api.deleteList(listId: list.id)) {
-      DeleteList200() => _gone(list.id).then((_) => ListOutcome.done),
-      DeleteList404() => _gone(list.id),
-      DeleteList429() => ListOutcome.rateLimited,
-      DeleteList400() || DeleteList401() || DeleteList403() => ListOutcome.failed,
+      DeleteList200() => _gone(list.id, null),
+      DeleteList404() => _gone(list.id, ListFailure.notFound),
+      DeleteList429() => ListFailure.rateLimited,
+      DeleteList400() || DeleteList401() || DeleteList403() => ListFailure.failed,
     };
   });
 
   /// Brings back the deleted List [id].
-  Future<ListOutcome> restore(String id) => _attempt(() async {
+  Future<ListFailure?> restore(String id) => _attempt(() async {
     return switch (await _api.restoreList(listId: id)) {
       RestoreList200(:final value) => _keep(value),
-      RestoreList404() => ListOutcome.expired,
+      RestoreList404() => ListFailure.notRestorable,
       RestoreList409(:final value) => _conflict(value),
-      RestoreList429() => ListOutcome.rateLimited,
-      RestoreList400() || RestoreList401() || RestoreList403() => ListOutcome.failed,
+      RestoreList429() => ListFailure.rateLimited,
+      RestoreList400() || RestoreList401() || RestoreList403() => ListFailure.failed,
     };
   });
 
   /// The Lists the User deleted and can still restore, newest deletion first.
-  /// Null when they couldn't be loaded; [outcome] says why.
-  Future<(List<DeletedList>?, ListOutcome)> recentlyDeleted() async {
+  /// Null when they couldn't be loaded, with why.
+  Future<(List<DeletedList>?, ListFailure?)> recentlyDeleted() async {
     try {
       return switch (await _api.listDeletedLists()) {
-        ListDeletedLists200(:final value) => (value.lists, ListOutcome.done),
-        ListDeletedLists429() => (null, ListOutcome.rateLimited),
-        ListDeletedLists401() => (null, ListOutcome.failed),
+        ListDeletedLists200(:final value) => (value.lists, null),
+        ListDeletedLists429() => (null, ListFailure.rateLimited),
+        ListDeletedLists401() => (null, ListFailure.failed),
       };
     } on DioException catch (e) {
-      return (null, _isOffline(e) ? ListOutcome.offline : ListOutcome.failed);
+      return (null, isOffline(e) ? ListFailure.offline : ListFailure.failed);
     }
   }
 
-  Future<ListOutcome> _attempt(Future<ListOutcome> Function() call) async {
+  Future<ListFailure?> _attempt(Future<ListFailure?> Function() call) async {
     try {
       return await call();
     } on DioException catch (e) {
-      return _isOffline(e) ? ListOutcome.offline : ListOutcome.failed;
+      return isOffline(e) ? ListFailure.offline : ListFailure.failed;
     }
   }
 
-  Future<ListOutcome> _keep(ListSummary list) async {
+  Future<ListFailure?> _keep(ListSummary list) async {
     await _db.saveKnownList(list);
     _show([list, ..._lists.where((l) => l.id != list.id)]);
-    return ListOutcome.done;
+    return null;
   }
 
-  Future<ListOutcome> _gone(String id) async {
+  /// Takes List [id] off the Lists screen and returns [failure].
+  Future<ListFailure?> _gone(String id, ListFailure? failure) async {
     await _db.forgetKnownList(id);
     _show(_lists.where((l) => l.id != id).toList());
-    return ListOutcome.notFound;
+    return failure;
   }
 
-  static ListOutcome _conflict(ApiError error) => switch (error.code) {
-    ApiErrorCode.limitExceeded => ListOutcome.limitReached,
-    _ => ListOutcome.failed,
+  static ListFailure _conflict(ApiError error) => switch (error.code) {
+    ApiErrorCode.limitExceeded => ListFailure.limitReached,
+    _ => ListFailure.failed,
   };
 
   void _show(List<ListSummary> lists) {
@@ -170,14 +187,6 @@ class ListsController extends ChangeNotifier {
     _loaded = true;
     notifyListeners();
   }
-
-  static bool _isOffline(DioException e) => switch (e.type) {
-    DioExceptionType.connectionError ||
-    DioExceptionType.connectionTimeout ||
-    DioExceptionType.sendTimeout ||
-    DioExceptionType.receiveTimeout => true,
-    _ => false,
-  };
 
   @override
   void dispose() {
