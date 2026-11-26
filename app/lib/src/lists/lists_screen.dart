@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../api/generated/cesta_api.dart';
 import '../session/session_controller.dart';
 import '../ui/components.dart';
+import 'list_messages.dart';
 import 'list_name_form.dart';
 import 'lists_controller.dart';
 
@@ -27,7 +28,15 @@ class _ListsScreenState extends State<ListsScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(_lists.refresh());
+    unawaited(_refresh());
+  }
+
+  /// Reloads the Lists. Offline the cached ones just stay; any other failure
+  /// is shown, as the session's own requests do.
+  Future<void> _refresh() async {
+    final failure = await _lists.refresh();
+    if (!mounted || failure == null || failure == ListFailure.offline) return;
+    showCesToast(context, message: listFailureMessage(AppLocalizations.of(context), failure));
   }
 
   void _openUserMenu() {
@@ -65,17 +74,18 @@ class _ListsScreenState extends State<ListsScreen> {
 
   Future<void> _openRecentlyDeleted() async {
     await context.push('/lists/deleted');
-    await _lists.refresh(); // pick up Lists restored there
+    await _refresh(); // pick up Lists restored there
   }
 
   void _create() {
     final l10n = AppLocalizations.of(context);
+    final id = ListsController.newListId(); // one per sheet, so retries don't duplicate
     unawaited(
       showCesFormSheet(
         context,
         title: l10n.listsNewSheetTitle,
         closeTooltip: l10n.sheetClose,
-        child: ListNameForm(submitLabel: l10n.listsCreate, onSubmit: _lists.create),
+        child: ListNameForm(submitLabel: l10n.listsCreate, onSubmit: (name) => _lists.create(id, name)),
       ),
     );
   }
@@ -116,11 +126,11 @@ class _ListsScreenState extends State<ListsScreen> {
   }
 
   Future<void> _delete(ListSummary list) async {
-    final outcome = await _lists.delete(list);
+    final failure = await _lists.delete(list);
     if (!mounted) return;
     final l10n = AppLocalizations.of(context);
-    if (outcome != ListOutcome.done) {
-      showCesToast(context, message: listOutcomeMessage(l10n, outcome));
+    if (failure != null) {
+      showCesToast(context, message: listFailureMessage(l10n, failure));
       return;
     }
     showCesToast(
@@ -132,9 +142,9 @@ class _ListsScreenState extends State<ListsScreen> {
   }
 
   Future<void> _undoDelete(ListSummary list) async {
-    final outcome = await _lists.restore(list.id);
-    if (!mounted || outcome == ListOutcome.done) return;
-    showCesToast(context, message: listOutcomeMessage(AppLocalizations.of(context), outcome));
+    final failure = await _lists.restore(list.id);
+    if (!mounted || failure == null) return;
+    showCesToast(context, message: listFailureMessage(AppLocalizations.of(context), failure));
   }
 
   String _subtitle(AppLocalizations l10n, ListSummary list) => switch (list.role) {
@@ -155,7 +165,7 @@ class _ListsScreenState extends State<ListsScreen> {
       listenable: Listenable.merge([_lists, widget.session]),
       builder: (context, _) => CesHomeScaffold(
         brand: l10n.appTitle,
-        title: l10n.homeTitle,
+        title: l10n.listsTitle,
         actions: [
           CesAvatarButton(
             initials: _initials(widget.session.user?.displayName ?? ''),
@@ -164,7 +174,7 @@ class _ListsScreenState extends State<ListsScreen> {
           ),
         ],
         empty: _lists.loaded
-            ? CesEmptyState(icon: CesIcons.basket, title: l10n.homeEmptyTitle, body: l10n.homeEmptyBody)
+            ? CesEmptyState(icon: CesIcons.basket, title: l10n.listsEmptyTitle, body: l10n.listsEmptyBody)
             : const SizedBox.shrink(),
         items: [
           for (final list in _lists.lists)
@@ -192,15 +202,3 @@ class _ListsScreenState extends State<ListsScreen> {
     );
   }
 }
-
-/// What to tell the User when a change to a List didn't go through.
-String listOutcomeMessage(AppLocalizations l10n, ListOutcome outcome) => switch (outcome) {
-  ListOutcome.done => '',
-  ListOutcome.invalidName => l10n.errorListNameInvalid,
-  ListOutcome.limitReached => l10n.errorListLimit,
-  ListOutcome.notFound => l10n.errorListNotFound,
-  ListOutcome.expired => l10n.errorListRestoreExpired,
-  ListOutcome.rateLimited => l10n.errorTooManyAttempts,
-  ListOutcome.offline => l10n.errorOffline,
-  ListOutcome.failed => l10n.errorUnknown,
-};

@@ -44,6 +44,18 @@ _Avoid_: Join code, invite QR
 A named collection of Items that a group of Members shops from.
 _Avoid_: Shopping list, cart, basket
 
+**Recently deleted**:
+The Lists an Owner deleted and can still restore, shown only to that Owner. A deleted List disappears for every Member at once and comes back for all of them when restored.
+_Avoid_: Trash, bin, archive
+
+**Restore window**:
+The 30 days after deletion during which the Owner can restore a List from Recently deleted. Once it has passed, the List is gone for good.
+_Avoid_: Grace period, retention period
+
+**Purge**:
+The daily job that removes for good, with their Memberships, the Lists whose Restore window has passed.
+_Avoid_: Cleanup, hard delete
+
 **Item**:
 One entry on a List representing something to buy.
 _Avoid_: Product, entry, line

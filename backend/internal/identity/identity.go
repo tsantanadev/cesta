@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
+	"github.com/tsantanadev/cesta/backend/internal/platform/names"
 )
 
 // MaxDisplayNameLength is the longest display name, in characters.
@@ -113,16 +113,7 @@ func scanUserOrWrap(row pgx.Row, what string) (User, error) {
 
 // normalizeDisplayName trims name and reports whether it is acceptable.
 func normalizeDisplayName(name string) (string, bool) {
-	name = strings.TrimSpace(name)
-	if name == "" || utf8.RuneCountInString(name) > MaxDisplayNameLength || !utf8.ValidString(name) {
-		return "", false
-	}
-	for _, r := range name {
-		if unicode.IsControl(r) {
-			return "", false
-		}
-	}
-	return name, true
+	return names.Normalize(name, MaxDisplayNameLength)
 }
 
 // suggestDisplayName picks a starting display name: the provider's name if it

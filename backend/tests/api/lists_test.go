@@ -525,3 +525,24 @@ func TestAListThatNeverExistedIsNotFound(t *testing.T) {
 	res.RequireStatus(t, http.StatusNotFound)
 	res.RequireErrorCode(t, "list_not_found")
 }
+
+// A restore that checks the List while the purge is removing it must find it
+// gone, not fail with a server error or report a List that isn't there.
+func TestARestoreRacingThePurgeFindsTheListGone(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+	srv.Clock.Advance(30*24*time.Hour - time.Millisecond)
+	var restore *testkit.Response
+
+	srv.RunPurgeDuring(t, srv.Clock.Now().Add(time.Millisecond), func() {
+		restore = ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+	})
+
+	restore.RequireStatus(t, http.StatusNotFound)
+	restore.RequireErrorCode(t, "list_not_found")
+	if lists := myLists(t, ana); len(lists) != 0 {
+		t.Fatalf("Ana's Lists = %+v, want none after the purge", lists)
+	}
+}

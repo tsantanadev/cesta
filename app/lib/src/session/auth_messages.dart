@@ -1,5 +1,6 @@
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_gateway.dart';
+import '../names.dart';
 
 /// The message shown for a failed sign-in, sign-up or reset. Null for failures
 /// the User caused on purpose (backing out of the Google picker).
@@ -22,9 +23,6 @@ const minPasswordLength = 8;
 /// Longest display name, matching the API contract.
 const maxDisplayNameLength = 50;
 
-// Control characters (C0, DEL, C1), which the server rejects too.
-final _control = RegExp(r'[\x00-\x1F\x7F-\x9F]');
-
 final _email = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
 String? validateEmail(AppLocalizations l10n, String? value) {
@@ -44,6 +42,6 @@ String? validateDisplayName(AppLocalizations l10n, String? value) {
   final name = value?.trim() ?? '';
   if (name.isEmpty) return l10n.errorDisplayNameRequired;
   if (name.runes.length > maxDisplayNameLength) return l10n.errorDisplayNameTooLong;
-  if (_control.hasMatch(name)) return l10n.errorDisplayNameInvalid;
+  if (controlCharacters.hasMatch(name)) return l10n.errorDisplayNameInvalid;
   return null;
 }

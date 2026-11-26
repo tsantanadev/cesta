@@ -100,6 +100,13 @@ class FakeApiClient implements ApiClient {
   /// How many Lists a User may own (not deleted), like the server's 100.
   int listLimit = 100;
 
+  /// When true, the next List create is applied but its response is lost, as
+  /// when the connection drops before the answer arrives.
+  bool loseNextCreateResponse = false;
+
+  /// When set (401 or 429), loading the User's Lists answers with this status.
+  int? listListsStatus;
+
   /// Every List the fake backend knows, deleted or not, in creation order.
   final _lists = <String, _FakeList>{};
   int _nextListId = 1;
@@ -140,6 +147,9 @@ class FakeApiClient implements ApiClient {
     sharedWith: [editor],
     uncheckedItemCount: uncheckedItemCount,
   );
+
+  /// Removes List [id] for good behind the app's back, as the purge does.
+  void purgeListNow(String id) => _lists.remove(id);
 
   /// Deletes List [id] behind the app's back, e.g. from another device.
   void deleteListNow(String id) => _lists[id]!.deletedAt = DateTime.now().toUtc();
@@ -187,7 +197,8 @@ class FakeApiClient implements ApiClient {
   }) async {
     _failIfOffline('/api/lists');
     final identity = auth.current;
-    if (identity == null) return const ListLists401(_unauthenticated);
+    if (identity == null || listListsStatus == 401) return const ListLists401(_unauthenticated);
+    if (listListsStatus == 429) return ListLists429(_error(ApiErrorCode.rateLimited));
     final mine = _lists.values.where((l) => l.deletedAt == null && l.members.contains(identity.uid)).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return ListLists200(ListSummaries(lists: [for (final l in mine) _summary(l, identity.uid)]));
@@ -204,6 +215,18 @@ class FakeApiClient implements ApiClient {
     final identity = auth.current;
     if (identity == null) return const CreateList401(_unauthenticated);
     if (rateLimited) return CreateList429(_error(ApiErrorCode.rateLimited));
+    final result = _createList(identity, body);
+    if (loseNextCreateResponse) {
+      loseNextCreateResponse = false;
+      throw DioException.receiveTimeout(
+        timeout: const Duration(seconds: 30),
+        requestOptions: RequestOptions(path: '/api/lists'),
+      );
+    }
+    return result;
+  }
+
+  CreateListResult _createList(FakeIdentity identity, ListCreate body) {
     final existing = _lists[body.id];
     if (existing != null) {
       if (existing.ownerUid != identity.uid) return CreateList409(_error(ApiErrorCode.listIdTaken));

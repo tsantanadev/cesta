@@ -416,23 +416,23 @@ abstract class AppLocalizations {
   /// **'That name can\'t be used. Try another.'**
   String get errorDisplayNameInvalid;
 
-  /// Title of the home screen, which lists the User's Lists.
+  /// Title of the Lists screen (the home screen), which lists the User's Lists.
   ///
   /// In en, this message translates to:
   /// **'Your Lists'**
-  String get homeTitle;
+  String get listsTitle;
 
-  /// Home screen when the User has no Lists.
+  /// Lists screen when the User has no Lists.
   ///
   /// In en, this message translates to:
   /// **'No Lists yet'**
-  String get homeEmptyTitle;
+  String get listsEmptyTitle;
 
-  /// Home screen empty state explanation.
+  /// Lists screen empty state explanation.
   ///
   /// In en, this message translates to:
   /// **'Lists you create or are invited to will show up here.'**
-  String get homeEmptyBody;
+  String get listsEmptyBody;
 
   /// Tooltip of the button that opens the User menu (display name, sign out).
   ///
@@ -584,17 +584,17 @@ abstract class AppLocalizations {
   /// **'Recently deleted'**
   String get listsRecentlyDeleted;
 
-  /// Explanation at the top of the Recently deleted screen.
+  /// Explanation at the top of the Recently deleted screen; days is the restore window.
   ///
   /// In en, this message translates to:
-  /// **'Deleted Lists can be restored for 30 days. After that they\'re gone for good.'**
-  String get listsRecentlyDeletedExplanation;
+  /// **'Deleted Lists can be restored for {days} days. After that they\'re gone for good.'**
+  String listsRecentlyDeletedExplanation(int days);
 
-  /// Recently deleted screen when there is nothing to restore.
+  /// Recently deleted screen when there is nothing to restore; days is the restore window.
   ///
   /// In en, this message translates to:
-  /// **'Nothing deleted in the last 30 days.'**
-  String get listsRecentlyDeletedEmpty;
+  /// **'Nothing deleted in the last {days} days.'**
+  String listsRecentlyDeletedEmpty(int days);
 
   /// How long a deleted List can still be restored.
   ///
@@ -608,11 +608,11 @@ abstract class AppLocalizations {
   /// **'Enter a name.'**
   String get errorListNameRequired;
 
-  /// Validation: List name over 60 characters.
+  /// Validation: List name too long; max is the longest allowed.
   ///
   /// In en, this message translates to:
-  /// **'Use 60 characters or fewer.'**
-  String get errorListNameTooLong;
+  /// **'Use {max} characters or fewer.'**
+  String errorListNameTooLong(int max);
 
   /// List name has characters that can't be used (e.g. control characters), or the server rejected it.
   ///
@@ -620,23 +620,29 @@ abstract class AppLocalizations {
   /// **'That name can\'t be used. Try another.'**
   String get errorListNameInvalid;
 
-  /// Creating or restoring a List failed because the User already owns 100 Lists.
+  /// Creating or restoring a List failed because the User already owns the most Lists allowed (limit).
   ///
   /// In en, this message translates to:
-  /// **'You\'ve reached the limit of 100 Lists. Delete one to create another.'**
-  String get errorListLimit;
+  /// **'You\'ve reached the limit of {limit} Lists. Delete one to create another.'**
+  String errorListLimit(int limit);
 
-  /// The List was deleted or the User is no longer a Member.
+  /// The List is gone for good, or the User is no longer a Member.
   ///
   /// In en, this message translates to:
   /// **'This List is no longer available.'**
   String get errorListNotFound;
 
-  /// Restoring failed because the 30-day window has passed.
+  /// Renaming failed because the List was deleted meanwhile (e.g. on another device); its Owner can still restore it.
   ///
   /// In en, this message translates to:
-  /// **'This List was deleted more than 30 days ago and can\'t be restored.'**
-  String get errorListRestoreExpired;
+  /// **'This List was deleted. You can restore it from Recently deleted.'**
+  String get errorListDeleted;
+
+  /// Restoring failed because the List is gone: its restore window passed, it was purged, or the User lost access. The app can't tell which.
+  ///
+  /// In en, this message translates to:
+  /// **'This List is no longer available and can\'t be restored.'**
+  String get errorListNotRestorable;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

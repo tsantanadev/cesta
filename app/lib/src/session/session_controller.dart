@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../api/generated/cesta_api.dart';
+import '../api/network.dart';
 import '../auth/auth_gateway.dart';
 import '../db/app_database.dart';
 
@@ -106,7 +107,7 @@ class SessionController extends ChangeNotifier {
         UpdateMe401() => DisplayNameOutcome.failed,
       };
     } on DioException catch (e) {
-      return _isOffline(e) ? DisplayNameOutcome.offline : DisplayNameOutcome.failed;
+      return isOffline(e) ? DisplayNameOutcome.offline : DisplayNameOutcome.failed;
     }
   }
 
@@ -118,14 +119,6 @@ class SessionController extends ChangeNotifier {
     _user = user;
     notifyListeners();
   }
-
-  static bool _isOffline(DioException e) => switch (e.type) {
-    DioExceptionType.connectionError ||
-    DioExceptionType.connectionTimeout ||
-    DioExceptionType.sendTimeout ||
-    DioExceptionType.receiveTimeout => true,
-    _ => false,
-  };
 
   @override
   void dispose() {

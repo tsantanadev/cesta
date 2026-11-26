@@ -12,3 +12,7 @@ Members shop in supermarkets with poor signal, so the app must let them edit Lis
 
 - Every mutation carries a client-generated ID (for idempotent retries) and a timestamp, and every row carries a version/updated-at for cursoring.
 - Authorization is re-checked on every pushed mutation. A device may hold mutations for a List the User was removed from, and those are rejected.
+
+## Notes
+
+- **2026-11-26 (#6):** Lists shipped online-only at first. The app caches the User's Lists so the Lists screen shows them offline, but creating, renaming, deleting and restoring a List need the network. List mutations move to the outbox with #7, which brings the outbox and sync. They already carry client-generated IDs, so creates retry idempotently.

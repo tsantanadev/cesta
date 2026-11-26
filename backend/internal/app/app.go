@@ -64,7 +64,12 @@ func Purge(ctx context.Context, d Deps) (int, error) {
 	if c == nil {
 		c = clock.System{}
 	}
-	return lists.NewService(d.DB, c, membership.NewService(d.DB), d.MaxListsPerUser).Purge(ctx, c.Now())
+	return newLists(d, c).Purge(ctx, c.Now())
+}
+
+// newLists builds the lists module, the same way for serving and for the purge.
+func newLists(d Deps, c clock.Clock) *lists.Service {
+	return lists.NewService(d.DB, c, membership.NewService(d.DB), d.MaxListsPerUser)
 }
 
 // New returns the backend's HTTP handler, instrumented with OpenTelemetry.
@@ -83,7 +88,7 @@ func New(d Deps) http.Handler {
 		Logger:           d.Logger,
 		Verifier:         d.TokenVerifier,
 		Identity:         identity.NewService(d.DB, c),
-		Lists:            lists.NewService(d.DB, c, membership.NewService(d.DB), d.MaxListsPerUser),
+		Lists:            newLists(d, c),
 		PerIP:            ratelimit.New(limits.PerIP, c),
 		PerUser:          ratelimit.New(limits.PerUser, c),
 		TrustedProxyHops: d.TrustedProxyHops,

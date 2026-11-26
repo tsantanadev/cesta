@@ -58,6 +58,29 @@ void main() {
     expect(find.text('Pharmacy'), findsOneWidget);
   });
 
+  testWidgets('when the server is rate limiting, the Lists screen says so and keeps the cached Lists', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.addList(ana, name: 'Pharmacy');
+    await h.pumpApp();
+    h.api.listListsStatus = 429;
+
+    await h.pumpApp();
+
+    expect(find.text('Too many attempts. Wait a moment and try again.'), findsOneWidget);
+    expect(find.text('Pharmacy'), findsOneWidget);
+  });
+
+  testWidgets('when the server rejects the session, the Lists screen says something went wrong', (tester) async {
+    final h = Harness(tester);
+    h.signedIn();
+    h.api.listListsStatus = 401;
+
+    await h.pumpApp();
+
+    expect(find.text('Something went wrong. Try again.'), findsOneWidget);
+  });
+
   testWidgets('signing out forgets the Lists on the device', (tester) async {
     final h = Harness(tester);
     final ana = h.signedIn();
@@ -122,6 +145,21 @@ void main() {
     expect(find.text("You're offline. Connect to the internet and try again."), findsOneWidget);
   });
 
+  testWidgets('retrying a create whose answer was lost makes just one List', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    await h.pumpApp();
+    h.api.loseNextCreateResponse = true;
+    await h.createList('Pharmacy');
+    expect(find.text("You're offline. Connect to the internet and try again."), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(CesButton, 'Create list'));
+    await tester.pumpAndSettle();
+
+    expect(h.api.listNamesOf(ana), ['Pharmacy']);
+    expect(find.text('Pharmacy'), findsOneWidget);
+  });
+
   testWidgets('the Lists screen is in Brazilian Portuguese on a Portuguese phone', (tester) async {
     final h = Harness(tester);
     final ana = h.signedIn();
@@ -175,12 +213,24 @@ void main() {
       expect(h.textInField('Name'), 'Feira');
     });
 
-    testWidgets('renaming a List deleted meanwhile says it is gone', (tester) async {
+    testWidgets('renaming a List deleted meanwhile says it can be restored from Recently deleted', (tester) async {
       final h = Harness(tester);
       final ana = h.signedIn();
       final id = h.api.addList(ana, name: 'Feira');
       await h.pumpApp();
       h.api.deleteListNow(id);
+
+      await h.renameList('Feira', 'Weekend feira');
+
+      expect(find.text('This List was deleted. You can restore it from Recently deleted.'), findsOneWidget);
+    });
+
+    testWidgets('renaming a List that is gone says it is no longer available', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      final id = h.api.addList(ana, name: 'Feira');
+      await h.pumpApp();
+      h.api.purgeListNow(id);
 
       await h.renameList('Feira', 'Weekend feira');
 
@@ -265,6 +315,21 @@ void main() {
       expect(find.text('Your Lists'), findsOneWidget);
       expect(find.text('Feira'), findsOneWidget);
       expect(h.api.listNamesOf(ana), ['Feira']);
+    });
+
+    testWidgets("restoring a List that is gone says it can't be restored, without guessing why", (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      final id = h.api.addList(ana, name: 'Feira', deletedAgo: const Duration(days: 3));
+      await h.openRecentlyDeleted();
+      h.api.purgeListNow(id);
+
+      await tester.tap(find.widgetWithText(CesButton, 'Restore'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("This List is no longer available and can't be restored."), findsOneWidget);
+      expect(find.textContaining('30 days ago'), findsNothing);
+      expect(find.text('Feira'), findsNothing);
     });
 
     testWidgets("doesn't show Lists other Users deleted", (tester) async {
