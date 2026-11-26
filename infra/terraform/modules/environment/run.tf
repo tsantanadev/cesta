@@ -87,6 +87,13 @@ resource "google_cloud_run_v2_service" "backend" {
         name  = "OTEL_EXPORTER_OTLP_ENDPOINT"
         value = var.otel_exporter_otlp_endpoint
       }
+      # Google's front end adds a traceparent marked "not sampled" to almost every request,
+      # and the SDK's default (parentbased_always_on) would then drop the span. always_on
+      # samples every request but keeps the incoming trace ID, so app traces still join up.
+      env {
+        name  = "OTEL_TRACES_SAMPLER"
+        value = "always_on"
+      }
       env {
         name  = "OTEL_RESOURCE_ATTRIBUTES"
         value = "deployment.environment.name=${var.environment}"

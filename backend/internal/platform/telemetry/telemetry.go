@@ -43,14 +43,9 @@ func Setup(ctx context.Context, serviceName, version string) (Shutdown, error) {
 		return func(context.Context) error { return nil }, nil
 	}
 
-	// Schemaless so it merges with the SDK default resource whatever semconv version that uses.
-	// resource.Default also applies OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES, which win.
-	res, err := resource.Merge(resource.NewSchemaless(
-		semconv.ServiceName(serviceName),
-		semconv.ServiceVersion(version),
-	), resource.Default())
+	res, err := NewResource(ctx, serviceName, version)
 	if err != nil {
-		return nil, fmt.Errorf("telemetry: resource: %w", err)
+		return nil, err
 	}
 
 	traceExp, err := otlptracehttp.New(ctx)
@@ -73,4 +68,19 @@ func Setup(ctx context.Context, serviceName, version string) (Shutdown, error) {
 	return func(ctx context.Context) error {
 		return errors.Join(tp.Shutdown(ctx), mp.Shutdown(ctx))
 	}, nil
+}
+
+// NewResource describes this service to the telemetry backend: its name and version,
+// then OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES, which win (later detectors
+// override earlier ones).
+func NewResource(ctx context.Context, serviceName, version string) (*resource.Resource, error) {
+	res, err := resource.New(ctx,
+		resource.WithTelemetrySDK(),
+		resource.WithAttributes(semconv.ServiceName(serviceName), semconv.ServiceVersion(version)),
+		resource.WithFromEnv(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("telemetry: resource: %w", err)
+	}
+	return res, nil
 }

@@ -101,7 +101,7 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
 ## Checks
 
 - **Bypass:** the smoke test asserts that `<run.app URL>/health` answers 404. Cloud Run's default URL can't be turned off, because Firebase Hosting rewrites use it. Instead, the backend serves only requests whose `X-Forwarded-Host` is `PUBLIC_HOST`, which Firebase Hosting sets. Anyone can forge the header, so this stops scanners and casual bypass. Firebase App Check is the real gate. If the smoke test's first request (through Hosting) gets a 404, Hosting isn't sending the header as expected: check the header the backend received in the request logs.
-- **Traces:** in Grafana Cloud → Explore → Tempo, query `{resource.service.name="cesta-backend"}`. Spans have no `client.address`, `network.peer.*` or `user_agent.original` (the backend drops them before export).
+- **Traces:** in Grafana Cloud → Explore → Tempo, query `{resource.service.name="cesta-backend"}`. The service sets `OTEL_TRACES_SAMPLER=always_on`; without it, Google's front end marks most requests "not sampled" and no spans are exported, with no errors either. Spans have no `client.address`, `network.peer.*` or `user_agent.original` (the backend drops them before export).
   Cloud Run throttles the CPU between requests, so spans are exported during later requests or when the instance shuts down. Expect them to show up a little late on an idle dev, not as each request finishes.
 - **Kill switch (dev):** simulate a budget notification over the limit, then confirm billing is detached and re-link it:
 
