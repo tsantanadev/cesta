@@ -34,11 +34,10 @@ func Enabled() bool {
 }
 
 // Setup installs the global propagator and, when Enabled, OTLP trace and metric providers.
-// The propagator is always W3C Trace Context so trace context sent by the app is honoured.
+// Only W3C Trace Context is installed — W3C Baggage is intentionally omitted so untrusted
+// internet/mobile clients cannot inject arbitrary baggage entries into request context.
 func Setup(ctx context.Context, serviceName, version string) (Shutdown, error) {
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{}, propagation.Baggage{},
-	))
+	otel.SetTextMapPropagator(propagation.TraceContext{})
 	if !Enabled() {
 		return func(context.Context) error { return nil }, nil
 	}

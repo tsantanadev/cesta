@@ -15,7 +15,7 @@ import (
 func logLine(ctx context.Context, t *testing.T) map[string]any {
 	t.Helper()
 	var buf bytes.Buffer
-	logger := slog.New(telemetry.LogHandler(slog.NewJSONHandler(&buf, nil))).With(slog.String("service", "cesta"))
+	logger := slog.New(telemetry.LogHandler(slog.NewJSONHandler(&buf, nil))).With(slog.String("service", "cesta-backend"))
 	logger.InfoContext(ctx, "hello")
 	var rec map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &rec); err != nil {
@@ -39,8 +39,8 @@ func TestLogHandlerAddsTraceAndSpanIDsFromContext(t *testing.T) {
 	if rec["span_id"] != sc.SpanID().String() {
 		t.Errorf("span_id = %v, want %s", rec["span_id"], sc.SpanID())
 	}
-	if rec["service"] != "cesta" {
-		t.Errorf("service = %v, want cesta (attributes from With must survive)", rec["service"])
+	if rec["service"] != "cesta-backend" {
+		t.Errorf("service = %v, want cesta-backend (attributes from With must survive)", rec["service"])
 	}
 }
 

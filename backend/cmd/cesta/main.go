@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -30,11 +31,13 @@ import (
 	"github.com/tsantanadev/cesta/backend/migrations"
 )
 
+const serviceName = "cesta-backend"
+
 // version is set at build time with -ldflags "-X main.version=...".
 var version = "dev"
 
 func main() {
-	logger := newLogger(os.Getenv("LOG_LEVEL"))
+	logger := newLogger(os.Stdout, os.Getenv("LOG_LEVEL"))
 	slog.SetDefault(logger)
 
 	cmd := "serve"
@@ -61,13 +64,13 @@ func run(cmd string, logger *slog.Logger) error {
 	}
 }
 
-func newLogger(level string) *slog.Logger {
+func newLogger(w io.Writer, level string) *slog.Logger {
 	var l slog.Level
 	if err := l.UnmarshalText([]byte(level)); err != nil {
 		l = slog.LevelInfo
 	}
-	return slog.New(telemetry.LogHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: l}))).
-		With(slog.String("service", "cesta"), slog.String("version", version))
+	return slog.New(telemetry.LogHandler(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: l}))).
+		With(slog.String("service", serviceName), slog.String("version", version))
 }
 
 func databaseURL() (string, error) {
@@ -106,7 +109,7 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 		port = "8080"
 	}
 
-	shutdownTelemetry, err := telemetry.Setup(ctx, "cesta-backend", version)
+	shutdownTelemetry, err := telemetry.Setup(ctx, serviceName, version)
 	if err != nil {
 		return err
 	}

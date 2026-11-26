@@ -7,13 +7,14 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-// personalKeys are span attributes that identify a person (IP address, device). otelhttp
-// records them on every server span. They are dropped before export so traces leave
-// the service with no personal data (LGPD, ADR-0005).
+// personalKeys are span attributes that identify a person (IP address, device) or
+// may carry sensitive query parameters (tokens, emails). They are dropped before
+// export so traces leave the service with no personal data (LGPD, ADR-0005).
 var personalKeys = map[attribute.Key]bool{
 	"client.address":       true,
 	"network.peer.address": true,
 	"network.peer.port":    true,
+	"url.query":            true,
 	"user_agent.original":  true,
 }
 
