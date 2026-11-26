@@ -317,7 +317,7 @@ if ! grep -q '"client_type": 3' "$ANDROID_JSON"; then
   warn "Wait a minute after enabling Google and run this wizard again."
   SKIPPED+=("re-run once google-services.json has a web client (client_type 3)")
 fi
-note "These are public client identifiers, not secrets: commit them."
+note "Both are git-ignored (the repo is public and they hold the Firebase API key). Re-run this wizard to recreate them."
 pause
 
 stage "iOS: Google sign-in URL scheme"
