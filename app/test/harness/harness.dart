@@ -100,6 +100,23 @@ class Harness {
     await tester.pumpAndSettle();
   }
 
+  /// Renames the List named [from] to [to] from its options.
+  Future<void> renameList(String from, String to) async {
+    await openListOptions(from);
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Name'), to);
+    await tester.tap(find.widgetWithText(CesButton, 'Save'));
+    await tester.pumpAndSettle();
+  }
+
+  /// Deletes the List named [name] from its options.
+  Future<void> deleteList(String name) async {
+    await openListOptions(name);
+    await tester.tap(find.text('Delete list'));
+    await tester.pumpAndSettle();
+  }
+
   /// Both the backend and the identity provider become unreachable.
   void goOffline() {
     api.goOffline();

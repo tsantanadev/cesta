@@ -146,4 +146,45 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Pharmacy'), findsOneWidget);
   });
+
+  group('rename', () {
+    testWidgets('the Owner renames a List', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Feira');
+      await h.pumpApp();
+
+      await h.renameList('Feira', 'Weekend feira');
+
+      expect(find.text('Weekend feira'), findsOneWidget);
+      expect(find.text('Feira'), findsNothing);
+      expect(h.api.listNamesOf(ana), ['Weekend feira']);
+    });
+
+    testWidgets('the sheet starts with the current name', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Feira');
+      await h.pumpApp();
+
+      await h.openListOptions('Feira');
+      await tester.tap(find.text('Rename'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rename list'), findsOneWidget);
+      expect(h.textInField('Name'), 'Feira');
+    });
+
+    testWidgets('renaming a List deleted meanwhile says it is gone', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      final id = h.api.addList(ana, name: 'Feira');
+      await h.pumpApp();
+      h.api.deleteListNow(id);
+
+      await h.renameList('Feira', 'Weekend feira');
+
+      expect(find.text('This List is no longer available.'), findsOneWidget);
+    });
+  });
 }

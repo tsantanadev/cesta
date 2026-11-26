@@ -141,6 +141,9 @@ class FakeApiClient implements ApiClient {
     uncheckedItemCount: uncheckedItemCount,
   );
 
+  /// Deletes List [id] behind the app's back, e.g. from another device.
+  void deleteListNow(String id) => _lists[id]!.deletedAt = DateTime.now().toUtc();
+
   static const _restoreWindow = Duration(days: 30);
 
   ListSummary _summary(_FakeList l, String uid) => ListSummary(
