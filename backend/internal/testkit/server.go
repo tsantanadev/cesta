@@ -25,6 +25,7 @@ import (
 
 	"github.com/tsantanadev/cesta/backend/internal/app"
 	"github.com/tsantanadev/cesta/backend/internal/httpapi"
+	"github.com/tsantanadev/cesta/backend/internal/lists"
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
 	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
@@ -101,6 +102,34 @@ func (s *Server) RunPurge(t testing.TB) int {
 		t.Fatalf("testkit: purge: %v", err)
 	}
 	return n
+}
+
+// RunPurgeDuring runs the purge as of at in a transaction and, once it has
+// removed Lists but not yet committed, runs during concurrently. It commits a
+// moment later and returns when during has finished, so tests can make a
+// request meet the purge mid-flight.
+func (s *Server) RunPurgeDuring(t testing.TB, at time.Time, during func()) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	tx, err := s.deps.DB.Begin(ctx)
+	if err != nil {
+		t.Fatalf("testkit: purge: %v", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := lists.PurgeIn(ctx, tx, at); err != nil {
+		t.Fatalf("testkit: purge: %v", err)
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		during()
+	}()
+	time.Sleep(300 * time.Millisecond) // let during reach the rows the purge holds
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("testkit: purge: commit: %v", err)
+	}
+	<-done
 }
 
 // Get sends GET path anonymously.

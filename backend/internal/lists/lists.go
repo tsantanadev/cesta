@@ -92,9 +92,8 @@ func (s *Service) Create(ctx context.Context, owner, id uuid.UUID, name string) 
 	}
 	now := s.clock.Now()
 	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		// Lock the owner first so a retry racing the original create sees it
-		// (requireRoomFor takes the same lock again, which is a no-op).
-		if _, err := tx.Exec(ctx, "SELECT 1 FROM users WHERE id = $1 FOR UPDATE", owner); err != nil {
+		// Lock the owner first so a retry racing the original create sees it.
+		if err := lockOwner(ctx, tx, owner); err != nil {
 			return err
 		}
 		var existingOwner uuid.UUID
@@ -173,15 +172,20 @@ func (s *Service) Rename(ctx context.Context, userID, listID uuid.UUID, name str
 	if !ok {
 		return Summary{}, ErrInvalidName
 	}
-	l, err := s.owned(ctx, userID, listID)
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		l, err := s.lockOwned(ctx, tx, userID, listID)
+		if err != nil {
+			return err
+		}
+		if l.deletedAt != nil {
+			return ErrDeleted
+		}
+		_, err = tx.Exec(ctx,
+			"UPDATE lists SET name = $2, updated_at = $3 WHERE id = $1 AND deleted_at IS NULL",
+			listID, name, s.clock.Now())
+		return err
+	})
 	if err != nil {
-		return Summary{}, err
-	}
-	if l.deletedAt != nil {
-		return Summary{}, ErrDeleted
-	}
-	if _, err := s.db.Exec(ctx, "UPDATE lists SET name = $2, updated_at = $3 WHERE id = $1",
-		listID, name, s.clock.Now()); err != nil {
 		return Summary{}, wrap("rename", err)
 	}
 	return s.summary(ctx, listID, userID)
@@ -190,22 +194,22 @@ func (s *Service) Rename(ctx context.Context, userID, listID uuid.UUID, name str
 // Delete deletes a List userID owns, for every Member at once. The Owner can
 // restore it within RestoreWindow. Deleting a deleted List changes nothing.
 func (s *Service) Delete(ctx context.Context, userID, listID uuid.UUID) (Deleted, error) {
-	l, err := s.owned(ctx, userID, listID)
-	if err != nil {
-		return Deleted{}, err
-	}
-	if l.deletedAt == nil {
-		now := s.clock.Now()
-		// deleted_at IS NULL keeps the first deletion time if two deletes race.
-		if _, err := s.db.Exec(ctx,
-			"UPDATE lists SET deleted_at = $2, updated_at = $2 WHERE id = $1 AND deleted_at IS NULL",
-			listID, now); err != nil {
-			return Deleted{}, wrap("delete", err)
-		}
-	}
 	d := Deleted{ID: listID}
-	if err := s.db.QueryRow(ctx, "SELECT name, deleted_at FROM lists WHERE id = $1", listID).
-		Scan(&d.Name, &d.DeletedAt); err != nil {
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		l, err := s.lockOwned(ctx, tx, userID, listID)
+		if err != nil {
+			return err
+		}
+		d.Name = l.name
+		if l.deletedAt != nil {
+			d.DeletedAt = l.deletedAt.UTC() // keep the original deletion time
+			return nil
+		}
+		d.DeletedAt = s.clock.Now()
+		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = $2, updated_at = $2 WHERE id = $1", listID, d.DeletedAt)
+		return err
+	})
+	if err != nil {
 		return Deleted{}, wrap("delete", err)
 	}
 	d.PurgeAt = d.DeletedAt.Add(RestoreWindow)
@@ -215,33 +219,37 @@ func (s *Service) Delete(ctx context.Context, userID, listID uuid.UUID) (Deleted
 // Restore brings back a List userID owns and deleted less than RestoreWindow
 // ago, for every Member. Restoring a List that isn't deleted changes nothing.
 func (s *Service) Restore(ctx context.Context, userID, listID uuid.UUID) (Summary, error) {
-	l, err := s.owned(ctx, userID, listID)
-	if err != nil {
-		return Summary{}, err
-	}
-	if l.deletedAt != nil {
-		err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-			if err := s.requireRoomFor(ctx, tx, userID); err != nil {
-				return err
-			}
-			_, err := tx.Exec(ctx,
-				"UPDATE lists SET deleted_at = NULL, updated_at = $2 WHERE id = $1", listID, s.clock.Now())
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		// The owner before the List, in the same order as Create.
+		if err := lockOwner(ctx, tx, userID); err != nil {
 			return err
-		})
-		if err != nil {
-			return Summary{}, wrap("restore", err)
 		}
+		l, err := s.lockOwned(ctx, tx, userID, listID)
+		if err != nil || l.deletedAt == nil {
+			return err
+		}
+		if err := s.requireRoomFor(ctx, tx, userID); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = NULL, updated_at = $2 WHERE id = $1", listID, s.clock.Now())
+		return err
+	})
+	if err != nil {
+		return Summary{}, wrap("restore", err)
 	}
 	return s.summary(ctx, listID, userID)
 }
 
+// lockOwner locks owner's row until tx ends. Every change that adds to the
+// Lists owner owns takes it first, so two at the limit can't both pass.
+func lockOwner(ctx context.Context, tx pgx.Tx, owner uuid.UUID) error {
+	_, err := tx.Exec(ctx, "SELECT 1 FROM users WHERE id = $1 FOR UPDATE", owner)
+	return err
+}
+
 // requireRoomFor returns ErrLimitReached if owner already owns the most Lists
-// allowed. It locks owner's row until tx ends, so two creates or restores at
-// the limit can't both pass.
+// allowed. The caller holds lockOwner.
 func (s *Service) requireRoomFor(ctx context.Context, tx pgx.Tx, owner uuid.UUID) error {
-	if _, err := tx.Exec(ctx, "SELECT 1 FROM users WHERE id = $1 FOR UPDATE", owner); err != nil {
-		return err
-	}
 	var owned int
 	if err := tx.QueryRow(ctx,
 		"SELECT count(*) FROM lists WHERE owner_id = $1 AND deleted_at IS NULL", owner).Scan(&owned); err != nil {
@@ -257,7 +265,18 @@ func (s *Service) requireRoomFor(ctx context.Context, tx pgx.Tx, owner uuid.UUID
 // with its memberships, and returns how many it removed. Reads already treat
 // such Lists as gone, so how long after the window the purge runs doesn't show.
 func (s *Service) Purge(ctx context.Context, now time.Time) (int, error) {
-	tag, err := s.db.Exec(ctx,
+	var n int
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) (err error) {
+		n, err = PurgeIn(ctx, tx, now)
+		return err
+	})
+	return n, err
+}
+
+// PurgeIn is Purge run inside tx, which the caller commits. Seam 1 uses it to
+// make requests meet a purge that hasn't committed yet.
+func PurgeIn(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
+	tag, err := tx.Exec(ctx,
 		"DELETE FROM lists WHERE deleted_at IS NOT NULL AND deleted_at <= $1", now.Add(-RestoreWindow))
 	if err != nil {
 		return 0, wrap("purge", err)
@@ -278,6 +297,7 @@ func (s *Service) RecentlyDeleted(ctx context.Context, owner uuid.UUID) ([]Delet
 	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Deleted, error) {
 		var d Deleted
 		err := row.Scan(&d.ID, &d.Name, &d.DeletedAt)
+		d.DeletedAt = d.DeletedAt.UTC()
 		d.PurgeAt = d.DeletedAt.Add(RestoreWindow)
 		return d, err
 	})
@@ -293,10 +313,11 @@ type listRow struct {
 	deletedAt *time.Time
 }
 
-// owned returns listID if userID owns it. It returns ErrNotFound if userID is
-// not a Member or the List is gone (purged, or deleted longer than
+// lockOwned locks listID until tx ends and returns it if userID owns it, so
+// the caller's change can't race a delete or the purge. It returns ErrNotFound
+// if userID is not a Member or the List is gone (purged, or deleted longer than
 // RestoreWindow ago), and ErrNotOwner for any other Member.
-func (s *Service) owned(ctx context.Context, userID, listID uuid.UUID) (listRow, error) {
+func (s *Service) lockOwned(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (listRow, error) {
 	role, err := s.members.RoleOf(ctx, listID, userID)
 	if errors.Is(err, membership.ErrNotAMember) {
 		return listRow{}, ErrNotFound
@@ -305,12 +326,13 @@ func (s *Service) owned(ctx context.Context, userID, listID uuid.UUID) (listRow,
 		return listRow{}, err
 	}
 	var l listRow
-	err = s.db.QueryRow(ctx, "SELECT name, deleted_at FROM lists WHERE id = $1", listID).Scan(&l.name, &l.deletedAt)
+	err = tx.QueryRow(ctx, "SELECT name, deleted_at FROM lists WHERE id = $1 FOR UPDATE", listID).
+		Scan(&l.name, &l.deletedAt)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return listRow{}, ErrNotFound
 	case err != nil:
-		return listRow{}, wrap("read", err)
+		return listRow{}, err
 	case l.deletedAt != nil && !s.restorable(*l.deletedAt):
 		return listRow{}, ErrNotFound
 	case role != membership.Owner:
@@ -324,9 +346,13 @@ func (s *Service) restorable(deletedAt time.Time) bool {
 	return s.clock.Now().Before(deletedAt.Add(RestoreWindow))
 }
 
-// summary returns listID as userID sees it.
+// summary returns listID as userID sees it, or ErrNotFound if it was purged
+// (or userID removed) since the caller's change committed.
 func (s *Service) summary(ctx context.Context, listID, userID uuid.UUID) (Summary, error) {
 	role, err := s.members.RoleOf(ctx, listID, userID)
+	if errors.Is(err, membership.ErrNotAMember) {
+		return Summary{}, ErrNotFound
+	}
 	if err != nil {
 		return Summary{}, err
 	}
@@ -335,8 +361,11 @@ func (s *Service) summary(ctx context.Context, listID, userID uuid.UUID) (Summar
 		return Summary{}, err
 	}
 	l := Summary{ID: listID, Role: role, MemberCount: count}
-	if err := s.db.QueryRow(ctx, "SELECT name, created_at FROM lists WHERE id = $1", listID).
-		Scan(&l.Name, &l.CreatedAt); err != nil {
+	err = s.db.QueryRow(ctx, "SELECT name, created_at FROM lists WHERE id = $1", listID).Scan(&l.Name, &l.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Summary{}, ErrNotFound
+	}
+	if err != nil {
 		return Summary{}, wrap("read", err)
 	}
 	return l, nil
