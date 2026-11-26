@@ -18,7 +18,35 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for ApiErrorCode.
+const (
+	ApiErrorCodeInternal           ApiErrorCode = "internal"
+	ApiErrorCodeInvalidDisplayName ApiErrorCode = "invalid_display_name"
+	ApiErrorCodeInvalidRequest     ApiErrorCode = "invalid_request"
+	ApiErrorCodeRateLimited        ApiErrorCode = "rate_limited"
+	ApiErrorCodeUnauthenticated    ApiErrorCode = "unauthenticated"
+)
+
+// Valid indicates whether the value is a known member of the ApiErrorCode enum.
+func (e ApiErrorCode) Valid() bool {
+	switch e {
+	case ApiErrorCodeInternal:
+		return true
+	case ApiErrorCodeInvalidDisplayName:
+		return true
+	case ApiErrorCodeInvalidRequest:
+		return true
+	case ApiErrorCodeRateLimited:
+		return true
+	case ApiErrorCodeUnauthenticated:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for HealthDatabase.
 const (
@@ -56,6 +84,18 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// ApiError defines model for ApiError.
+type ApiError struct {
+	// Code Stable machine-readable reason.
+	Code ApiErrorCode `json:"code"`
+
+	// Message Human-readable explanation, in English, for logs and debugging.
+	Message string `json:"message"`
+}
+
+// ApiErrorCode Stable machine-readable reason.
+type ApiErrorCode string
+
 // Health defines model for Health.
 type Health struct {
 	Database HealthDatabase `json:"database"`
@@ -68,8 +108,45 @@ type HealthDatabase string
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// User defines model for User.
+type User struct {
+	// DisplayName The name other Members see.
+	DisplayName string `json:"displayName"`
+
+	// DisplayNameConfirmed False until the User has set or confirmed their display name.
+	DisplayNameConfirmed bool   `json:"displayNameConfirmed"`
+	Email                string `json:"email"`
+
+	// Id Internal User ID.
+	Id openapi_types.UUID `json:"id"`
+}
+
+// UserUpdate defines model for UserUpdate.
+type UserUpdate struct {
+	// DisplayName Trimmed; must contain at least one visible character.
+	DisplayName string `json:"displayName"`
+}
+
+// BadRequest defines model for BadRequest.
+type BadRequest = ApiError
+
+// RateLimited defines model for RateLimited.
+type RateLimited = ApiError
+
+// Unauthenticated defines model for Unauthenticated.
+type Unauthenticated = ApiError
+
+// UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
+type UpdateMeJSONRequestBody = UserUpdate
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetMe The signed-in User
+	// (GET /api/me)
+	GetMe(w http.ResponseWriter, r *http.Request)
+	// UpdateMe Set the signed-in User's display name
+	// (PATCH /api/me)
+	UpdateMe(w http.ResponseWriter, r *http.Request)
 	// GetHealth Liveness and database readiness
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -83,6 +160,34 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetMe operation middleware
+func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMe operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
@@ -219,8 +324,154 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/me", wrapper.UpdateMe)
 
 	return m
+}
+
+type BadRequestJSONResponse ApiError
+
+type RateLimitedResponseHeaders struct {
+	RetryAfter *int
+}
+type RateLimitedJSONResponse struct {
+	Body ApiError
+
+	Headers RateLimitedResponseHeaders
+}
+
+type UnauthenticatedJSONResponse ApiError
+
+type GetMeRequestObject struct {
+}
+
+type GetMeResponseObject interface {
+	VisitGetMeResponse(w http.ResponseWriter) error
+}
+
+type GetMe200JSONResponse User
+
+func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response GetMe401JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response GetMe429JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMeRequestObject struct {
+	Body *UpdateMeJSONRequestBody
+}
+
+type UpdateMeResponseObject interface {
+	VisitUpdateMeResponse(w http.ResponseWriter) error
+}
+
+type UpdateMe200JSONResponse User
+
+func (response UpdateMe200JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateMe400JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response UpdateMe401JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response UpdateMe429JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetHealthRequestObject struct {
@@ -244,6 +495,29 @@ func (response GetHealth200JSONResponse) VisitGetHealthResponse(w http.ResponseW
 	return err
 }
 
+type GetHealth429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response GetHealth429JSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealth503JSONResponse Health
 
 func (response GetHealth503JSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
@@ -260,6 +534,12 @@ func (response GetHealth503JSONResponse) VisitGetHealthResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetMe The signed-in User
+	// (GET /api/me)
+	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// UpdateMe Set the signed-in User's display name
+	// (PATCH /api/me)
+	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
 	// GetHealth Liveness and database readiness
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -307,6 +587,61 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
+// GetMe operation middleware
+func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	var request GetMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.GetMe(ctx, request.(GetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeResponseObject); ok {
+		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMe operation middleware
+func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	var request UpdateMeRequestObject
+
+	var body UpdateMeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.UpdateMe(ctx, request.(UpdateMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
+		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -336,13 +671,26 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

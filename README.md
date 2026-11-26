@@ -45,9 +45,12 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080      # Android emula
 
 On a physical device, set `API_BASE_URL` to your machine's LAN address, e.g. `http://192.168.1.10:8080`.
 
+Sign-in needs the Firebase config files (`android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist`), which `infra/auth-setup.sh dev` writes. Without them the app builds but stops at startup. The local backend (`make dev`) accepts ID tokens from the `cesta-dev` Firebase project.
+
 | Task | Command |
 | --- | --- |
-| Tests, including Seam 2 (the real app with an in-memory database and a fake API client, `test/harness/`) | `flutter test` |
+| Tests, including Seam 2 (the real app with an in-memory database, a fake API client and a fake identity provider, `test/harness/`) | `flutter test` |
+| Of those, `test/api_*_test.dart` cover the API transport (trace context, ID tokens and the refresh-and-retry on 401) against a fake HTTP adapter, since Seam 2 replaces the client it runs in | `flutter test test/api_*` |
 | Analyze (lint) | `flutter analyze` |
 | Format | `dart format .` |
 | Regenerate the Dart API client, localizations and Drift code | `tool/codegen.sh` |

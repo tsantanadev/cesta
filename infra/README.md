@@ -87,7 +87,7 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
 
 6. **DNS.** `terraform output required_dns_updates` lists the records for the custom domain. Create them at the DNS provider for `tsantana.dev`. Firebase verifies them and provisions the certificate; this can take up to a few hours.
 
-7. **Firebase console.** Authentication → Sign-in method: enable **Email/Password** and **Google**. Crashlytics is turned on when the Android and iOS apps are registered.
+7. **Sign-in.** Run `infra/auth-setup.sh <env>`. It adopts anything already made in the Firebase console, registers your Android signing key, applies Terraform (Email/Password sign-in, the Android and iOS apps, `modules/environment/auth.tf`), walks you through enabling **Google** in the console (Terraform can't create its OAuth client), and writes `google-services.json` and `GoogleService-Info.plist` into the app. The app uses dev's config until build flavors arrive. Crashlytics is turned on once the apps are registered.
 
 8. **GitHub.** Settings → Environments: create `dev` and `prod`. Restrict both to the `main` branch, and add yourself as a required reviewer on `prod`. Add the values of `terraform output github_variables` as environment **variables** (they are not secrets). `prod` also needs `DEV_IMAGE_REPOSITORY`, set to dev's `IMAGE_REPOSITORY`.
 

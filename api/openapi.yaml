@@ -5,11 +5,14 @@ info:
   description: Source of truth for the Cesta REST/JSON API. The Dart client is generated from this document.
 servers:
   - url: http://localhost:8080
+security:
+  - firebaseIdToken: []
 paths:
   /health:
     get:
       operationId: getHealth
       summary: Liveness and database readiness
+      security: []
       responses:
         "200":
           description: Service and database are healthy
@@ -23,8 +26,118 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/me:
+    get:
+      operationId: getMe
+      summary: The signed-in User
+      description: >-
+        Returns the User behind the bearer token. The first valid request from a new
+        identity creates the User, with a suggested display name taken from the
+        identity provider (or the email address) and displayNameConfirmed false.
+      responses:
+        "200":
+          description: The signed-in User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    patch:
+      operationId: updateMe
+      summary: Set the signed-in User's display name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: The updated User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 components:
+  securitySchemes:
+    firebaseIdToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A Firebase ID token for the signed-in User.
+  responses:
+    Unauthenticated:
+      description: The bearer token is missing, malformed, expired or not trusted
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    BadRequest:
+      description: The request is invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    RateLimited:
+      description: Too many requests from this User or IP address; retry after the Retry-After header
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
   schemas:
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable reason.
+          enum: [unauthenticated, rate_limited, invalid_request, invalid_display_name, internal]
+        message:
+          type: string
+          description: Human-readable explanation, in English, for logs and debugging.
+    User:
+      type: object
+      required: [id, email, displayName, displayNameConfirmed]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Internal User ID.
+        email:
+          type: string
+        displayName:
+          type: string
+          description: The name other Members see.
+        displayNameConfirmed:
+          type: boolean
+          description: False until the User has set or confirmed their display name.
+    UserUpdate:
+      type: object
+      required: [displayName]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Trimmed; must contain at least one visible character.
     Health:
       type: object
       required: [status, database]

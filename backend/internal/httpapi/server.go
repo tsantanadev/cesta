@@ -2,9 +2,14 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/tsantanadev/cesta/backend/internal/identity"
+	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
+	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 )
 
 // Pinger reports whether the database is reachable.
@@ -17,8 +22,15 @@ const healthPingTimeout = 2 * time.Second
 
 // Server implements StrictServerInterface. Each operation delegates to the module that owns it.
 type Server struct {
-	DB     Pinger
-	Logger *slog.Logger
+	DB       Pinger
+	Logger   *slog.Logger
+	Verifier auth.TokenVerifier
+	Identity *identity.Service
+	PerIP    *ratelimit.Limiter
+	PerUser  *ratelimit.Limiter
+	// TrustedProxyHops is how many proxies in front of the backend append to
+	// X-Forwarded-For (see clientIP).
+	TrustedProxyHops int
 }
 
 var _ StrictServerInterface = (*Server)(nil)
@@ -34,7 +46,29 @@ func (s *Server) GetHealth(ctx context.Context, _ GetHealthRequestObject) (GetHe
 	return GetHealth200JSONResponse{Status: Ok, Database: Up}, nil
 }
 
-// Handler returns the HTTP handler for every operation in the contract.
+// Handler returns the HTTP handler for every operation in the contract, behind
+// the per-IP rate limit, the body size cap and authentication.
 func (s *Server) Handler() http.Handler {
-	return Handler(NewStrictHandler(s, nil))
+	strict := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  s.badRequest,
+		ResponseErrorHandlerFunc: s.internalError,
+	})
+	routes := HandlerWithOptions(strict, StdHTTPServerOptions{
+		Middlewares:      []MiddlewareFunc{s.authenticate(publicOperations())},
+		ErrorHandlerFunc: s.badRequest,
+	})
+	return s.limitIP(routes)
+}
+
+func (s *Server) badRequest(w http.ResponseWriter, _ *http.Request, err error) {
+	if maxErr := (*http.MaxBytesError)(nil); errors.As(err, &maxErr) {
+		writeError(w, http.StatusRequestEntityTooLarge, ApiErrorCodeInvalidRequest, "request body is too large")
+		return
+	}
+	writeError(w, http.StatusBadRequest, ApiErrorCodeInvalidRequest, "the request is malformed")
+}
+
+func (s *Server) internalError(w http.ResponseWriter, r *http.Request, err error) {
+	s.Logger.ErrorContext(r.Context(), "request failed", slog.String("error", err.Error()))
+	writeError(w, http.StatusInternalServerError, ApiErrorCodeInternal, "something went wrong")
 }

@@ -1,7 +1,7 @@
 // Package testkit is the Seam 1 harness: black-box HTTP tests against the real
 // backend and a real, migrated Postgres (testcontainers). The only fakes allowed
-// are TokenVerifier, EmailSender and Clock (package fakes); they are exposed on
-// Server once the slices that use them are wired into app.Deps.
+// are TokenVerifier, EmailSender and Clock (package fakes). Tests act as named
+// Users (Ana, Bruno) through Server.As and move time with Server.Clock.
 //
 // Every response is checked against api/openapi.yaml, so a handler that drifts
 // from the contract fails the test that exercised it.
@@ -25,31 +25,63 @@ import (
 
 	"github.com/tsantanadev/cesta/backend/internal/app"
 	"github.com/tsantanadev/cesta/backend/internal/httpapi"
+	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
+	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
+	"github.com/tsantanadev/cesta/backend/internal/testkit/fakes"
+)
+
+// Named Users for tests. Ana signed up with Google, so the provider knows her
+// name; Bruno signed up with email + password, so it doesn't.
+var (
+	Ana   = auth.Identity{Subject: "firebase-uid-ana", Email: "ana@example.com", Name: "Ana Souza"}
+	Bruno = auth.Identity{Subject: "firebase-uid-bruno", Email: "bruno.lima@example.com"}
 )
 
 // Server is a running backend under test.
 type Server struct {
 	URL string
+	// Clock is the backend's clock; tests advance it to move time.
+	Clock *fakes.Clock
 
+	tokens *fakes.TokenVerifier
 	router routers.Router
 	dbName string
 }
 
+// Option configures a test server.
+type Option func(*app.Deps)
+
+// WithRateLimits sets the per-IP and per-User rate limits.
+func WithRateLimits(perIP, perUser ratelimit.Rule) Option {
+	return func(d *app.Deps) { d.RateLimits = app.RateLimits{PerIP: perIP, PerUser: perUser} }
+}
+
 // NewServer starts the backend against a fresh migrated database. It is torn down when t ends.
-func NewServer(t testing.TB) *Server {
+//
+// The server trusts one proxy hop, so Client.FromIP can pose as different
+// client IP addresses through X-Forwarded-For.
+func NewServer(t testing.TB, opts ...Option) *Server {
 	t.Helper()
 	pool, dbName := newDatabase(t)
 
 	s := &Server{
+		Clock:  fakes.NewClock(time.Date(2026, time.March, 2, 9, 0, 0, 0, time.UTC)),
+		tokens: fakes.NewTokenVerifier(),
 		router: contractRouter(t),
 		dbName: dbName,
 	}
-	handler := app.New(app.Deps{
-		DB:     pool,
-		Logger: slog.New(telemetry.LogHandler(slog.NewTextHandler(testWriter{t}, nil))),
-	})
-	hs := httptest.NewServer(handler)
+	deps := app.Deps{
+		DB:               pool,
+		Logger:           slog.New(telemetry.LogHandler(slog.NewTextHandler(testWriter{t}, nil))),
+		TokenVerifier:    s.tokens,
+		Clock:            s.Clock,
+		TrustedProxyHops: 1,
+	}
+	for _, opt := range opts {
+		opt(&deps)
+	}
+	hs := httptest.NewServer(app.New(deps))
 	t.Cleanup(hs.Close)
 	s.URL = hs.URL
 	return s
@@ -58,10 +90,51 @@ func NewServer(t testing.TB) *Server {
 // Get sends GET path anonymously.
 func (s *Server) Get(t testing.TB, path string) *Response {
 	t.Helper()
-	return s.do(t, http.MethodGet, path, nil)
+	return s.Anonymous().Get(t, path)
 }
 
-func (s *Server) do(t testing.TB, method, path string, body []byte) *Response {
+// Anonymous returns a client that sends no token.
+func (s *Server) Anonymous() *Client { return &Client{srv: s} }
+
+// As returns a client signed in as id: its token verifies as id.
+func (s *Server) As(id auth.Identity) *Client {
+	return &Client{srv: s, token: s.tokens.SignIn(id)}
+}
+
+// WithToken returns a client that sends token as is (it need not verify).
+// An empty token sends an empty bearer credential.
+func (s *Server) WithToken(token string) *Client {
+	return &Client{srv: s, token: token, sendEmpty: true}
+}
+
+// Client sends requests to a Server, optionally with a bearer token and a client IP.
+type Client struct {
+	srv       *Server
+	token     string
+	sendEmpty bool
+	ip        string
+}
+
+// FromIP returns a copy of the client whose requests come from ip.
+func (c *Client) FromIP(ip string) *Client {
+	cp := *c
+	cp.ip = ip
+	return &cp
+}
+
+// Get sends GET path.
+func (c *Client) Get(t testing.TB, path string) *Response {
+	t.Helper()
+	return c.srv.do(t, c, http.MethodGet, path, nil)
+}
+
+// Patch sends PATCH path with a JSON body.
+func (c *Client) Patch(t testing.TB, path, body string) *Response {
+	t.Helper()
+	return c.srv.do(t, c, http.MethodPatch, path, []byte(body))
+}
+
+func (s *Server) do(t testing.TB, c *Client, method, path string, body []byte) *Response {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -71,6 +144,12 @@ func (s *Server) do(t testing.TB, method, path string, body []byte) *Response {
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.token != "" || c.sendEmpty {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	if c.ip != "" {
+		req.Header.Set("X-Forwarded-For", c.ip)
 	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -155,6 +234,20 @@ func (r *Response) RequireJSON(t testing.TB, want string) {
 	}
 	if !bytes.Equal(gotN, expN) {
 		t.Fatalf("body = %s, want %s", gotN, expN)
+	}
+}
+
+// RequireErrorCode fails t unless the body is an API Error with the given code.
+func (r *Response) RequireErrorCode(t testing.TB, want string) {
+	t.Helper()
+	var e struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(r.Body, &e); err != nil {
+		t.Fatalf("body is not an API error: %v\nbody: %s", err, r.Body)
+	}
+	if e.Code != want {
+		t.Fatalf("error code = %q, want %q\nbody: %s", e.Code, want, r.Body)
 	}
 }
 

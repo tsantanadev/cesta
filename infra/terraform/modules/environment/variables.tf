@@ -83,3 +83,27 @@ variable "function_runtime" {
   type        = string
   default     = "go126"
 }
+
+variable "app_id" {
+  description = "Android application ID and iOS bundle ID of the Cesta app."
+  type        = string
+  default     = "dev.tsantana.cesta"
+}
+
+variable "android_sha1_hashes" {
+  description = "SHA-1 fingerprints of the keys that sign Android builds (debug and release). Needed for Google sign-in."
+  type        = list(string)
+  default     = []
+}
+
+variable "android_sha256_hashes" {
+  description = "SHA-256 fingerprints of the keys that sign Android builds. Needed for App Links later."
+  type        = list(string)
+  default     = []
+}
+
+variable "apple_team_id" {
+  description = "Apple Developer team ID that signs iOS builds. Optional until App Links / Universal Links."
+  type        = string
+  default     = null
+}

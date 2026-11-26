@@ -2,6 +2,10 @@
 
 export 'default_client/api_client.dart';
 export 'default_client/api_client_results.dart';
+export 'default_client/models/api_error.dart';
+export 'default_client/models/api_error_code.dart';
 export 'default_client/models/health.dart';
 export 'default_client/models/health_database.dart';
 export 'default_client/models/health_status.dart';
+export 'default_client/models/user.dart';
+export 'default_client/models/user_update.dart';

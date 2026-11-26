@@ -11,10 +11,14 @@ dependencies:
   dio: ^5.11.1
   drift: ^2.35.4
   drift_flutter: ^0.3.1
+  firebase_auth: ^7.1.0
+  firebase_core: ^5.2.0
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  go_router: ^18.1.4
+  google_sign_in: ^7.2.0
   intl: ^0.20.3
   material_ui: ^1.1.0
 dev_dependencies:
@@ -27,3 +31,26 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  fonts:
+    # Plus Jakarta Sans (SIL Open Font License, assets/fonts/OFL.txt), bundled so it works offline.
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+        - asset: assets/fonts/PlusJakartaSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSans-ExtraBold.ttf
+          weight: 800
+    # Phosphor icons (MIT, assets/fonts/phosphor/LICENSE), used through CesIcons.
+    - family: PhosphorRegular
+      fonts:
+        - asset: assets/fonts/phosphor/Phosphor.ttf
+    - family: PhosphorBold
+      fonts:
+        - asset: assets/fonts/phosphor/Phosphor-Bold.ttf
+    - family: PhosphorFill
+      fonts:
+        - asset: assets/fonts/phosphor/Phosphor-Fill.ttf

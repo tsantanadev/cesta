@@ -37,6 +37,13 @@ class CestaSpacing extends ThemeExtension<CestaSpacing> {
 abstract final class CestaRadii {
   static const card = 16.0;
   static const button = 12.0;
+  static const field = 12.0;
+  static const sheet = 24.0;
+}
+
+/// The bundled typeface (assets/fonts, declared in pubspec.yaml).
+abstract final class CestaFonts {
+  static const family = 'PlusJakartaSans';
 }
 
 /// Semantic status colours that follow light/dark mode.
@@ -66,6 +73,8 @@ class CestaStatusColors extends ThemeExtension<CestaStatusColors> {
 /// Type scale: Material 3 sizes with Cesta weights. Sizes are in logical
 /// pixels and scale with the user's text size setting.
 TextTheme cestaTextTheme(TextTheme base) => base.copyWith(
+  displaySmall: base.displaySmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
+  headlineMedium: base.headlineMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.25),
   headlineSmall: base.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
   titleLarge: base.titleLarge?.copyWith(fontWeight: FontWeight.w700),
   titleMedium: base.titleMedium?.copyWith(fontWeight: FontWeight.w600),

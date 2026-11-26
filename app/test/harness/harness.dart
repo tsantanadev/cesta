@@ -1,34 +1,112 @@
 import 'package:cesta/src/app.dart';
 import 'package:cesta/src/db/app_database.dart';
+import 'package:cesta/src/ui/components.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'fake_api_client.dart';
+import 'fake_auth_gateway.dart';
+
+export 'package:cesta/src/ui/components.dart' show CesButton, CesMessage;
 
 export 'fake_api_client.dart';
+export 'fake_auth_gateway.dart';
 
 const english = Locale('en');
 const brazilianPortuguese = Locale('pt', 'BR');
 
-/// Seam 2 harness: the real app with an in-memory local database and a fake
-/// API client. Each test gets its own [Harness]; [db] can be reused across
-/// [pumpApp] calls to simulate the app restarting with the same storage.
+/// Seam 2 harness: the real app with an in-memory local database, a fake API
+/// client and a fake identity provider. Each test gets its own [Harness]; [db]
+/// and [auth] can be reused across [pumpApp] calls to simulate the app
+/// restarting with the same storage and the same stored session.
 class Harness {
-  Harness(this.tester) : api = FakeApiClient(), db = AppDatabase(NativeDatabase.memory()) {
+  Harness(this.tester) : auth = FakeAuthGateway(), db = AppDatabase(NativeDatabase.memory()) {
+    api = FakeApiClient(auth: auth);
     addTearDown(db.close);
   }
 
   final WidgetTester tester;
-  final FakeApiClient api;
+  final FakeAuthGateway auth;
+  late final FakeApiClient api;
   final AppDatabase db;
 
-  Future<void> pumpApp({Locale locale = english, ThemeMode themeMode = ThemeMode.light, double textScale = 1.0}) async {
+  Future<void> pumpApp({
+    Locale locale = english,
+    ThemeMode themeMode = ThemeMode.light,
+    double textScale = 1.0,
+    String? initialLocation,
+  }) async {
     // Unmount any previous instance so restarts start from a clean widget tree.
     await tester.pumpWidget(const SizedBox.shrink());
     tester.platformDispatcher.textScaleFactorTestValue = textScale;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    await tester.pumpWidget(CestaApp(api: api, database: db, locale: locale, themeMode: themeMode));
+    await tester.pumpWidget(
+      CestaApp(
+        api: api,
+        auth: auth,
+        database: db,
+        locale: locale,
+        themeMode: themeMode,
+        initialLocation: initialLocation,
+      ),
+    );
     await tester.pumpAndSettle();
   }
+
+  /// A User who has used Cesta before, with a confirmed display name.
+  /// [withGoogle] makes the Google picker return them; [signedIn] starts the
+  /// app with their session stored.
+  void existingUser({
+    required String email,
+    required String password,
+    required String displayName,
+    bool withGoogle = false,
+    bool signedIn = false,
+  }) {
+    final identity = auth.addIdentity(email: email, password: password, name: displayName, signedIn: signedIn);
+    api.addUser(identity, displayName: displayName);
+    if (withGoogle) auth.googleAccount = FakeGoogleAccount(email: email, name: displayName);
+  }
+
+  /// Starts signed in as a User with a confirmed display name.
+  void signedIn({String email = 'ana@example.com', String displayName = 'Ana Souza'}) =>
+      existingUser(email: email, password: 'irrelevant', displayName: displayName, signedIn: true);
+
+  /// Both the backend and the identity provider become unreachable.
+  void goOffline() {
+    api.goOffline();
+    auth.offline = true;
+  }
+
+  Future<void> openEmailSignIn() async {
+    await tester.tap(find.text('Already have an account? Sign in'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> signInWithEmail(String email, String password) async {
+    await openEmailSignIn();
+    await tester.enterText(find.widgetWithText(TextField, 'Email'), email);
+    await tester.enterText(find.widgetWithText(TextField, 'Password'), password);
+    await tester.tap(find.widgetWithText(CesButton, 'Sign in'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> signUpWithEmail(String email, String password) async {
+    await tester.tap(find.text('Continue with email'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, 'Email'), email);
+    await tester.enterText(find.widgetWithText(TextField, 'Password'), password);
+    await tester.tap(find.widgetWithText(CesButton, 'Create account'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openAccountMenu() async {
+    await tester.tap(find.byTooltip('Account'));
+    await tester.pumpAndSettle();
+  }
+
+  /// The text in the field labelled [label].
+  String textInField(String label) =>
+      tester.widget<TextField>(find.widgetWithText(TextField, label)).controller?.text ?? '';
 }

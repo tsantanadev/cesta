@@ -44,4 +44,156 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get healthRetry => 'Verificar novamente';
+
+  @override
+  String get welcomeTagline => 'Listas de compras compartilhadas que funcionam no mercado, com ou sem sinal.';
+
+  @override
+  String get welcomeContinueWithGoogle => 'Continuar com Google';
+
+  @override
+  String get welcomeContinueWithEmail => 'Continuar com e-mail';
+
+  @override
+  String get welcomeHaveAccount => 'Já tem uma conta? Entrar';
+
+  @override
+  String get signInTitle => 'Entrar';
+
+  @override
+  String get signInButton => 'Entrar';
+
+  @override
+  String get signInForgotPassword => 'Esqueceu a senha?';
+
+  @override
+  String get signInNoAccount => 'Primeira vez? Crie uma conta';
+
+  @override
+  String get signUpTitle => 'Criar conta';
+
+  @override
+  String get signUpButton => 'Criar conta';
+
+  @override
+  String get signUpHaveAccount => 'Já tem uma conta? Entrar';
+
+  @override
+  String get fieldEmail => 'E-mail';
+
+  @override
+  String get fieldPassword => 'Senha';
+
+  @override
+  String get fieldPasswordShow => 'Mostrar senha';
+
+  @override
+  String get fieldPasswordHide => 'Ocultar senha';
+
+  @override
+  String get fieldPasswordHint => 'Pelo menos 8 caracteres';
+
+  @override
+  String get errorEmailRequired => 'Digite seu e-mail.';
+
+  @override
+  String get errorEmailInvalid => 'Digite um e-mail válido.';
+
+  @override
+  String get errorPasswordRequired => 'Digite sua senha.';
+
+  @override
+  String get errorPasswordTooShort => 'Use pelo menos 8 caracteres.';
+
+  @override
+  String get errorWrongCredentials => 'E-mail ou senha incorretos.';
+
+  @override
+  String get errorEmailInUse => 'Já existe uma conta com este e-mail. Entre com ela.';
+
+  @override
+  String get errorWeakPassword => 'Escolha uma senha mais forte.';
+
+  @override
+  String get errorOffline => 'Você está sem conexão. Conecte-se à internet e tente de novo.';
+
+  @override
+  String get errorTooManyAttempts => 'Muitas tentativas. Aguarde um pouco e tente de novo.';
+
+  @override
+  String get errorAccountDisabled => 'Esta conta foi desativada.';
+
+  @override
+  String get errorOtherSignInMethod => 'Este e-mail já é usado com outra forma de entrar. Entre por ela.';
+
+  @override
+  String get errorUnknown => 'Algo deu errado. Tente de novo.';
+
+  @override
+  String get resetTitle => 'Redefinir senha';
+
+  @override
+  String get resetExplanation => 'Digite o e-mail da sua conta e enviaremos um link para você escolher uma nova senha.';
+
+  @override
+  String get resetButton => 'Enviar link';
+
+  @override
+  String resetSent(String email) {
+    return 'Se existir uma conta para $email, enviamos para ela um link para redefinir a senha.';
+  }
+
+  @override
+  String get resetBackToSignIn => 'Voltar para entrar';
+
+  @override
+  String get displayNameOnboardingTitle => 'Como podemos te chamar?';
+
+  @override
+  String get displayNameExplanation => 'Os outros membros das suas listas veem este nome.';
+
+  @override
+  String get displayNameEditTitle => 'Nome de exibição';
+
+  @override
+  String get fieldDisplayName => 'Nome de exibição';
+
+  @override
+  String get displayNameContinue => 'Continuar';
+
+  @override
+  String get displayNameSave => 'Salvar';
+
+  @override
+  String get errorDisplayNameRequired => 'Digite um nome.';
+
+  @override
+  String get errorDisplayNameTooLong => 'Use até 50 caracteres.';
+
+  @override
+  String get errorDisplayNameInvalid => 'Esse nome não pode ser usado. Tente outro.';
+
+  @override
+  String get homeTitle => 'Suas listas';
+
+  @override
+  String get homeEmptyTitle => 'Nenhuma lista ainda';
+
+  @override
+  String get homeEmptyBody => 'As listas que você criar ou para as quais for convidado aparecerão aqui.';
+
+  @override
+  String get userMenu => 'Conta';
+
+  @override
+  String get userMenuChangeDisplayName => 'Alterar nome de exibição';
+
+  @override
+  String get userMenuServerStatus => 'Status do servidor';
+
+  @override
+  String get userMenuSignOut => 'Sair';
+
+  @override
+  String get loading => 'Carregando…';
 }

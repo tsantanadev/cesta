@@ -6,6 +6,8 @@
 // Configuration comes from the environment:
 //
 //	DATABASE_URL                 Postgres URL (required)
+//	FIREBASE_PROJECT_ID          Firebase project whose ID tokens are accepted (required by serve)
+//	TRUSTED_PROXY_HOPS           proxies in front of the backend that append to X-Forwarded-For (default 0)
 //	PORT                         HTTP port (default 8080)
 //	LOG_LEVEL                    debug, info, warn or error (default info)
 //	PUBLIC_HOST                  custom domain served by Firebase Hosting; other requests get 404 (off when unset)
@@ -21,10 +23,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/tsantanadev/cesta/backend/internal/app"
+	"github.com/tsantanadev/cesta/backend/internal/platform/auth/firebase"
 	"github.com/tsantanadev/cesta/backend/internal/platform/db"
 	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
 	"github.com/tsantanadev/cesta/backend/migrations"
@@ -100,6 +104,16 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	projectID := os.Getenv("FIREBASE_PROJECT_ID")
+	if projectID == "" {
+		return errors.New("FIREBASE_PROJECT_ID is not set")
+	}
+	hops := 0
+	if v := os.Getenv("TRUSTED_PROXY_HOPS"); v != "" {
+		if hops, err = strconv.Atoi(v); err != nil || hops < 0 {
+			return fmt.Errorf("TRUSTED_PROXY_HOPS = %q, want a non-negative integer", v)
+		}
+	}
 	publicHost := os.Getenv("PUBLIC_HOST")
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -125,8 +139,14 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	defer pool.Close()
 
 	srv := &http.Server{
-		Addr:              net.JoinHostPort("", port),
-		Handler:           app.New(app.Deps{DB: pool, Logger: logger, PublicHost: publicHost}),
+		Addr: net.JoinHostPort("", port),
+		Handler: app.New(app.Deps{
+			DB:               pool,
+			Logger:           logger,
+			TokenVerifier:    firebase.NewVerifier(projectID),
+			TrustedProxyHops: hops,
+			PublicHost:       publicHost,
+		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

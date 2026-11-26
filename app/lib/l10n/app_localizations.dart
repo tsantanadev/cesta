@@ -163,6 +163,306 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check again'**
   String get healthRetry;
+
+  /// Welcome screen line under the app name.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared shopping lists that work in the store, with or without signal.'**
+  String get welcomeTagline;
+
+  /// Button that signs in or signs up with a Google account.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with Google'**
+  String get welcomeContinueWithGoogle;
+
+  /// Button that opens the email sign-up form.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with email'**
+  String get welcomeContinueWithEmail;
+
+  /// Link from the welcome screen to the email sign-in form.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account? Sign in'**
+  String get welcomeHaveAccount;
+
+  /// Title of the email sign-in screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signInTitle;
+
+  /// Button that signs in with email and password.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signInButton;
+
+  /// Link to the password reset screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get signInForgotPassword;
+
+  /// Link from sign-in to sign-up.
+  ///
+  /// In en, this message translates to:
+  /// **'New here? Create an account'**
+  String get signInNoAccount;
+
+  /// Title of the email sign-up screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Create account'**
+  String get signUpTitle;
+
+  /// Button that creates an account with email and password.
+  ///
+  /// In en, this message translates to:
+  /// **'Create account'**
+  String get signUpButton;
+
+  /// Link from sign-up to sign-in.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account? Sign in'**
+  String get signUpHaveAccount;
+
+  /// Label of the email address field.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get fieldEmail;
+
+  /// Label of the password field.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get fieldPassword;
+
+  /// Tooltip of the button that reveals the password.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get fieldPasswordShow;
+
+  /// Tooltip of the button that hides the password.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get fieldPasswordHide;
+
+  /// Helper text under the new password field on sign-up.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 8 characters'**
+  String get fieldPasswordHint;
+
+  /// Validation: email left empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email address.'**
+  String get errorEmailRequired;
+
+  /// Validation or server: the email address is malformed.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email address.'**
+  String get errorEmailInvalid;
+
+  /// Validation: password left empty on sign-in.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password.'**
+  String get errorPasswordRequired;
+
+  /// Validation: new password too short.
+  ///
+  /// In en, this message translates to:
+  /// **'Use at least 8 characters.'**
+  String get errorPasswordTooShort;
+
+  /// Sign-in failed because the email or password is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong email or password.'**
+  String get errorWrongCredentials;
+
+  /// Sign-up failed because the email already has an account.
+  ///
+  /// In en, this message translates to:
+  /// **'An account with this email already exists. Sign in instead.'**
+  String get errorEmailInUse;
+
+  /// The identity provider rejected the password as too weak.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a stronger password.'**
+  String get errorWeakPassword;
+
+  /// An action that needs the network failed because the device is offline.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re offline. Connect to the internet and try again.'**
+  String get errorOffline;
+
+  /// The identity provider or the server is rate limiting this device.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Wait a moment and try again.'**
+  String get errorTooManyAttempts;
+
+  /// Sign-in failed because the account is disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'This account has been disabled.'**
+  String get errorAccountDisabled;
+
+  /// The email already has an account that signs in another way.
+  ///
+  /// In en, this message translates to:
+  /// **'This email is already used with another sign-in method. Sign in that way instead.'**
+  String get errorOtherSignInMethod;
+
+  /// Fallback error for unexpected failures.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Try again.'**
+  String get errorUnknown;
+
+  /// Title of the password reset screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset password'**
+  String get resetTitle;
+
+  /// Explanation on the password reset screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the email you signed up with and we\'ll send you a link to choose a new password.'**
+  String get resetExplanation;
+
+  /// Button that sends the password reset email.
+  ///
+  /// In en, this message translates to:
+  /// **'Send reset link'**
+  String get resetButton;
+
+  /// Confirmation after requesting a password reset. Deliberately does not reveal whether the account exists.
+  ///
+  /// In en, this message translates to:
+  /// **'If an account exists for {email}, we sent it a link to reset the password.'**
+  String resetSent(String email);
+
+  /// Button that returns to sign-in after sending a reset link.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to sign in'**
+  String get resetBackToSignIn;
+
+  /// Title of the display name screen shown once after sign-up.
+  ///
+  /// In en, this message translates to:
+  /// **'What should we call you?'**
+  String get displayNameOnboardingTitle;
+
+  /// Explains what the display name is for.
+  ///
+  /// In en, this message translates to:
+  /// **'Other Members of your Lists see this name.'**
+  String get displayNameExplanation;
+
+  /// Title of the screen that changes the display name.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get displayNameEditTitle;
+
+  /// Label of the display name field.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get fieldDisplayName;
+
+  /// Confirms the display name during onboarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get displayNameContinue;
+
+  /// Saves a changed display name.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get displayNameSave;
+
+  /// Validation: display name blank.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get errorDisplayNameRequired;
+
+  /// Validation: display name over 50 characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Use 50 characters or fewer.'**
+  String get errorDisplayNameTooLong;
+
+  /// Display name has characters that can't be used (e.g. control characters), or the server rejected it.
+  ///
+  /// In en, this message translates to:
+  /// **'That name can\'t be used. Try another.'**
+  String get errorDisplayNameInvalid;
+
+  /// Title of the home screen, which lists the User's Lists.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Lists'**
+  String get homeTitle;
+
+  /// Home screen when the User has no Lists.
+  ///
+  /// In en, this message translates to:
+  /// **'No Lists yet'**
+  String get homeEmptyTitle;
+
+  /// Home screen empty state explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Lists you create or are invited to will show up here.'**
+  String get homeEmptyBody;
+
+  /// Tooltip of the button that opens the User menu (display name, sign out).
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get userMenu;
+
+  /// Account menu item.
+  ///
+  /// In en, this message translates to:
+  /// **'Change display name'**
+  String get userMenuChangeDisplayName;
+
+  /// Account menu item that opens the server status screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Server status'**
+  String get userMenuServerStatus;
+
+  /// Account menu item that signs out.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get userMenuSignOut;
+
+  /// Shown while the app is starting or loading the account.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get loading;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
