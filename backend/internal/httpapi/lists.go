@@ -51,8 +51,29 @@ func (s *Server) CreateList(ctx context.Context, req CreateListRequestObject) (C
 	}
 }
 
-func (s *Server) RenameList(context.Context, RenameListRequestObject) (RenameListResponseObject, error) {
-	return nil, errListsNotImplemented
+// RenameList renames a List the signed-in User owns.
+func (s *Server) RenameList(ctx context.Context, req RenameListRequestObject) (RenameListResponseObject, error) {
+	u, err := signedIn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.Body == nil {
+		return RenameList400JSONResponse{BadRequestJSONResponse{Code: ApiErrorCodeInvalidRequest, Message: "request body is required"}}, nil
+	}
+	l, err := s.Lists.Rename(ctx, u.ID, req.ListId, req.Body.Name)
+	switch {
+	case errors.Is(err, lists.ErrInvalidName):
+		return RenameList400JSONResponse{BadRequestJSONResponse(invalidListName())}, nil
+	case errors.Is(err, lists.ErrNotFound):
+		return RenameList404JSONResponse{NotFoundJSONResponse(listNotFound())}, nil
+	case errors.Is(err, lists.ErrNotOwner):
+		return RenameList403JSONResponse{ForbiddenJSONResponse(notListOwner())}, nil
+	case errors.Is(err, lists.ErrDeleted):
+		return RenameList409JSONResponse{ConflictJSONResponse{Code: ApiErrorCodeListDeleted, Message: "restore the List before changing it"}}, nil
+	case err != nil:
+		return nil, err
+	}
+	return RenameList200JSONResponse(apiListSummary(l)), nil
 }
 
 func (s *Server) DeleteList(context.Context, DeleteListRequestObject) (DeleteListResponseObject, error) {
@@ -74,6 +95,14 @@ func invalidListName() ApiError {
 		Code:    ApiErrorCodeInvalidListName,
 		Message: fmt.Sprintf("List name must be 1 to %d visible characters", lists.MaxNameLength),
 	}
+}
+
+func listNotFound() ApiError {
+	return ApiError{Code: ApiErrorCodeListNotFound, Message: "no such List"}
+}
+
+func notListOwner() ApiError {
+	return ApiError{Code: ApiErrorCodeNotListOwner, Message: "only the List's Owner can do this"}
 }
 
 func limitExceeded() ApiError {

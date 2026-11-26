@@ -36,7 +36,18 @@ var (
 	ErrIDTaken = errors.New("list id taken")
 	// ErrLimitReached is returned when the User already owns the most Lists allowed.
 	ErrLimitReached = errors.New("list limit reached")
+	// ErrNotFound is returned when the List doesn't exist, is gone for good, or
+	// the User is not a Member of it. The three are indistinguishable on purpose.
+	ErrNotFound = errors.New("list not found")
+	// ErrNotOwner is returned when a Member who is not the Owner tries an Owner-only change.
+	ErrNotOwner = errors.New("not the list owner")
+	// ErrDeleted is returned for a change to a deleted List other than restoring it.
+	ErrDeleted = errors.New("list deleted")
 )
+
+// RestoreWindow is how long after deletion the Owner can restore a List. After
+// it the List is gone, and the purge removes it.
+const RestoreWindow = 30 * 24 * time.Hour
 
 // Summary is a List as one of its Members sees it.
 type Summary struct {
@@ -147,6 +158,63 @@ func (s *Service) Mine(ctx context.Context, userID uuid.UUID) ([]Summary, error)
 	return out, nil
 }
 
+// Rename sets the name of a List userID owns.
+func (s *Service) Rename(ctx context.Context, userID, listID uuid.UUID, name string) (Summary, error) {
+	name, ok := normalizeName(name)
+	if !ok {
+		return Summary{}, ErrInvalidName
+	}
+	l, err := s.owned(ctx, userID, listID)
+	if err != nil {
+		return Summary{}, err
+	}
+	if l.deletedAt != nil {
+		return Summary{}, ErrDeleted
+	}
+	if _, err := s.db.Exec(ctx, "UPDATE lists SET name = $2, updated_at = $3 WHERE id = $1",
+		listID, name, s.clock.Now()); err != nil {
+		return Summary{}, wrap("rename", err)
+	}
+	return s.summary(ctx, listID, userID)
+}
+
+// listRow is the state of a List the access checks need.
+type listRow struct {
+	name      string
+	deletedAt *time.Time
+}
+
+// owned returns listID if userID owns it. It returns ErrNotFound if userID is
+// not a Member or the List is gone (purged, or deleted longer than
+// RestoreWindow ago), and ErrNotOwner for any other Member.
+func (s *Service) owned(ctx context.Context, userID, listID uuid.UUID) (listRow, error) {
+	role, err := s.members.RoleOf(ctx, listID, userID)
+	if errors.Is(err, membership.ErrNotAMember) {
+		return listRow{}, ErrNotFound
+	}
+	if err != nil {
+		return listRow{}, err
+	}
+	var l listRow
+	err = s.db.QueryRow(ctx, "SELECT name, deleted_at FROM lists WHERE id = $1", listID).Scan(&l.name, &l.deletedAt)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return listRow{}, ErrNotFound
+	case err != nil:
+		return listRow{}, wrap("read", err)
+	case l.deletedAt != nil && !s.restorable(*l.deletedAt):
+		return listRow{}, ErrNotFound
+	case role != membership.Owner:
+		return listRow{}, ErrNotOwner
+	}
+	return l, nil
+}
+
+// restorable reports whether a List deleted at deletedAt can still be restored.
+func (s *Service) restorable(deletedAt time.Time) bool {
+	return s.clock.Now().Before(deletedAt.Add(RestoreWindow))
+}
+
 // summary returns listID as userID sees it.
 func (s *Service) summary(ctx context.Context, listID, userID uuid.UUID) (Summary, error) {
 	role, err := s.members.RoleOf(ctx, listID, userID)
@@ -167,8 +235,10 @@ func (s *Service) summary(ctx context.Context, listID, userID uuid.UUID) (Summar
 
 // wrap adds context to unexpected errors and passes sentinel errors through.
 func wrap(what string, err error) error {
-	if errors.Is(err, ErrInvalidName) || errors.Is(err, ErrIDTaken) || errors.Is(err, ErrLimitReached) {
-		return err
+	for _, sentinel := range []error{ErrInvalidName, ErrIDTaken, ErrLimitReached, ErrNotFound, ErrNotOwner, ErrDeleted} {
+		if errors.Is(err, sentinel) {
+			return err
+		}
 	}
 	return fmt.Errorf("lists: %s: %w", what, err)
 }

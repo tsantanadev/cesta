@@ -3,8 +3,11 @@ package api_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/tsantanadev/cesta/backend/internal/testkit"
 )
@@ -99,5 +102,52 @@ func TestCreatingAListWithAnotherUsersListIDIsRejected(t *testing.T) {
 	res.RequireErrorCode(t, "list_id_taken")
 	if lists := myLists(t, bruno); len(lists) != 0 {
 		t.Fatalf("Bruno's Lists = %+v, want none", lists)
+	}
+}
+
+func TestTheOwnerCanRenameAList(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+
+	res := ana.Patch(t, "/api/lists/"+groceriesID, `{"name": " Feira de sábado "}`)
+
+	res.RequireStatus(t, http.StatusOK)
+	if got := decodeList(t, res); got.Name != "Feira de sábado" || got.Role != "owner" {
+		t.Fatalf("renamed List = %+v, want name Feira de sábado, role owner", got)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 || lists[0].Name != "Feira de sábado" {
+		t.Fatalf("Ana's Lists = %+v, want the renamed List", lists)
+	}
+}
+
+func TestListNamesMustBeOneToSixtyVisibleCharacters(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	invalid := map[string]string{
+		"empty":           ``,
+		"only spaces":     `   `,
+		"control char":    `Feira\u0007`,
+		"sixty-one runes": strings.Repeat("é", 61),
+	}
+
+	for label, name := range invalid {
+		t.Run(label, func(t *testing.T) {
+			create := ana.Post(t, "/api/lists", `{"id": "`+uuid.NewString()+`", "name": "`+name+`"}`)
+			rename := ana.Patch(t, "/api/lists/"+groceriesID, `{"name": "`+name+`"}`)
+
+			create.RequireStatus(t, http.StatusBadRequest)
+			create.RequireErrorCode(t, "invalid_list_name")
+			rename.RequireStatus(t, http.StatusBadRequest)
+			rename.RequireErrorCode(t, "invalid_list_name")
+		})
+	}
+	sixty := strings.Repeat("é", 60)
+	if got := decodeList(t, ana.Patch(t, "/api/lists/"+groceriesID, `{"name": "`+sixty+`"}`)); got.Name != sixty {
+		t.Fatalf("name = %q, want 60 accented characters accepted", got.Name)
+	}
+	if lists := myLists(t, ana); len(lists) != 1 {
+		t.Fatalf("Ana has %d Lists, want 1 (no invalid create succeeded)", len(lists))
 	}
 }
