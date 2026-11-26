@@ -39,7 +39,7 @@ func capBody(next http.Handler) http.Handler {
 	})
 }
 
-// authenticate has identity authenticate the bearer token on every operation
+// authenticate checks the bearer token with identity on every operation
 // the contract does not mark public, and puts the User in the request context.
 // Operations it doesn't know are treated as protected.
 func (s *Server) authenticate(public map[string]bool) MiddlewareFunc {

@@ -1,8 +1,10 @@
 import 'package:cesta/src/api/generated/cesta_api.dart';
-import 'package:cesta/src/session/input_rules.dart' show maxDisplayNameLength;
 import 'package:dio/dio.dart';
 
 import 'fake_auth_gateway.dart';
+
+/// The API contract's longest display name, as the server enforces it.
+const _maxDisplayNameLength = 50;
 
 /// Seam 2 fake: stands in for the generated [ApiClient].
 ///
@@ -88,7 +90,7 @@ class FakeApiClient implements ApiClient {
       return const UpdateMe429(ApiError(code: ApiErrorCode.rateLimited, message: 'too many requests'));
     }
     final name = body.displayName.trim();
-    if (rejectDisplayNames || name.isEmpty || name.runes.length > maxDisplayNameLength) {
+    if (rejectDisplayNames || name.isEmpty || name.runes.length > _maxDisplayNameLength) {
       return const UpdateMe400(ApiError(code: ApiErrorCode.invalidDisplayName, message: 'invalid display name'));
     }
     final updated = User(id: user.id, email: user.email, displayName: name, displayNameConfirmed: true);

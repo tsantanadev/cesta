@@ -78,7 +78,7 @@ void main() {
 
       expect(find.text('Enter your email address.'), findsOneWidget);
       expect(find.text('Enter your password.'), findsOneWidget);
-      expect(find.byType(CesMessage), findsNothing); // nothing was sent to sign in
+      expect(find.byType(CesMessage), findsNothing); // only the form says what is missing, no sign-in error
     });
   });
 
@@ -131,7 +131,7 @@ void main() {
 
       expect(find.text('Enter a valid email address.'), findsOneWidget);
       expect(find.text('Use at least 8 characters.'), findsOneWidget);
-      expect(find.byType(CesMessage), findsNothing); // nothing was sent to sign up
+      expect(find.byType(CesMessage), findsNothing); // only the form says what is wrong, no sign-up error
     });
   });
 
@@ -259,7 +259,7 @@ void main() {
       expect(find.text('Too many attempts. Wait a moment and try again.'), findsOneWidget);
     });
 
-    testWidgets('the tag previews the name as it is typed', (tester) async {
+    testWidgets('an Item tile previews the name as it is typed', (tester) async {
       final h = Harness(tester);
       await h.signInWithGoogleForTheFirstTime();
 

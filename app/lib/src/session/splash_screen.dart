@@ -33,12 +33,14 @@ class SplashScreen extends StatelessWidget {
                   text: switch (failure) {
                     UserLoadFailure.offline => l10n.errorOffline,
                     UserLoadFailure.rateLimited => l10n.errorTooManyAttempts,
-                    UserLoadFailure.failed => l10n.userLoadFailed,
+                    UserLoadFailure.rejected || UserLoadFailure.failed => l10n.userLoadFailed,
                   },
                 ),
                 const CesGap.lg(),
-                CesButton(label: l10n.userLoadRetry, onPressed: session.retryUserLoad),
-                const CesGap.sm(),
+                if (failure != UserLoadFailure.rejected) ...[
+                  CesButton(label: l10n.userLoadRetry, onPressed: session.retryUserLoad),
+                  const CesGap.sm(),
+                ],
                 CesLink(label: l10n.userMenuSignOut, onPressed: session.signOut),
               ],
             ],

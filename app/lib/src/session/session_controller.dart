@@ -19,7 +19,15 @@ enum SessionStatus {
 enum DisplayNameOutcome { saved, invalid, rateLimited, offline, failed }
 
 /// Why the signed-in User couldn't be loaded when nothing was cached.
-enum UserLoadFailure { offline, rateLimited, failed }
+enum UserLoadFailure {
+  offline,
+  rateLimited,
+
+  /// The server rejected the session even after a fresh token: only signing
+  /// in again can help.
+  rejected,
+  failed,
+}
 
 /// The identity provider's session and the signed-in User, which the router
 /// follows.
@@ -101,10 +109,13 @@ class SessionController extends ChangeNotifier {
         case GetMe429():
           failure = UserLoadFailure.rateLimited;
         case GetMe401():
-          failure = UserLoadFailure.failed;
+          failure = UserLoadFailure.rejected;
       }
     } on DioException catch (e) {
       failure = isOffline(e) ? UserLoadFailure.offline : UserLoadFailure.failed;
+    } catch (_) {
+      // E.g. the device database failed: still leave the splash with a way out.
+      failure = UserLoadFailure.failed;
     }
     if (_session?.uid != session.uid) return;
     final unavailable = _user == null ? failure : null;

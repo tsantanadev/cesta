@@ -37,8 +37,8 @@ abstract final class CestaColors {
   /// Text and icons on [folha].
   static const onFolha = Color(0xFFFFFFFF);
 
-  /// The welcome screen's full-bleed ground (Figma "brand-surface").
-  static const brandSurface = Color(0xFF1E6B43);
+  /// The welcome screen's full-bleed ground (Figma "brand-surface"); Folha in light mode.
+  static const brandSurface = folha;
 
   /// Text and outlines on [brandSurface], in both modes (Figma "on-brand").
   static const onBrand = Color(0xFFFFFFFF);
@@ -91,8 +91,9 @@ class CestaSpacing extends ThemeExtension<CestaSpacing> {
 abstract final class CestaRadii {
   static const card = 16.0;
 
-  /// Buttons are 56 dp pills (Figma Button 3:61).
-  static const button = 28.0;
+  /// Buttons are pills (Figma Button 3:61: 56 dp tall, radius 28). Large
+  /// enough to stay a pill when a button grows with the text size.
+  static const button = 999.0;
   static const field = 12.0;
   static const sheet = 28.0;
 }

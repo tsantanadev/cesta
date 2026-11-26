@@ -6,7 +6,13 @@ library;
 import 'dart:math' as math;
 
 import 'package:cupertino_ui/cupertino_ui.dart'
-    show CupertinoActionSheet, CupertinoActionSheetAction, CupertinoButton, CupertinoTextField, showCupertinoModalPopup;
+    show
+        CupertinoActionSheet,
+        CupertinoActionSheetAction,
+        CupertinoButton,
+        CupertinoTextField,
+        showCupertinoModalPopup,
+        showCupertinoSheet;
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:material_ui/material_ui.dart';
 
@@ -153,7 +159,8 @@ class CesButton extends StatelessWidget {
     }
     final style = ButtonStyle(
       backgroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.disabled) ? background.withValues(alpha: background.a * 0.5) : background,
+        (states) =>
+            states.contains(WidgetState.disabled) ? background.withValues(alpha: background.a * 0.5) : background,
       ),
       foregroundColor: WidgetStatePropertyAll(foreground),
       overlayColor: WidgetStatePropertyAll(foreground.withValues(alpha: 0.08)),
@@ -539,21 +546,34 @@ class CesText extends StatelessWidget {
 }
 
 /// A screen's big heading in Bricolage: 36 dp, or 40 dp when [large] (the
-/// welcome headline). On-brand on a [CesBrandScaffold].
+/// welcome headline), with an optional [subtitle] under it as [CesText.intro].
+/// On-brand on a [CesBrandScaffold].
 class CesDisplayHeading extends StatelessWidget {
-  const CesDisplayHeading(this.text, {super.key, this.large = false});
+  const CesDisplayHeading(this.text, {super.key, this.large = false, this.subtitle});
 
   final String text;
   final bool large;
+  final String? subtitle;
+
+  static const _subtitleGap = 10.0;
 
   @override
   Widget build(BuildContext context) {
     final colour = CesBrandScaffold.contains(context)
         ? context.palette.onBrand
         : Theme.of(context).colorScheme.onSurface;
-    return Semantics(
+    final heading = Semantics(
       header: true,
       child: Text(text, style: (large ? CestaDisplayType.headline : CestaDisplayType.heading).copyWith(color: colour)),
+    );
+    if (subtitle == null) return heading;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        heading,
+        const SizedBox(height: _subtitleGap),
+        CesText.intro(subtitle!),
+      ],
     );
   }
 }
@@ -1061,20 +1081,20 @@ void showCesToast(BuildContext context, {required String message, String? action
     );
 }
 
-/// Shows a bottom sheet with a [title], a close button and [child] (usually
-/// a form), kept above the keyboard.
+/// Shows a sheet with a [title], a close button and [child] (usually a
+/// form), kept above the keyboard: a bottom sheet, or on iOS a Cupertino
+/// sheet.
 Future<void> showCesFormSheet(
   BuildContext context, {
   required String title,
   required String closeTooltip,
   required Widget child,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  builder: (context) => Padding(
+}) {
+  Widget content(BuildContext context, ScrollController? scroll) => Padding(
     padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
     child: SafeArea(
       child: SingleChildScrollView(
+        controller: scroll,
         padding: EdgeInsets.fromLTRB(context.spacing.lg, 0, context.spacing.lg, context.spacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1097,8 +1117,25 @@ Future<void> showCesFormSheet(
         ),
       ),
     ),
-  ),
-);
+  );
+  if (_isCupertino(context)) {
+    return showCupertinoSheet<void>(
+      context: context,
+      scrollableBuilder: (context, scroll) => Material(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        child: Padding(
+          padding: EdgeInsets.only(top: context.spacing.md),
+          child: content(context, scroll),
+        ),
+      ),
+    );
+  }
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => content(context, null),
+  );
+}
 
 /// Vertical gap from the spacing scale.
 class CesGap extends StatelessWidget {
@@ -1145,13 +1182,22 @@ class _SheetCloseButton extends StatelessWidget {
   }
 }
 
-/// A full-bleed page on the brand surface (Figma "01 Welcome"): no app bar,
-/// light status bar icons, and components inside it ([CesButton.outline],
-/// [CesWordmark]) switch to their on-brand colours.
+/// A full-bleed page on the brand surface (Figma "01 Welcome"): a [hero]
+/// from the top, an [intro] under it and the [actions] at the bottom of the
+/// screen. Light status bar icons; components inside it ([CesButton.outline],
+/// [CesWordmark], [CesDisplayHeading], [CesText.intro]) switch to their
+/// on-brand colours.
 class CesBrandScaffold extends StatelessWidget {
-  const CesBrandScaffold({super.key, required this.body});
+  const CesBrandScaffold({super.key, required this.hero, required this.intro, required this.actions});
 
-  final Widget body;
+  final Widget hero;
+  final List<Widget> intro;
+  final List<Widget> actions;
+
+  // The design's insets, off the 4 dp scale's named steps.
+  static const _introPadding = EdgeInsets.fromLTRB(28, 20, 28, 0);
+  static const _actionsPadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
+  static const _actionGap = 12.0;
 
   /// Whether [context] is inside a [CesBrandScaffold].
   static bool contains(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_OnBrand>() != null;
@@ -1164,7 +1210,33 @@ class CesBrandScaffold extends StatelessWidget {
       body: _OnBrand(
         child: DefaultTextStyle.merge(
           style: TextStyle(color: context.palette.onBrand),
-          child: SafeArea(child: body),
+          child: SafeArea(
+            child: CesPinnedLayout(
+              top: [
+                hero,
+                Padding(
+                  padding: _introPadding,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final (i, w) in intro.indexed) ...[if (i > 0) SizedBox(height: context.spacing.md), w],
+                    ],
+                  ),
+                ),
+              ],
+              bottom: [
+                Padding(
+                  padding: _actionsPadding,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final (i, w) in actions.indexed) ...[if (i > 0) const SizedBox(height: _actionGap), w],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     ),
@@ -1350,4 +1422,25 @@ class CesHangingTiles extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A large Item tile showing [name] under a basket, hanging on a string: the
+/// display name screen's preview of the name being typed (Figma 20:624).
+class CesNamePreview extends StatelessWidget {
+  const CesNamePreview({super.key, required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) => CesHangingTiles(
+    canvas: const Size(342, 196),
+    tiles: [
+      CesHangingTile(
+        left: 97,
+        top: 44,
+        degrees: 3,
+        tile: CesItemTile(name: name, icon: CesIcons.basket, size: 148),
+      ),
+    ],
+  );
 }

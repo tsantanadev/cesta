@@ -9,6 +9,8 @@
 //	DATABASE_URL                 Postgres URL (required)
 //	FIREBASE_PROJECT_ID          Firebase project whose ID tokens are accepted (required by serve)
 //	TRUSTED_PROXY_HOPS           proxies in front of the backend that append to X-Forwarded-For (default 0)
+//	RATE_LIMIT_PER_IP            requests allowed per client IP, as <burst>/<every> (default 120/250ms)
+//	RATE_LIMIT_PER_USER          requests allowed per User, as <burst>/<every> (default 60/500ms)
 //	PORT                         HTTP port (default 8080)
 //	LOG_LEVEL                    debug, info, warn or error (default info)
 //	PUBLIC_HOST                  custom domain served by Firebase Hosting; other requests get 404 (off when unset)
@@ -31,6 +33,7 @@ import (
 	"github.com/tsantanadev/cesta/backend/internal/app"
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth/firebase"
 	"github.com/tsantanadev/cesta/backend/internal/platform/db"
+	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
 	"github.com/tsantanadev/cesta/backend/migrations"
 )
@@ -75,6 +78,25 @@ func newLogger(level string) *slog.Logger {
 	}
 	return slog.New(telemetry.LogHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: l}))).
 		With(slog.String("service", "cesta"), slog.String("version", version))
+}
+
+// rateLimits reads RATE_LIMIT_PER_IP and RATE_LIMIT_PER_USER; an unset one
+// keeps its default.
+func rateLimits() (app.RateLimits, error) {
+	limits := app.DefaultRateLimits
+	for name, rule := range map[string]*ratelimit.Rule{
+		"RATE_LIMIT_PER_IP":   &limits.PerIP,
+		"RATE_LIMIT_PER_USER": &limits.PerUser,
+	} {
+		if v := os.Getenv(name); v != "" {
+			r, err := ratelimit.ParseRule(v)
+			if err != nil {
+				return app.RateLimits{}, fmt.Errorf("%s: %w", name, err)
+			}
+			*rule = r
+		}
+	}
+	return limits, nil
 }
 
 func databaseURL() (string, error) {
@@ -135,6 +157,10 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 			return fmt.Errorf("TRUSTED_PROXY_HOPS = %q, want a non-negative integer", v)
 		}
 	}
+	limits, err := rateLimits()
+	if err != nil {
+		return err
+	}
 	publicHost := os.Getenv("PUBLIC_HOST")
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -166,6 +192,7 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 			Logger:           logger,
 			TokenVerifier:    firebase.NewVerifier(projectID),
 			TrustedProxyHops: hops,
+			RateLimits:       limits,
 			PublicHost:       publicHost,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,

@@ -19,10 +19,10 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> with AuthSubmission {
-  // The hero's layout in the design's 390 × 330 frame.
+  // The hero: sample Item tiles placed as in the design's 390 × 330 frame.
   static const _heroCanvas = Size(390, 330);
 
-  List<CesHangingTile> _tags(AppLocalizations l10n) => [
+  List<CesHangingTile> _tiles(AppLocalizations l10n) => [
     CesHangingTile(
       left: 20,
       top: 92,
@@ -59,50 +59,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> with AuthSubmission {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return CesBrandScaffold(
-      body: CesPinnedLayout(
-        top: [
-          CesHangingTiles(canvas: _heroCanvas, tiles: _tags(l10n)),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(28, 20, 28, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CesWordmark(name: l10n.appTitle, large: true),
-                const CesGap.md(),
-                CesDisplayHeading(l10n.welcomeHeadline, large: true),
-                const CesGap.md(),
-                CesText.intro(l10n.welcomeSubtitle),
-              ],
-            ),
-          ),
-        ],
-        bottom: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (error case final error?) ...[
-                  CesMessage(tone: CesMessageTone.error, text: error),
-                  const CesGap.md(),
-                ],
-                CesButton.secondary(
-                  label: l10n.welcomeContinueWithGoogle,
-                  icon: CesIcons.google,
-                  busy: busy,
-                  onPressed: () => submitAuth(widget.auth.signInWithGoogle),
-                ),
-                const SizedBox(height: 12),
-                CesButton.outline(
-                  label: l10n.welcomeContinueWithEmail,
-                  icon: CesIcons.email,
-                  onPressed: busy ? null : () => context.push(Routes.signUp),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+      hero: CesHangingTiles(canvas: _heroCanvas, tiles: _tiles(l10n)),
+      intro: [
+        CesWordmark(name: l10n.appTitle, large: true),
+        CesDisplayHeading(l10n.welcomeHeadline, large: true),
+        CesText.intro(l10n.welcomeSubtitle),
+      ],
+      actions: [
+        if (error case final error?) CesMessage(tone: CesMessageTone.error, text: error),
+        CesButton.secondary(
+          label: l10n.welcomeContinueWithGoogle,
+          icon: CesIcons.google,
+          busy: busy,
+          onPressed: () => submitAuth(widget.auth.signInWithGoogle),
+        ),
+        CesButton.outline(
+          label: l10n.welcomeContinueWithEmail,
+          icon: CesIcons.email,
+          onPressed: busy ? null : () => context.push(Routes.signUp),
+        ),
+      ],
     );
   }
 }

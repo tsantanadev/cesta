@@ -6,7 +6,10 @@
 package ratelimit
 
 import (
+	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +20,18 @@ import (
 type Rule struct {
 	Burst int
 	Every time.Duration
+}
+
+// ParseRule reads a Rule written as "<burst>/<every>", e.g. "120/250ms": a
+// burst of 120 requests, refilling one every 250ms.
+func ParseRule(s string) (Rule, error) {
+	burst, every, ok := strings.Cut(s, "/")
+	b, errB := strconv.Atoi(burst)
+	e, errE := time.ParseDuration(every)
+	if !ok || errB != nil || errE != nil || b <= 0 || e <= 0 {
+		return Rule{}, fmt.Errorf("rate limit %q: want <burst>/<every> with both positive, e.g. 120/250ms", s)
+	}
+	return Rule{Burst: b, Every: e}, nil
 }
 
 // sweepInterval is how often idle, full buckets are dropped so memory stays bounded.

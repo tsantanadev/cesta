@@ -17,6 +17,22 @@ void main() {
     expect(h.api.listNamesOf(ana), ['Weekend feira']);
   });
 
+  testWidgets(
+    'on iOS, Lists are created and renamed through Cupertino sheets',
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    (tester) async {
+      final h = Harness(tester);
+      h.signedIn();
+      await h.pumpApp();
+
+      await h.createList('Weekend feira');
+      await h.renameList('Weekend feira', 'Saturday feira');
+
+      expect(find.text('Saturday feira'), findsOneWidget);
+      expect(find.text('Weekend feira'), findsNothing);
+    },
+  );
+
   testWidgets('shows owned and shared Lists, with what is left to buy', (tester) async {
     final h = Harness(tester);
     final ana = h.signedIn();

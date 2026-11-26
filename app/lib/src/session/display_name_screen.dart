@@ -9,7 +9,7 @@ import 'session_controller.dart';
 
 /// Sets the display name (Figma "02 Your name"): once after sign-up
 /// ([onboarding]), prefilled with the server's suggestion, and later from the
-/// User menu. A tag previews the name as it is typed.
+/// User menu. An Item tile previews the name as it is typed.
 class DisplayNameScreen extends StatefulWidget {
   const DisplayNameScreen({super.key, required this.session, required this.onboarding});
 
@@ -25,9 +25,6 @@ class _DisplayNameScreenState extends State<DisplayNameScreen> {
   late final _name = TextEditingController(text: widget.session.user?.displayName ?? '');
   bool _busy = false;
   String? _error;
-
-  // The preview tag's place in the design's 342 × 196 frame.
-  static const _previewCanvas = Size(342, 196);
 
   @override
   void dispose() {
@@ -66,21 +63,13 @@ class _DisplayNameScreenState extends State<DisplayNameScreen> {
         top: [
           ValueListenableBuilder(
             valueListenable: _name,
-            builder: (context, value, _) => CesHangingTiles(
-              canvas: _previewCanvas,
-              tiles: [
-                CesHangingTile(
-                  left: 97,
-                  top: 44,
-                  degrees: 3,
-                  tile: CesItemTile(name: value.text.trim(), icon: CesIcons.basket, size: 148),
-                ),
-              ],
-            ),
+            builder: (context, value, _) => CesNamePreview(name: value.text.trim()),
           ),
           const CesGap.lg(),
-          if (widget.onboarding) ...[CesDisplayHeading(l10n.displayNameOnboardingTitle), const SizedBox(height: 10)],
-          CesText.intro(l10n.displayNameExplanation),
+          if (widget.onboarding)
+            CesDisplayHeading(l10n.displayNameOnboardingTitle, subtitle: l10n.displayNameExplanation)
+          else
+            CesText.intro(l10n.displayNameExplanation),
           const CesGap.lg(),
           if (_error case final error?) ...[CesMessage(tone: CesMessageTone.error, text: error), const CesGap.md()],
           CesTextField.display(
