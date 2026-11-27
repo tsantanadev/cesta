@@ -716,12 +716,6 @@ abstract class AppLocalizations {
   /// **'You'**
   String get listCheckedByYou;
 
-  /// Placeholder indicator: some changes made on this device haven't reached the server yet.
-  ///
-  /// In en, this message translates to:
-  /// **'Waiting to sync'**
-  String get listSyncPending;
-
   /// Screen reader hint on an Item tag: tapping it marks the Item as bought.
   ///
   /// In en, this message translates to:
@@ -866,11 +860,107 @@ abstract class AppLocalizations {
   /// **'Use a number above zero, like 2 or 1.5.'**
   String get errorItemQuantityInvalid;
 
-  /// Placeholder message: the server refused a change made on this device, which was rolled back.
+  /// Pill on a List while the phone is offline (Figma 13 List offline), with how many changes wait to reach the server.
   ///
   /// In en, this message translates to:
-  /// **'Your change to “{name}” couldn\'t be saved, so it was undone.'**
-  String errorItemRejected(String name);
+  /// **'{count, plural, =0{Offline} =1{Offline · 1 change waiting to sync} other{Offline · {count} changes waiting to sync}}'**
+  String listOffline(int count);
+
+  /// Subtitle of a List with no Items (Figma 15 Empty list).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to buy yet'**
+  String get listNothingToBuyYet;
+
+  /// Heading of a List with no Items.
+  ///
+  /// In en, this message translates to:
+  /// **'Start your list'**
+  String get listEmptyTitle;
+
+  /// Body of a List with no Items.
+  ///
+  /// In en, this message translates to:
+  /// **'Add what you need. Everyone on this list sees it right away.'**
+  String get listEmptyBody;
+
+  /// Title of the Opened item sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit item'**
+  String get itemEditTitle;
+
+  /// Saves the edits to an Item.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get itemSave;
+
+  /// Who added the Item, on the Opened item sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Added by {name}'**
+  String itemAddedBy(String name);
+
+  /// The signed-in User added the Item.
+  ///
+  /// In en, this message translates to:
+  /// **'Added by you'**
+  String get itemAddedByYou;
+
+  /// Who checked the Item, on the Opened item sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked by {name}'**
+  String itemCheckedBy(String name);
+
+  /// The signed-in User checked the Item.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked by you'**
+  String get itemCheckedByYou;
+
+  /// Removes the Item from the List.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove item'**
+  String get itemRemove;
+
+  /// Toast after removing an Item; it has an Undo action.
+  ///
+  /// In en, this message translates to:
+  /// **'{item} removed'**
+  String itemRemoved(String item);
+
+  /// Toast (Figma 13b): a change to an Item that someone else removed was not saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save “{name}”. It was removed.'**
+  String itemRejectedRemoved(String name);
+
+  /// Toast: a change was not saved because its List was deleted or the User left it.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save “{name}”. The list is no longer available.'**
+  String itemRejectedListGone(String name);
+
+  /// Toast: the server refused a change made on this device, which was undone.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save “{name}”.'**
+  String itemRejected(String name);
+
+  /// Title of the Item limit sheet (Figma 14).
+  ///
+  /// In en, this message translates to:
+  /// **'This list is full'**
+  String get itemLimitTitle;
+
+  /// Body of the Item limit sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'A list can hold up to {max} items. Clear checked items, or remove ones you no longer need, to make room.'**
+  String itemLimitBody(int max);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

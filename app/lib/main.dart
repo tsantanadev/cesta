@@ -7,6 +7,7 @@ import 'src/api/generated/cesta_api.dart';
 import 'src/app.dart';
 import 'src/auth/firebase_auth_gateway.dart';
 import 'src/db/app_database.dart';
+import 'src/sync/network_status.dart';
 
 /// Backend base URL. Override with `--dart-define=API_BASE_URL=...`
 /// (the Android emulator reaches the host as http://10.0.2.2:8080).
@@ -19,5 +20,5 @@ Future<void> main() async {
   final auth = FirebaseAuthGateway();
   final api = CestaApi(createApiTransport(baseUrl: apiBaseUrl, idToken: auth.idToken)).api;
   final database = AppDatabase(driftDatabase(name: 'cesta'));
-  runApp(CestaApp(api: api, auth: auth, database: database));
+  runApp(CestaApp(api: api, auth: auth, database: database, network: DeviceNetworkStatus()));
 }

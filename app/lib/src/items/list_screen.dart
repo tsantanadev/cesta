@@ -11,6 +11,8 @@ import '../session/session_controller.dart';
 import '../sync/sync_engine.dart';
 import '../ui/components.dart';
 import '../ui/tokens.dart';
+import 'item_form.dart';
+import 'item_limit_sheet.dart';
 import 'item_text.dart';
 import 'items_store.dart';
 
@@ -42,13 +44,21 @@ class ListScreen extends StatefulWidget {
 class _ListScreenState extends State<ListScreen> {
   List<ShownItem> _shown = const [];
   int _pending = 0;
+  bool _loaded = false;
   StreamSubscription<List<ShownItem>>? _itemsSub;
   StreamSubscription<int>? _pendingSub;
 
   @override
   void initState() {
     super.initState();
-    _itemsSub = widget.items.watchList(widget.listId).listen((items) => setState(() => _shown = items));
+    _itemsSub = widget.items
+        .watchList(widget.listId)
+        .listen(
+          (items) => setState(() {
+            _shown = items;
+            _loaded = true;
+          }),
+        );
     _pendingSub = widget.items.watchPendingCount().listen((n) => setState(() => _pending = n));
   }
 
@@ -72,8 +82,62 @@ class _ListScreenState extends State<ListScreen> {
     unawaited(widget.items.setChecked(item, checked: checked, by: me));
   }
 
-  /// Opens the Item to edit or remove it (#7 design gap "Opened Item": not built yet).
-  void _openItem(ShownItem item) {}
+  /// Opens [item] to edit or remove it (Figma "12 Opened item" 38:2519).
+  void _openItem(ShownItem item) {
+    final me = _me;
+    if (me == null) return;
+    final l10n = AppLocalizations.of(context);
+    unawaited(
+      showCesFormSheet(
+        context,
+        title: l10n.itemEditTitle,
+        closeTooltip: l10n.sheetClose,
+        sectionGap: 18,
+        child: ItemForm(
+          submitLabel: l10n.itemSave,
+          initial: (name: item.name, quantity: item.quantity, unit: item.unit, note: item.note),
+          details: [
+            item.addedById == me.id ? l10n.itemAddedByYou : l10n.itemAddedBy(item.addedByName),
+            if (item.checked)
+              item.checkedById == me.id ? l10n.itemCheckedByYou : l10n.itemCheckedBy(item.checkedByName ?? ''),
+          ],
+          onSubmit: (draft) => unawaited(
+            widget.items.update(
+              item,
+              by: me,
+              name: draft.name,
+              quantity: draft.quantity,
+              unit: draft.unit,
+              note: draft.note,
+            ),
+          ),
+          onRemove: () => unawaited(_remove(item, me)),
+        ),
+      ),
+    );
+  }
+
+  /// Removes [item], with Undo (Figma "12b Item removed" 38:2667).
+  Future<void> _remove(ShownItem item, Actor me) async {
+    await widget.items.remove(itemId: item.id, listId: item.listId, by: me);
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    showCesToast(
+      context,
+      message: l10n.itemRemoved(item.name),
+      actionLabel: l10n.itemUndo,
+      onAction: () => unawaited(widget.items.restore(item, by: me)),
+    );
+  }
+
+  /// Opens Add items, unless the List is already full (Figma "14 Item limit").
+  void _addItems() {
+    if (_shown.length >= maxItemsPerList) {
+      unawaited(showItemLimitSheet(context));
+      return;
+    }
+    unawaited(context.push(Routes.addItems(widget.listId)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,12 +166,6 @@ class _ListScreenState extends State<ListScreen> {
                         children: [
                           CesBackButton(onPressed: () => context.pop()),
                           const Spacer(),
-                          // Placeholder until the offline/pending indicator is designed (#7 design gap).
-                          if (_pending > 0)
-                            Tooltip(
-                              message: l10n.listSyncPending,
-                              child: Icon(CesIcons.offline, size: 20, color: scheme.onSurfaceVariant),
-                            ),
                         ],
                       ),
                     ),
@@ -133,7 +191,9 @@ class _ListScreenState extends State<ListScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    l10n.listToBuyInBasket(toBuy.length, inBasket.length),
+                                    _shown.isEmpty
+                                        ? l10n.listNothingToBuyYet
+                                        : l10n.listToBuyInBasket(toBuy.length, inBasket.length),
                                     style: TextStyle(
                                       fontFamily: CestaFonts.family,
                                       fontWeight: FontWeight.w500,
@@ -141,10 +201,28 @@ class _ListScreenState extends State<ListScreen> {
                                       color: scheme.onSurfaceVariant,
                                     ),
                                   ),
+                                  // Figma "13 List offline" 38:3843: only while offline.
+                                  ValueListenableBuilder(
+                                    valueListenable: widget.sync.offline,
+                                    builder: (context, offline, _) => offline
+                                        ? Padding(
+                                            padding: const EdgeInsets.only(top: 10),
+                                            child: CesStatusPill(label: l10n.listOffline(_pending)),
+                                          )
+                                        : const SizedBox.shrink(),
+                                  ),
                                 ],
                               ),
                             ),
                           ),
+                          // Figma "15 Empty list" 39:3859.
+                          if (_loaded && _shown.isEmpty)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(40, 96, 40, 0),
+                                child: CesEmptyListState(title: l10n.listEmptyTitle, body: l10n.listEmptyBody),
+                              ),
+                            ),
                           // To buy (Figma 4:169): tags in insertion order.
                           SliverPadding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -187,6 +265,7 @@ class _ListScreenState extends State<ListScreen> {
                                             : item.checkedByName ?? '',
                                         semanticHint: l10n.itemUncheck,
                                         onTap: () => _setChecked(item, false),
+                                        onLongPress: () => _openItem(item),
                                       ),
                                     ),
                                 ],
@@ -204,10 +283,7 @@ class _ListScreenState extends State<ListScreen> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: CesAddBar(
-                label: l10n.listAddAnItem,
-                onTap: () => unawaited(context.push(Routes.addItems(widget.listId))),
-              ),
+              child: CesAddBar(label: l10n.listAddAnItem, onTap: _addItems),
             ),
           ],
         ),

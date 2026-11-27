@@ -65,15 +65,12 @@ void main() {
     expect(h.tagNames(), ['Tomatoes']);
     expect(find.text('2 kg'), findsOneWidget);
     expect(h.basketRows(), [('Coffee', 'You')]);
-    expect(h.showsPending, isTrue);
+    expect(h.offlinePill, 'Offline · 2 changes waiting to sync');
     expect(h.api.itemsToBuy(list), ['Coffee']);
 
-    h.api.goOnline();
-    h.auth.offline = false;
-    await tester.pump(const Duration(minutes: 1)); // the next retry
-    await tester.pumpAndSettle();
+    await h.goOnline();
 
-    expect(h.showsPending, isFalse);
+    expect(h.offlinePill, isNull);
     expect(h.api.itemsToBuy(list), ['Tomatoes']);
     expect(h.api.itemsInBasket(list), ['Coffee']);
     expect(h.api.serverItem('Tomatoes').quantity?.value, '2');
@@ -111,8 +108,8 @@ void main() {
 
     expect(h.tagNames(), ['Coffee']);
     expect(h.basketRows(), isEmpty);
-    expect(find.text('Your change to “Coffee” couldn\'t be saved, so it was undone.'), findsOneWidget);
-    expect(h.showsPending, isFalse);
+    expect(find.text('Couldn’t save “Coffee”. The list is no longer available.'), findsOneWidget);
+    expect(h.offlinePill, isNull);
   });
 
   testWidgets('pulling down shows changes made on another phone', (tester) async {
@@ -129,6 +126,102 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(h.basketRows(), [('Coffee', 'Rui')]);
+  });
+
+  testWidgets('long-pressing a tag opens the Item; Save sends the edits and clears emptied fields', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Tomatoes', addedBy: ana, quantity: '1', unit: ItemUnit.kg, note: 'Ripe ones');
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await h.openItem('Tomatoes');
+
+    expect(find.text('Edit item'), findsOneWidget);
+    expect(h.textInField('Name'), 'Tomatoes');
+    expect(h.quantityText, '1');
+    expect(h.selectedUnit, 'kg');
+    expect(h.noteText, 'Ripe ones');
+    expect(find.text('Added by you'), findsOneWidget);
+    expect(find.textContaining('Checked by'), findsNothing);
+
+    await tester.enterText(field('Name'), 'Cherry tomatoes');
+    await h.tap(find.bySemanticsLabel('Less')); // 1 → no quantity
+    await h.tap(find.widgetWithText(CesChoiceChip, 'kg')); // unselect
+    await tester.enterText(h.noteField, '');
+    await h.tap(find.widgetWithText(CesButton, 'Save'));
+
+    expect(find.text('Edit item'), findsNothing);
+    expect(h.tagNames(), ['Cherry tomatoes']);
+    final saved = h.api.serverItem('Cherry tomatoes');
+    expect(saved.quantity?.value, isNull);
+    expect(saved.unit?.value, isNull);
+    expect(saved.note?.value, isNull);
+  });
+
+  testWidgets('long-pressing a basket row opens the Item, saying who added and who checked it', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final rui = h.existingUser(email: 'rui@example.com', password: 'x', displayName: 'Rui');
+    final list = h.api.addList(ana, name: 'Weekend feira', sharedWith: [rui]);
+    h.api.addItem(list, name: 'Milk', addedBy: rui, checkedBy: rui);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await tester.longPress(find.widgetWithText(CesCheckedItem, 'Milk'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit item'), findsOneWidget);
+    expect(find.text('Added by Rui'), findsOneWidget);
+    expect(find.text('Checked by Rui'), findsOneWidget);
+
+    await h.tap(find.widgetWithText(CesButton, 'Save')); // nothing changed: nothing to send
+    expect(h.api.itemsInBasket(list), ['Milk']);
+  });
+
+  testWidgets('Remove item takes it off the List, and Undo brings it back', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Tomatoes', addedBy: ana, quantity: '1', unit: ItemUnit.kg);
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await h.openItem('Tomatoes');
+    await h.tap(find.text('Remove item'));
+
+    expect(h.tagNames(), ['Coffee']);
+    expect(find.text('Tomatoes removed'), findsOneWidget);
+    expect(h.api.itemsToBuy(list), ['Coffee']);
+
+    await h.tap(find.text('Undo'));
+
+    expect(h.tagNames(), containsAll(['Tomatoes', 'Coffee']));
+    expect(h.api.itemsToBuy(list), containsAll(['Tomatoes', 'Coffee']));
+    expect(h.api.serverItem('Tomatoes').quantity?.value, '1');
+    expect(h.api.serverItem('Tomatoes').unit?.value, ItemUnit.kg);
+  });
+
+  testWidgets('offline, Undo of a removal just drops the waiting change', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Tomatoes', addedBy: ana);
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    h.goOffline();
+
+    await h.openItem('Tomatoes');
+    await h.tap(find.text('Remove item'));
+    await h.tap(find.text('Undo'));
+
+    expect(h.tagNames(), ['Tomatoes', 'Coffee']);
+    expect(h.offlinePill, 'Offline');
+    await h.goOnline();
+    expect(h.api.itemsToBuy(list), ['Tomatoes', 'Coffee']);
   });
 
   testWidgets('the List, Add items and New item read in Portuguese', (tester) async {

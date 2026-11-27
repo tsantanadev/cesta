@@ -58,34 +58,33 @@ final class ShownItem {
     required String byId,
     required String byName,
     required bool pending,
-  }) =>
-      ShownItem(
-        id: id,
-        listId: listId,
-        name: fields.name ?? name,
-        addedAt: addedAt,
-        addedById: addedById,
-        addedByName: addedByName,
-        quantity: fields.quantity == null ? quantity : fields.quantity!.value,
-        unit: fields.unit == null ? unit : _unit(fields.unit!.value),
-        note: fields.note == null ? note : fields.note!.value,
-        checkedAt: switch (fields.checked) {
-          true => at,
-          false => null,
-          null => checkedAt,
-        },
-        checkedById: switch (fields.checked) {
-          true => byId,
-          false => null,
-          null => checkedById,
-        },
-        checkedByName: switch (fields.checked) {
-          true => byName,
-          false => null,
-          null => checkedByName,
-        },
-        pending: pending,
-      );
+  }) => ShownItem(
+    id: id,
+    listId: listId,
+    name: fields.name ?? name,
+    addedAt: addedAt,
+    addedById: addedById,
+    addedByName: addedByName,
+    quantity: fields.quantity == null ? quantity : fields.quantity!.value,
+    unit: fields.unit == null ? unit : _unit(fields.unit!.value),
+    note: fields.note == null ? note : fields.note!.value,
+    checkedAt: switch (fields.checked) {
+      true => at,
+      false => null,
+      null => checkedAt,
+    },
+    checkedById: switch (fields.checked) {
+      true => byId,
+      false => null,
+      null => checkedById,
+    },
+    checkedByName: switch (fields.checked) {
+      true => byName,
+      false => null,
+      null => checkedByName,
+    },
+    pending: pending,
+  );
 }
 
 ItemUnit? _unit(ItemFieldsUnit? u) => u == null ? null : ItemUnit.fromJson(u.toJson());
@@ -151,9 +150,9 @@ class ItemsStore {
       by: by,
       fields: ItemFields(
         name: name.trim(),
-        quantity: (value: quantity),
-        unit: (value: unit == null ? null : ItemFieldsUnit.fromJson(unit.toJson())),
-        note: (value: _note(note)),
+        quantity: quantity == null ? null : (value: quantity),
+        unit: unit == null ? null : (value: ItemFieldsUnit.fromJson(unit.toJson())),
+        note: _note(note) == null ? null : (value: _note(note)),
       ),
     );
     return id;
@@ -195,6 +194,39 @@ class ItemsStore {
   /// Removes Item [itemId] from List [listId].
   Future<void> remove({required String itemId, required String listId, required Actor by}) =>
       _enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
+
+  /// Undoes the removal of [item]: drops the removal while it is still
+  /// waiting to sync, or else adds the Item again as it was (the server keeps
+  /// removed Items removed, so it comes back as a new Item).
+  Future<void> restore(ShownItem item, {required Actor by}) async {
+    final dropped =
+        await (_db.delete(_db.outbox)..where(
+              (t) =>
+                  t.itemId.equals(item.id) & t.type.equals(MutationType.itemDelete.toJson()) & t.applied.equals(false),
+            ))
+            .go();
+    if (dropped > 0) {
+      _changes.add(null);
+      return;
+    }
+    final id = await add(
+      listId: item.listId,
+      by: by,
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+      note: item.note,
+    );
+    if (item.checked) {
+      await _enqueue(
+        MutationType.itemUpdate,
+        itemId: id,
+        listId: item.listId,
+        by: by,
+        fields: const ItemFields(checked: true),
+      );
+    }
+  }
 
   Future<void> _enqueue(
     MutationType type, {

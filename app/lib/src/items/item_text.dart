@@ -52,3 +52,6 @@ String? parseQuantity(String text) {
   if (num.parse(result) <= 0) throw FormatException('Not above zero', text);
   return result;
 }
+
+/// The most Items a List can hold (the server's limit).
+const maxItemsPerList = 500;

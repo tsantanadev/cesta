@@ -7,11 +7,19 @@ import 'tokens.dart';
 /// A Checked Item In the basket (Figma "Checked item" 3:47): a filled check,
 /// the [name] crossed out and who [checkedBy] it. Tapping it runs [onTap].
 class CesCheckedItem extends StatelessWidget {
-  const CesCheckedItem({super.key, required this.name, required this.checkedBy, this.onTap, this.semanticHint});
+  const CesCheckedItem({
+    super.key,
+    required this.name,
+    required this.checkedBy,
+    this.onTap,
+    this.onLongPress,
+    this.semanticHint,
+  });
 
   final String name;
   final String checkedBy;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final String? semanticHint;
 
   @override
@@ -23,6 +31,7 @@ class CesCheckedItem extends StatelessWidget {
       hint: semanticHint,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(CestaRadii.field),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
@@ -474,6 +483,47 @@ class CesSoftField extends StatelessWidget {
         border: border,
         enabledBorder: border,
         focusedBorder: border,
+      ),
+    );
+  }
+}
+
+/// A status pill under a List's title (Figma "Offline pill" 38:3844): a
+/// muted dot and a [label] on Branco.
+class CesStatusPill extends StatelessWidget {
+  const CesStatusPill({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: ShapeDecoration(color: scheme.surfaceContainerLow, shape: const StadiumBorder()),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 7, 14, 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: scheme.onSurfaceVariant, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontFamily: CestaFonts.family,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

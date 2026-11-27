@@ -350,6 +350,7 @@ class FakeApiClient implements ApiClient {
     required FakeIdentity addedBy,
     String? quantity,
     ItemUnit? unit,
+    String? note,
     FakeIdentity? checkedBy,
   }) {
     final id = '00000000-0000-4000-9000-${(_nextItemId++).toString().padLeft(12, '0')}';
@@ -360,6 +361,7 @@ class FakeApiClient implements ApiClient {
       name: name,
       quantity: quantity,
       unit: unit?.toJson(),
+      note: note,
       addedByUid: addedBy.uid,
       addedAt: now.add(Duration(milliseconds: _nextItemId)),
       checkedByUid: checkedBy?.uid,

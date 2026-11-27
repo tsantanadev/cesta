@@ -209,7 +209,20 @@ class CesItemTile extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.semanticHint,
-  });
+  }) : _blank = false;
+
+  /// An empty white tag (Figma "Item tile" State=Suggestion 3:39, as the empty
+  /// List shows it): Branco with a Checked outline and hole.
+  const CesItemTile.blank({super.key, this.size = 112})
+    : name = '',
+      icon = null,
+      quantity = null,
+      onTap = null,
+      onLongPress = null,
+      semanticHint = null,
+      _blank = true;
+
+  final bool _blank;
 
   final String name;
   final IconData? icon;
@@ -292,9 +305,11 @@ class CesItemTile extends StatelessWidget {
           );
     final radius = BorderRadius.circular(CestaRadii.sign);
     final interactive = onTap != null || onLongPress != null;
+    final scheme = Theme.of(context).colorScheme;
+    final outline = BorderSide(color: palette.bought, width: 1.5);
     Widget tile = Material(
-      color: palette.toBuy,
-      borderRadius: radius,
+      color: _blank ? scheme.surfaceContainerLow : palette.toBuy,
+      shape: RoundedRectangleBorder(borderRadius: radius, side: _blank ? outline : BorderSide.none),
       child: InkWell(
         borderRadius: radius,
         onTap: onTap,
@@ -331,7 +346,9 @@ class CesItemTile extends StatelessWidget {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, shape: BoxShape.circle),
+                  decoration: _blank
+                      ? BoxDecoration(border: Border.fromBorderSide(outline), shape: BoxShape.circle)
+                      : BoxDecoration(color: scheme.surface, shape: BoxShape.circle),
                 ),
               ),
             ),
@@ -480,4 +497,54 @@ class CesItemPreview extends StatelessWidget {
       ),
     ],
   );
+}
+
+/// A List with no Items (Figma "15 Empty list" 39:3859): an empty tag on its
+/// string, a [title] and a [body], centred.
+class CesEmptyListState extends StatelessWidget {
+  const CesEmptyListState({super.key, required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _HangingTiles(
+          canvas: Size(350, 138),
+          tiles: [_HangingTile(left: 119, top: 22, degrees: 3, tile: CesItemTile.blank())],
+        ),
+        const SizedBox(height: 12),
+        Semantics(
+          header: true,
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: CestaFonts.display,
+              fontWeight: FontWeight.w800,
+              fontSize: 24,
+              letterSpacing: -0.48,
+              color: scheme.onSurface,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          body,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: CestaFonts.family,
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
+            height: 1.4,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
 }

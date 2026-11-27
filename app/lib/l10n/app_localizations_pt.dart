@@ -352,9 +352,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get listCheckedByYou => 'Você';
 
   @override
-  String get listSyncPending => 'Aguardando sincronização';
-
-  @override
   String get itemCheck => 'Marcar como comprado';
 
   @override
@@ -435,7 +432,76 @@ class AppLocalizationsPt extends AppLocalizations {
   String get errorItemQuantityInvalid => 'Use um número maior que zero, como 2 ou 1,5.';
 
   @override
-  String errorItemRejected(String name) {
-    return 'Não foi possível salvar a mudança em “$name”, então ela foi desfeita.';
+  String listOffline(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Sem conexão · $count alterações aguardando sincronização',
+      one: 'Sem conexão · 1 alteração aguardando sincronização',
+      zero: 'Sem conexão',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get listNothingToBuyYet => 'Nada para comprar ainda';
+
+  @override
+  String get listEmptyTitle => 'Comece sua lista';
+
+  @override
+  String get listEmptyBody => 'Adicione o que você precisa. Todos nesta lista veem na hora.';
+
+  @override
+  String get itemEditTitle => 'Editar item';
+
+  @override
+  String get itemSave => 'Salvar';
+
+  @override
+  String itemAddedBy(String name) {
+    return 'Adicionado por $name';
+  }
+
+  @override
+  String get itemAddedByYou => 'Adicionado por você';
+
+  @override
+  String itemCheckedBy(String name) {
+    return 'Marcado por $name';
+  }
+
+  @override
+  String get itemCheckedByYou => 'Marcado por você';
+
+  @override
+  String get itemRemove => 'Remover item';
+
+  @override
+  String itemRemoved(String item) {
+    return '$item removido';
+  }
+
+  @override
+  String itemRejectedRemoved(String name) {
+    return 'Não foi possível salvar “$name”. Ele foi removido.';
+  }
+
+  @override
+  String itemRejectedListGone(String name) {
+    return 'Não foi possível salvar “$name”. A lista não está mais disponível.';
+  }
+
+  @override
+  String itemRejected(String name) {
+    return 'Não foi possível salvar “$name”.';
+  }
+
+  @override
+  String get itemLimitTitle => 'Esta lista está cheia';
+
+  @override
+  String itemLimitBody(int max) {
+    return 'Uma lista pode ter até $max itens. Limpe os itens marcados ou remova os que você não precisa mais para abrir espaço.';
   }
 }

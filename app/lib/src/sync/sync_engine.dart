@@ -2,12 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
-import 'package:material_ui/material_ui.dart' show AppLifecycleListener;
+import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:material_ui/material_ui.dart' show AppLifecycleListener, ValueNotifier;
 
 import '../api/generated/cesta_api.dart';
+import '../api/network.dart';
 import '../db/app_database.dart';
 import '../items/items_store.dart';
+import 'network_status.dart';
 
 /// A change made on this device that the server refused. It has already been
 /// rolled back locally when this is reported.
@@ -27,15 +31,16 @@ final class RejectedChange {
 /// Brings the device and the server in step (ADR-0001): pushes the outbox,
 /// then pulls what changed since the last cursor.
 ///
-/// Once [start]ed it syncs straight away, when the app resumes, after each
-/// local change and whenever [sync] is called (e.g. pull-to-refresh). When the
-/// server can't be reached it retries with exponential backoff, which is also
-/// how it notices the connection coming back.
+/// Once [start]ed it syncs straight away, when the app resumes, when the
+/// phone's connection comes back, after each local change and whenever [sync]
+/// is called (e.g. pull-to-refresh). When the server can't be reached it also
+/// retries with exponential backoff.
 class SyncEngine {
   SyncEngine({
     required this._api,
     required this._db,
     required this._items,
+    required this._network,
     this.firstRetry = const Duration(seconds: 1),
     this.maxRetry = const Duration(seconds: 60),
   });
@@ -43,6 +48,7 @@ class SyncEngine {
   final ApiClient _api;
   final AppDatabase _db;
   final ItemsStore _items;
+  final NetworkStatus _network;
 
   /// Backoff bounds between failed attempts.
   final Duration firstRetry;
@@ -56,12 +62,19 @@ class SyncEngine {
   /// Changes the server refused, after they were rolled back.
   Stream<RejectedChange> get rejections => _rejections.stream;
 
+  final _offline = ValueNotifier(false);
+
+  /// True while the phone has no connection or the server can't be reached;
+  /// false again once a sync gets through.
+  ValueListenable<bool> get offline => _offline;
+
   bool _started = false;
   bool _again = false;
   int _failures = 0;
   Future<void>? _current;
   Timer? _retry;
   StreamSubscription<void>? _localChanges;
+  StreamSubscription<bool>? _networkChanges;
   AppLifecycleListener? _lifecycle;
 
   /// Starts syncing for the signed-in User. Safe to call more than once.
@@ -70,6 +83,20 @@ class SyncEngine {
     _started = true;
     _localChanges = _items.changes.listen((_) => unawaited(sync()));
     _lifecycle = AppLifecycleListener(onResume: () => unawaited(sync()));
+    _networkChanges = _network.changes.listen(_networkChanged);
+    unawaited(_network.isConnected().then((connected) => connected ? null : _offline.value = true));
+    unawaited(sync());
+  }
+
+  void _networkChanged(bool connected) {
+    if (!connected) {
+      _offline.value = true;
+      return;
+    }
+    // Back online: sync now rather than at the next backoff retry.
+    _failures = 0;
+    _retry?.cancel();
+    _retry = null;
     unawaited(sync());
   }
 
@@ -81,6 +108,8 @@ class SyncEngine {
     _failures = 0;
     _lifecycle?.dispose();
     _lifecycle = null;
+    await _networkChanges?.cancel();
+    _networkChanges = null;
     await _localChanges?.cancel();
     _localChanges = null;
     await _current;
@@ -117,7 +146,11 @@ class SyncEngine {
     try {
       await _push();
       await _pull();
+      _offline.value = false;
       return true;
+    } on DioException catch (e) {
+      if (isOffline(e)) _offline.value = true;
+      return false;
     } catch (_) {
       // Offline, a timeout, 401/429, or an unexpected answer: try again later.
       return false;
@@ -249,6 +282,7 @@ class SyncEngine {
   Future<void> dispose() async {
     await stop();
     await _rejections.close();
+    _offline.dispose();
   }
 }
 
