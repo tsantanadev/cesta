@@ -12,6 +12,7 @@ import '../api/network.dart';
 import '../db/app_database.dart';
 import '../items/items_store.dart';
 import 'network_status.dart';
+import 'outbox.dart';
 
 /// A change made on this device that the server refused. It has already been
 /// rolled back locally when this is reported.
@@ -40,6 +41,7 @@ class SyncEngine {
     required this._api,
     required this._db,
     required this._items,
+    required this._outbox,
     required this._network,
     this.firstRetry = const Duration(seconds: 1),
     this.maxRetry = const Duration(seconds: 60),
@@ -48,6 +50,7 @@ class SyncEngine {
   final ApiClient _api;
   final AppDatabase _db;
   final ItemsStore _items;
+  final ChangeOutbox _outbox;
   final NetworkStatus _network;
 
   /// Backoff bounds between failed attempts.
@@ -85,7 +88,7 @@ class SyncEngine {
   void start() {
     if (_started) return;
     _started = true;
-    _localChanges = _items.changes.listen((_) => unawaited(sync()));
+    _localChanges = _outbox.changes.listen((_) => unawaited(sync()));
     _lifecycle = AppLifecycleListener(onResume: () => unawaited(sync()));
     _networkChanges = _network.changes.listen(_networkChanged);
     unawaited(_network.isConnected().then((connected) => connected ? null : _offline.value = true));
@@ -184,12 +187,7 @@ class SyncEngine {
     bool stopped() => generation != _generation;
     var size = pushBatch;
     while (!stopped()) {
-      final batch =
-          await (_db.select(_db.outbox)
-                ..where((t) => t.applied.equals(false))
-                ..orderBy([(t) => OrderingTerm.asc(t.seq)])
-                ..limit(size))
-              .get();
+      final batch = await _outbox.unpushed(size);
       if (batch.isEmpty) return;
       final answer = await _send(batch);
       if (stopped()) return;
@@ -207,9 +205,7 @@ class SyncEngine {
           }
           await _rollBack(row, answer.refusal);
         } else if (r.status == MutationResultStatus.applied) {
-          await (_db.update(
-            _db.outbox,
-          )..where((t) => t.seq.equals(row.seq))).write(const OutboxCompanion(applied: Value(true)));
+          await _outbox.markApplied(row);
           continue;
         } else {
           await _rollBack(row, r.reason?.code);
@@ -258,14 +254,10 @@ class SyncEngine {
         shown.where((i) => i.id == row.itemId).firstOrNull?.name ??
         ItemFields.fromJson(jsonDecode(row.fields) as Map<String, Object?>).name ??
         '';
-    final type = MutationType.fromJson(row.type);
-    await (_db.delete(_db.outbox)..where(
-          (t) => type == MutationType.itemCreate
-              ? t.itemId.equals(row.itemId) & t.applied.equals(false)
-              : t.seq.equals(row.seq),
-        ))
-        .go();
-    _rejections.add(RejectedChange(type: type, itemName: name, listId: row.listId, reason: reason));
+    await _outbox.rollBack(row);
+    _rejections.add(
+      RejectedChange(type: MutationType.fromJson(row.type), itemName: name, listId: row.listId, reason: reason),
+    );
   }
 
   Future<void> _pull(int generation) async {
@@ -289,7 +281,7 @@ class SyncEngine {
               await (_db.delete(_db.syncedItems)..where((r) => r.id.equals(t.id))).go();
             case TombstoneType.list:
               await (_db.delete(_db.syncedItems)..where((r) => r.listId.equals(t.id))).go();
-              await (_db.delete(_db.outbox)..where((r) => r.listId.equals(t.id))).go();
+              await _outbox.dropList(t.id);
               await _db.forgetKnownList(t.id);
           }
         }
@@ -298,7 +290,7 @@ class SyncEngine {
             .insertOnConflictUpdate(SyncCursorCompanion.insert(id: const Value(1), cursor: page.cursor));
         // The pull now reflects every change the server applied, so their
         // overlays can go without the display flickering back.
-        if (!page.hasMore) await (_db.delete(_db.outbox)..where((t) => t.applied.equals(true))).go();
+        if (!page.hasMore) await _outbox.dropApplied();
       });
       cursor = page.cursor;
       if (!page.hasMore) return;

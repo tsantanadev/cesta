@@ -13,6 +13,7 @@ import 'lists/lists_controller.dart';
 import 'router.dart';
 import 'session/session_controller.dart';
 import 'sync/network_status.dart';
+import 'sync/outbox.dart';
 import 'sync/sync_engine.dart';
 import 'ui/components.dart';
 import 'ui/theme.dart';
@@ -50,6 +51,7 @@ class CestaApp extends StatefulWidget {
 class _CestaAppState extends State<CestaApp> {
   late final SessionController _session;
   late final ListsController _lists;
+  late final ChangeOutbox _outbox;
   late final ItemsStore _items;
   late final SyncEngine _sync;
   late final GoRouter _router;
@@ -61,8 +63,9 @@ class _CestaAppState extends State<CestaApp> {
     super.initState();
     _session = SessionController(auth: widget.auth, api: widget.api, db: widget.database)..start();
     _lists = ListsController(api: widget.api, db: widget.database, session: _session);
-    _items = ItemsStore(widget.database);
-    _sync = SyncEngine(api: widget.api, db: widget.database, items: _items, network: widget.network);
+    _outbox = ChangeOutbox(widget.database);
+    _items = ItemsStore(widget.database, _outbox);
+    _sync = SyncEngine(api: widget.api, db: widget.database, items: _items, outbox: _outbox, network: widget.network);
     _session.addListener(_followSession);
     _rejections = _sync.rejections.listen(_tellRejected);
     _router = buildRouter(
@@ -115,7 +118,7 @@ class _CestaAppState extends State<CestaApp> {
     unawaited(_rejections.cancel());
     _session.removeListener(_followSession);
     unawaited(_sync.dispose());
-    _items.dispose();
+    _outbox.dispose();
     _router.dispose();
     _lists.dispose();
     _session.dispose();

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
@@ -6,6 +5,9 @@ import 'package:uuid/uuid.dart';
 
 import '../api/generated/cesta_api.dart';
 import '../db/app_database.dart';
+import '../sync/outbox.dart';
+
+export '../sync/outbox.dart' show Actor;
 
 /// An Item as the app shows it: what the server last reported, with the
 /// device's changes not yet confirmed applied on top.
@@ -89,23 +91,16 @@ final class ShownItem {
 
 ItemUnit? _unit(ItemFieldsUnit? u) => u == null ? null : ItemUnit.fromJson(u.toJson());
 
-/// The signed-in User making a change, recorded with it so the change shows
-/// who made it before the server confirms it.
-typedef Actor = ({String id, String displayName});
-
-/// The device's Items (the display's source of truth) and the outbox of
-/// changes to them (ADR-0001).
+/// The device's Items (the display's source of truth) with the outbox of
+/// changes to them on top (ADR-0001).
 ///
-/// Changes are written to the outbox and show at once; [changes] fires after
-/// each so the sync engine can push it.
+/// Changes go into the [ChangeOutbox] and show at once; the sync engine
+/// pushes them from there.
 class ItemsStore {
-  ItemsStore(this._db);
+  ItemsStore(this._db, this._outbox);
 
   final AppDatabase _db;
-  final _changes = StreamController<void>.broadcast();
-
-  /// Fires after every local change.
-  Stream<void> get changes => _changes.stream;
+  final ChangeOutbox _outbox;
 
   static const _uuid = Uuid();
 
@@ -144,7 +139,7 @@ class ItemsStore {
     String? note,
   }) async {
     final id = _uuid.v4();
-    await _enqueue(
+    await _outbox.enqueue(
       MutationType.itemCreate,
       itemId: id,
       listId: listId,
@@ -178,13 +173,13 @@ class ItemsStore {
       note: cleanNote == item.note ? null : (value: cleanNote),
     );
     if (fields.toJson().isEmpty) return Future.value();
-    return _enqueue(MutationType.itemUpdate, itemId: item.id, listId: item.listId, by: by, fields: fields);
+    return _outbox.enqueue(MutationType.itemUpdate, itemId: item.id, listId: item.listId, by: by, fields: fields);
   }
 
   static String? _note(String? note) => (note?.trim().isEmpty ?? true) ? null : note!.trim();
 
   /// Checks [item] (puts it In the basket), or unchecks it when [checked] is false.
-  Future<void> setChecked(ShownItem item, {required bool checked, required Actor by}) => _enqueue(
+  Future<void> setChecked(ShownItem item, {required bool checked, required Actor by}) => _outbox.enqueue(
     MutationType.itemUpdate,
     itemId: item.id,
     listId: item.listId,
@@ -194,22 +189,13 @@ class ItemsStore {
 
   /// Removes Item [itemId] from List [listId].
   Future<void> remove({required String itemId, required String listId, required Actor by}) =>
-      _enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
+      _outbox.enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
 
   /// Undoes the removal of [item]: drops the removal while it is still
   /// waiting to sync, or else adds the Item again as it was (the server keeps
   /// removed Items removed, so it comes back as a new Item).
   Future<void> restore(ShownItem item, {required Actor by}) async {
-    final dropped =
-        await (_db.delete(_db.outbox)..where(
-              (t) =>
-                  t.itemId.equals(item.id) & t.type.equals(MutationType.itemDelete.toJson()) & t.applied.equals(false),
-            ))
-            .go();
-    if (dropped > 0) {
-      _changes.add(null);
-      return;
-    }
+    if (await _outbox.dropPendingRemoval(item.id)) return;
     final id = await add(
       listId: item.listId,
       by: by,
@@ -219,7 +205,7 @@ class ItemsStore {
       note: item.note,
     );
     if (item.checked) {
-      await _enqueue(
+      await _outbox.enqueue(
         MutationType.itemUpdate,
         itemId: id,
         listId: item.listId,
@@ -228,32 +214,6 @@ class ItemsStore {
       );
     }
   }
-
-  Future<void> _enqueue(
-    MutationType type, {
-    required String itemId,
-    required String listId,
-    required Actor by,
-    required ItemFields fields,
-  }) async {
-    await _db
-        .into(_db.outbox)
-        .insert(
-          OutboxCompanion.insert(
-            mutationId: _uuid.v4(),
-            type: type.toJson(),
-            itemId: itemId,
-            listId: listId,
-            fields: jsonEncode(fields.toJson()),
-            clientTimestampMicros: DateTime.now().toUtc().microsecondsSinceEpoch,
-            byId: by.id,
-            byName: by.displayName,
-          ),
-        );
-    _changes.add(null);
-  }
-
-  void dispose() => unawaited(_changes.close());
 }
 
 /// [synced] Items with the [pending] outbox changes (oldest first) applied on top.
