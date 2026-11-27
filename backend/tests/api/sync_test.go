@@ -383,6 +383,94 @@ func TestTheFiveHundredAndFirstItemIsRejected(t *testing.T) {
 	}
 }
 
+func TestCheckingAnItemRecordsWhoCheckedItAndWhen(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.AddEditor(t, groceriesID, testkit.Bruno)
+	bruno.Patch(t, "/api/me", `{"displayName": "Bruno"}`).RequireStatus(t, http.StatusOK)
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+	srv.Clock.Advance(time.Hour)
+
+	pushOK(t, bruno, updateItem(milkID, `{"checked": true}`))
+
+	got := findItem(t, pullAll(t, ana, ""), milkID)
+	if got.CheckedAt == nil || !got.CheckedAt.Equal(srv.Clock.Now()) || got.CheckedBy == nil ||
+		got.CheckedBy.DisplayName != "Bruno" || !got.UpdatedAt.Equal(srv.Clock.Now()) ||
+		got.AddedBy.DisplayName != "Ana Souza" {
+		t.Fatalf("checked Item = %+v (checkedBy %+v), want checked by Bruno now", got, got.CheckedBy)
+	}
+
+	pushOK(t, ana, updateItem(milkID, `{"checked": false}`))
+
+	if got := findItem(t, pullAll(t, ana, ""), milkID); got.CheckedAt != nil || got.CheckedBy != nil {
+		t.Fatalf("unchecked Item = %+v, want not checked", got)
+	}
+}
+
+func TestSendingNullClearsAnOptionalField(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk", "quantity": "2", "unit": "L", "note": "cold"}`))
+
+	pushOK(t, ana, updateItem(milkID, `{"quantity": null, "unit": null}`))
+
+	got := findItem(t, pullAll(t, ana, ""), milkID)
+	if got.Quantity != nil || got.Unit != nil || got.Note == nil || *got.Note != "cold" || got.Name != "Milk" {
+		t.Fatalf("Item = %+v, want quantity and unit cleared, the rest kept", got)
+	}
+}
+
+func TestInvalidItemFieldsAreRejected(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+	invalid := map[string]string{
+		"blank name":        `{"name": "  "}`,
+		"long name":         `{"name": "` + strings.Repeat("é", 81) + `"}`,
+		"zero quantity":     `{"quantity": "0"}`,
+		"negative quantity": `{"quantity": "-1"}`,
+		"too many decimals": `{"quantity": "1.2345"}`,
+		"unknown unit":      `{"unit": "dozen"}`,
+		"long note":         `{"note": "` + strings.Repeat("a", 201) + `"}`,
+		"control char note": `{"note": "a\u0007"}`,
+		"name cannot clear": `{"name": ""}`,
+	}
+
+	for label, fields := range invalid {
+		t.Run(label, func(t *testing.T) {
+			res := push(t, ana, updateItem(milkID, fields), createItem(groceriesID, uuid.NewString(), fields))
+			requireRejected(t, res[0], "invalid_item")
+			requireRejected(t, res[1], "invalid_item")
+		})
+	}
+	requireRejected(t, push(t, ana, createItem(groceriesID, uuid.NewString(), `{"quantity": "1"}`))[0], "invalid_item")
+	if p := pullAll(t, ana, ""); len(p.Items) != 1 || p.Items[0].Name != "Milk" || p.Items[0].Quantity != nil {
+		t.Fatalf("Items = %+v, want Milk unchanged", p.Items)
+	}
+}
+
+func TestListsCountTheirItemsToBuy(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	pushOK(t, ana,
+		createItem(groceriesID, milkID, `{"name": "Milk"}`),
+		createItem(groceriesID, breadID, `{"name": "Bread"}`),
+		createItem(groceriesID, uuid.NewString(), `{"name": "Eggs", "checked": true}`),
+		updateItem(breadID, `{"checked": true}`))
+	removed := uuid.NewString()
+	pushOK(t, ana, createItem(groceriesID, removed, `{"name": "Jam"}`), deleteItem(removed))
+
+	lists := myLists(t, ana)
+
+	if len(lists) != 1 || lists[0].UncheckedItemCount != 1 {
+		t.Fatalf("Lists = %+v, want Groceries with 1 Item to buy", lists)
+	}
+}
+
 func TestAUserWhoJoinsAListPullsAllItsItemsSinceTheirCursor(t *testing.T) {
 	srv := testkit.NewServer(t)
 	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)

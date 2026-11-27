@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	"github.com/tsantanadev/cesta/backend/internal/lists"
 )
 
@@ -18,9 +20,17 @@ func (s *Server) ListLists(ctx context.Context, _ ListListsRequestObject) (ListL
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]uuid.UUID, 0, len(mine))
+	for _, l := range mine {
+		ids = append(ids, l.ID)
+	}
+	counts, err := s.Sync.UncheckedCounts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	out := ListLists200JSONResponse{Lists: make([]ListSummary, 0, len(mine))}
 	for _, l := range mine {
-		out.Lists = append(out.Lists, apiListSummary(l))
+		out.Lists = append(out.Lists, apiListSummary(l, counts[l.ID]))
 	}
 	return out, nil
 }
@@ -46,10 +56,15 @@ func (s *Server) CreateList(ctx context.Context, req CreateListRequestObject) (C
 		return CreateList409JSONResponse{ConflictJSONResponse(listDeleted())}, nil
 	case err != nil:
 		return nil, err
+	}
+	sum, err := s.listSummary(ctx, l)
+	switch {
+	case err != nil:
+		return nil, err
 	case created:
-		return CreateList201JSONResponse(apiListSummary(l)), nil
+		return CreateList201JSONResponse(sum), nil
 	default:
-		return CreateList200JSONResponse(apiListSummary(l)), nil
+		return CreateList200JSONResponse(sum), nil
 	}
 }
 
@@ -75,7 +90,11 @@ func (s *Server) RenameList(ctx context.Context, req RenameListRequestObject) (R
 	case err != nil:
 		return nil, err
 	}
-	return RenameList200JSONResponse(apiListSummary(l)), nil
+	sum, err := s.listSummary(ctx, l)
+	if err != nil {
+		return nil, err
+	}
+	return RenameList200JSONResponse(sum), nil
 }
 
 // DeleteList deletes a List the signed-in User owns.
@@ -113,7 +132,11 @@ func (s *Server) RestoreList(ctx context.Context, req RestoreListRequestObject) 
 	case err != nil:
 		return nil, err
 	}
-	return RestoreList200JSONResponse(apiListSummary(l)), nil
+	sum, err := s.listSummary(ctx, l)
+	if err != nil {
+		return nil, err
+	}
+	return RestoreList200JSONResponse(sum), nil
 }
 
 // ListDeletedLists returns the Lists the signed-in User deleted and can still restore.
@@ -164,12 +187,21 @@ func limitExceeded(limit int) ApiError {
 	}
 }
 
-func apiListSummary(l lists.Summary) ListSummary {
+// listSummary returns l as the API shows it, with its count of Items to buy.
+func (s *Server) listSummary(ctx context.Context, l lists.Summary) (ListSummary, error) {
+	counts, err := s.Sync.UncheckedCounts(ctx, []uuid.UUID{l.ID})
+	if err != nil {
+		return ListSummary{}, err
+	}
+	return apiListSummary(l, counts[l.ID]), nil
+}
+
+func apiListSummary(l lists.Summary, unchecked int) ListSummary {
 	return ListSummary{
 		Id:                 l.ID,
 		Name:               l.Name,
 		Role:               Role(l.Role),
-		UncheckedItemCount: 0, // Items arrive with #7
+		UncheckedItemCount: unchecked,
 		MemberCount:        l.MemberCount,
 		CreatedAt:          l.CreatedAt,
 	}
