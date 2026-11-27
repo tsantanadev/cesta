@@ -1,6 +1,6 @@
 import 'package:uuid/uuid.dart';
 
-import '../api/generated/cesta_api.dart';
+import '../api/generated/cesta_api.dart' hide HistoryEntry;
 import '../db/app_database.dart';
 import '../sync/outbox.dart';
 
@@ -111,18 +111,11 @@ final class ShownItem {
 
 /// An entry of a List's Item history: an Item that was bought (checked, then
 /// cleared with Clear checked), as it was when cleared.
-final class HistoryItem {
-  const HistoryItem({
-    required this.itemId,
-    required this.listId,
-    required this.details,
-    required this.clearedAt,
-    required this.clearedBy,
-  });
+final class HistoryEntry {
+  const HistoryEntry({required this.itemId, required this.details, required this.clearedAt, required this.clearedBy});
 
   /// The cleared Item's ID.
   final String itemId;
-  final String listId;
   final ItemDetails details;
   final DateTime clearedAt;
   final Actor clearedBy;
@@ -164,15 +157,15 @@ class ItemsStore {
   /// reported, with the Items this device cleared and the server hasn't
   /// confirmed yet on top, so it is searchable offline. Emits again
   /// whenever it changes.
-  Stream<List<HistoryItem>> watchHistory(String listId) => _db
+  Stream<List<HistoryEntry>> watchHistory(String listId) => _db
       .customSelect('SELECT 1', readsFrom: {_db.syncedHistory, _db.syncedItems, _db.outbox})
       .watch()
       .asyncMap((_) => readHistory(listId));
 
   /// The Item history of List [listId], most recent first (see [watchHistory]).
-  Future<List<HistoryItem>> readHistory(String listId) => _db.transaction(() async {
+  Future<List<HistoryEntry>> readHistory(String listId) => _db.transaction(() async {
     final rows = await (_db.select(_db.syncedHistory)..where((t) => t.listId.equals(listId))).get();
-    final history = <String, HistoryItem>{for (final r in rows) r.itemId: _fromHistoryRow(r)};
+    final history = <String, HistoryEntry>{for (final r in rows) r.itemId: _fromHistoryRow(r)};
     final pending = await _outbox.forList(listId);
     final clears = pending.where((m) => m.type == MutationType.itemClear && !history.containsKey(m.itemId)).toList();
     if (clears.isNotEmpty) {
@@ -188,9 +181,8 @@ class ItemsStore {
       for (final m in clears) {
         final item = beforeClears[m.itemId];
         if (item == null) continue;
-        history[m.itemId] = HistoryItem(
+        history[m.itemId] = HistoryEntry(
           itemId: m.itemId,
-          listId: listId,
           details: item.details,
           clearedAt: DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true),
           clearedBy: (id: m.byId, displayName: m.byName),
@@ -322,9 +314,8 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
   });
 }
 
-HistoryItem _fromHistoryRow(SyncedHistoryData r) => HistoryItem(
+HistoryEntry _fromHistoryRow(SyncedHistoryData r) => HistoryEntry(
   itemId: r.itemId,
-  listId: r.listId,
   details: ItemDetails(
     name: r.name,
     quantity: r.quantity,

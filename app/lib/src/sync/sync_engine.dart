@@ -9,7 +9,7 @@ import 'package:material_ui/material_ui.dart' show AppLifecycleListener, ValueNo
 import '../api/generated/cesta_api.dart';
 import '../api/network.dart';
 import '../db/app_database.dart';
-import '../items/items_store.dart';
+import '../items/items_store.dart' hide HistoryEntry;
 import 'network_status.dart';
 import 'outbox.dart';
 

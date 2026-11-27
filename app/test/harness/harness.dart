@@ -299,7 +299,7 @@ class Harness {
 
   /// List [listId]'s Item history on the device, most recent first, as
   /// screens read it.
-  Future<List<HistoryItem>> itemHistory(String listId) => tester
+  Future<List<HistoryEntry>> itemHistory(String listId) => tester
       .runAsync(() async {
         final outbox = ChangeOutbox(db);
         try {

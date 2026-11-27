@@ -42,9 +42,9 @@ class AddItemsScreen extends StatefulWidget {
 class _AddItemsScreenState extends State<AddItemsScreen> {
   final _search = TextEditingController();
   List<ShownItem> _onList = const [];
-  List<HistoryItem> _history = const [];
+  List<HistoryEntry> _history = const [];
   StreamSubscription<List<ShownItem>>? _itemsSub;
-  StreamSubscription<List<HistoryItem>>? _historySub;
+  StreamSubscription<List<HistoryEntry>>? _historySub;
 
   @override
   void initState() {
@@ -111,7 +111,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   }
 
   /// Adds [entry] of the Item history again, as it was last bought.
-  void _addAgain(HistoryItem entry) {
+  void _addAgain(HistoryEntry entry) {
     final me = _me;
     if (me == null) return;
     unawaited(_add(entry.details, me));
