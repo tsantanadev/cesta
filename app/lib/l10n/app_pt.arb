@@ -107,6 +107,8 @@
   "listCheckedByYou": "Você",
   "itemCheck": "Marcar como comprado",
   "itemUncheck": "Desmarcar",
+  "itemOpen": "Abrir",
+  "addItemsMatches": "Resultados",
   "addItemsSearch": "Buscar itens",
   "addItemsDone": "Concluir",
   "addItemsAddAsNew": "Adicionar “{name}” como novo item",

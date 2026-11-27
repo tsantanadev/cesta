@@ -10,10 +10,10 @@ import '../routes.dart';
 import '../session/session_controller.dart';
 import '../sync/sync_engine.dart';
 import '../ui/components.dart';
-import 'item_form.dart';
 import 'item_limit_sheet.dart';
 import 'item_text.dart';
 import 'items_store.dart';
+import 'opened_item.dart';
 
 /// A List's screen (Figma "04 List" 4:148): its Items to buy as tags, then
 /// the Checked Items In the basket, and the bar that adds Items.
@@ -83,48 +83,11 @@ class _ListScreenState extends State<ListScreen> {
     unawaited(widget.items.setChecked(item, checked: checked, by: me));
   }
 
-  /// Opens [item] to edit or remove it (Figma "12 Opened item" 38:2519).
+  /// Opens [item] to edit or remove it (Figma "12 Opened item").
   void _openItem(ShownItem item) {
     final me = _me;
     if (me == null) return;
-    final l10n = AppLocalizations.of(context);
-    unawaited(
-      showCesItemSheet(
-        context,
-        title: l10n.itemEditTitle,
-        closeTooltip: l10n.sheetClose,
-        child: ItemForm(
-          submitLabel: l10n.itemSave,
-          initial: item.details,
-          details: [
-            item.addedBy.id == me.id ? l10n.itemAddedByYou : l10n.itemAddedBy(item.addedBy.displayName),
-            if (item.checkedBy case final checkedBy?)
-              checkedBy.id == me.id ? l10n.itemCheckedByYou : l10n.itemCheckedBy(checkedBy.displayName),
-          ],
-          onSubmit: (draft) => unawaited(widget.items.update(item, by: me, details: draft)),
-          onRemove: () => unawaited(_remove(item, me)),
-        ),
-      ),
-    );
-  }
-
-  /// Removes [item], with Undo (Figma "12b Item removed" 38:2667). The
-  /// removal syncs once the Toast closes, so Undo never has to re-add it.
-  Future<void> _remove(ShownItem item, Actor me) async {
-    final undoWindow = Completer<void>();
-    await widget.items.remove(itemId: item.id, listId: item.listId, by: me, undoableUntil: undoWindow.future);
-    if (!mounted) {
-      undoWindow.complete();
-      return;
-    }
-    final l10n = AppLocalizations.of(context);
-    final toast = showCesToast(
-      context,
-      message: l10n.itemRemoved(item.name),
-      actionLabel: l10n.itemUndo,
-      onAction: () => unawaited(widget.items.restore(item, by: me)),
-    );
-    unawaited(toast.closed.then((_) => undoWindow.complete()));
+    showOpenedItem(context, items: widget.items, item: item, me: me);
   }
 
   /// Opens Add items, unless the List is already full (Figma "14 Item limit").

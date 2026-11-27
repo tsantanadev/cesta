@@ -358,6 +358,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get itemUncheck => 'Desmarcar';
 
   @override
+  String get itemOpen => 'Abrir';
+
+  @override
+  String get addItemsMatches => 'Resultados';
+
+  @override
   String get addItemsSearch => 'Buscar itens';
 
   @override
