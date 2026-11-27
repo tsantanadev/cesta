@@ -15,6 +15,7 @@ enum ApiErrorCode {
   invalidItem("invalid_item"),
   itemNotFound("item_not_found"),
   itemDeleted("item_deleted"),
+  itemNotChecked("item_not_checked"),
   internal("internal");
 
   const ApiErrorCode(this.value);
