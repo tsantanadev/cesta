@@ -109,7 +109,7 @@ class CesAddBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLowest,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: const [BoxShadow(color: Color(0x1A173829), offset: Offset(0, -4), blurRadius: 24)],
+        boxShadow: const [BoxShadow(color: Color(0x1A173829), offset: Offset(0, -4), blurRadius: 20)],
       ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 14, 16, 30 + bottomInset),
