@@ -108,17 +108,23 @@ class _ListScreenState extends State<ListScreen> {
     );
   }
 
-  /// Removes [item], with Undo (Figma "12b Item removed" 38:2667).
+  /// Removes [item], with Undo (Figma "12b Item removed" 38:2667). The
+  /// removal syncs once the Toast closes, so Undo never has to re-add it.
   Future<void> _remove(ShownItem item, Actor me) async {
-    await widget.items.remove(itemId: item.id, listId: item.listId, by: me);
-    if (!mounted) return;
+    final undoWindow = Completer<void>();
+    await widget.items.remove(itemId: item.id, listId: item.listId, by: me, undoableUntil: undoWindow.future);
+    if (!mounted) {
+      undoWindow.complete();
+      return;
+    }
     final l10n = AppLocalizations.of(context);
-    showCesToast(
+    final toast = showCesToast(
       context,
       message: l10n.itemRemoved(item.name),
       actionLabel: l10n.itemUndo,
       onAction: () => unawaited(widget.items.restore(item, by: me)),
     );
+    unawaited(toast.closed.then((_) => undoWindow.complete()));
   }
 
   /// Opens Add items, unless the List is already full (Figma "14 Item limit").

@@ -26,6 +26,12 @@ class ChangeOutbox {
   /// so undoing one can't just drop it.
   final _inFlight = <int>{};
 
+  /// Items whose removal is held out of the push while Undo is offered, so
+  /// undoing it just drops it, with how many holds each has (removed, undone
+  /// and removed again overlap). Kept in memory only: once the app is gone,
+  /// so is the Undo, and the removal is pushed at the next sync.
+  final _heldRemovals = <String, int>{};
+
   static const _uuid = Uuid();
 
   /// Fires with the List's ID after every change to its Items enqueued or
@@ -57,6 +63,25 @@ class ChangeOutbox {
     _changes.add(listId);
   }
 
+  /// Enqueues the removal of Item [itemId] of List [listId], held out of the
+  /// push until [until] completes (or fails).
+  Future<void> enqueueHeldRemoval({
+    required String itemId,
+    required String listId,
+    required Actor by,
+    required Future<void> until,
+  }) async {
+    _heldRemovals.update(itemId, (n) => n + 1, ifAbsent: () => 1);
+    unawaited(
+      until.catchError((Object _) {}).whenComplete(() {
+        if (_heldRemovals.update(itemId, (n) => n - 1) == 0) _heldRemovals.remove(itemId);
+        // Pushes it now, unless it was undone meanwhile (nothing then to push).
+        if (!_changes.isClosed) _changes.add(listId);
+      }),
+    );
+    await enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
+  }
+
   /// Drops every change to Item [itemId] while its creation is still waiting
   /// to be pushed, so the Item never reaches the server; false when it can't
   /// (it was pushed, or is being pushed).
@@ -85,11 +110,16 @@ class ChangeOutbox {
     return listId != null;
   }
 
-  /// The oldest [limit] changes not yet pushed, now in flight until [settle].
+  /// The oldest [limit] changes not yet pushed and not held, now in flight
+  /// until [settle].
   Future<List<OutboxData>> unpushed(int limit) async {
     final batch =
         await (_db.select(_db.outbox)
-              ..where((t) => t.applied.equals(false))
+              ..where(
+                (t) =>
+                    t.applied.equals(false) &
+                    (t.itemId.isNotIn(_heldRemovals.keys) | t.type.equalsValue(MutationType.itemDelete).not()),
+              )
               ..orderBy([(t) => OrderingTerm.asc(t.seq)])
               ..limit(limit))
             .get();
