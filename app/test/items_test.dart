@@ -224,6 +224,113 @@ void main() {
     expect(h.api.itemsToBuy(list), ['Tomatoes', 'Coffee']);
   });
 
+  testWidgets('an edit to an Item someone else removed is not saved, and says so', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Milk', addedBy: ana);
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    h.api.removeItemNow('Milk'); // on another phone; this one hasn't pulled yet
+
+    await h.tapTag('Milk');
+
+    expect(find.text('Couldn’t save “Milk”. It was removed.'), findsOneWidget);
+    expect(h.tagNames(), ['Coffee']);
+    expect(h.basketRows(), isEmpty);
+  });
+
+  testWidgets('a full List says so instead of opening Add items', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    for (var i = 0; i < 500; i++) {
+      h.api.addItem(list, name: 'Item $i', addedBy: ana);
+    }
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await h.tap(find.text('Add an item'));
+
+    expect(find.text('This list is full'), findsOneWidget);
+    expect(
+      find.text(
+        'A list can hold up to 500 items. Clear checked items, or remove ones you no longer need, to make room.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(CesButton, 'Clear checked'), findsNothing); // Clear checked isn't in the app yet
+    expect(find.byType(CesSearchField), findsNothing);
+
+    await h.tap(find.byTooltip('Close'));
+    expect(find.text('This list is full'), findsNothing);
+  });
+
+  testWidgets('an Item the server refuses because the List is full shows the limit sheet', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    h.api.itemLimit = 1; // filled up from another phone meanwhile
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await h.addNewItem('Tomatoes', listName: 'Weekend feira');
+
+    expect(find.text('This list is full'), findsOneWidget);
+    expect(h.api.itemsToBuy(list), ['Coffee']);
+  });
+
+  testWidgets('an empty List invites adding the first Item', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.addList(ana, name: 'Weekend feira');
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    expect(find.text('Nothing to buy yet'), findsOneWidget);
+    expect(find.text('Start your list'), findsOneWidget);
+    expect(find.text('Add what you need. Everyone on this list sees it right away.'), findsOneWidget);
+    expect(h.tagNames(), isEmpty);
+
+    await h.addNewItem('Tomatoes', listName: 'Weekend feira');
+    await h.tap(find.text('Done'));
+
+    expect(find.text('Start your list'), findsNothing);
+    expect(find.text('1 to buy, 0 in the basket'), findsOneWidget);
+  });
+
+  testWidgets('the Opened item, offline pill and empty List read in Portuguese', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final rui = h.existingUser(email: 'rui@example.com', password: 'x', displayName: 'Rui');
+    final list = h.api.addList(ana, name: 'Feira', sharedWith: [rui]);
+    h.api.addItem(list, name: 'Arroz', addedBy: rui, quantity: '1.5', unit: ItemUnit.kg, checkedBy: ana);
+    h.api.addList(ana, name: 'Vazia');
+    await h.pumpApp(locale: brazilianPortuguese);
+    await h.openList('Feira');
+
+    await tester.longPress(find.widgetWithText(CesCheckedItem, 'Arroz'));
+    await tester.pumpAndSettle();
+    expect(find.text('Editar item'), findsOneWidget);
+    expect(h.quantityText, '1,5');
+    expect(find.text('Adicionado por Rui'), findsOneWidget);
+    expect(find.text('Marcado por você'), findsOneWidget);
+    expect(find.text('Salvar'), findsOneWidget);
+    await h.tap(find.text('Remover item'));
+    expect(find.text('Arroz removido'), findsOneWidget);
+
+    h.goOffline();
+    await h.tap(find.text('Desfazer'));
+    expect(h.offlinePill, 'Sem conexão · 2 alterações aguardando sincronização');
+
+    await h.tap(find.byTooltip('Voltar'));
+    await h.openList('Vazia');
+    expect(find.text('Nada para comprar ainda'), findsOneWidget);
+    expect(find.text('Comece sua lista'), findsOneWidget);
+  });
+
   testWidgets('the List, Add items and New item read in Portuguese', (tester) async {
     final h = Harness(tester);
     final ana = h.signedIn();

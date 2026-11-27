@@ -377,6 +377,11 @@ class FakeApiClient implements ApiClient {
     ..checkedAt = DateTime.now().toUtc()
     ..seq = ++_changeSeq;
 
+  /// Someone removes the Item named [name] behind the app's back.
+  void removeItemNow(String name) => _liveItems.firstWhere((i) => i.name == name)
+    ..deleted = true
+    ..seq = ++_changeSeq;
+
   Iterable<_FakeItem> get _liveItems => _items.values.where((i) => !i.deleted);
 
   /// Names of the Items on List [listId] still to buy, in insertion order.
