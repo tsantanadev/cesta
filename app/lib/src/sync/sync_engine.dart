@@ -235,15 +235,15 @@ class SyncEngine {
     id: i.id,
     listId: i.listId,
     name: i.name,
-    quantity: Value(i.quantity),
-    unit: Value(i.unit?.toJson()),
-    note: Value(i.note),
+    quantity: Value(i.quantity?.value),
+    unit: Value(i.unit?.value?.toJson()),
+    note: Value(i.note?.value),
     addedById: i.addedBy.id,
     addedByName: i.addedBy.displayName,
     addedAtMicros: i.addedAt.microsecondsSinceEpoch,
-    checkedAtMicros: Value(i.checkedAt?.microsecondsSinceEpoch),
-    checkedById: Value(i.checkedBy?.id),
-    checkedByName: Value(i.checkedBy?.displayName),
+    checkedAtMicros: Value(i.checkedAt?.value?.microsecondsSinceEpoch),
+    checkedById: Value(i.checkedBy?.value?.id),
+    checkedByName: Value(i.checkedBy?.value?.displayName),
   );
 
   Future<void> dispose() async {

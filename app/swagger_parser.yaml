@@ -9,3 +9,6 @@ swagger_parser:
     serializer: plain
     response_mode: all_statuses
     page_width: 120
+    # Optional nullable fields become records, so explicit null (e.g. clearing an
+    # Item's note) is sent instead of being dropped.
+    use_presence_records: true

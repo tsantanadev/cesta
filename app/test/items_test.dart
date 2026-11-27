@@ -76,8 +76,8 @@ void main() {
     expect(h.showsPending, isFalse);
     expect(h.api.itemsToBuy(list), ['Tomatoes']);
     expect(h.api.itemsInBasket(list), ['Coffee']);
-    expect(h.api.serverItem('Tomatoes').quantity, '2');
-    expect(h.api.serverItem('Tomatoes').unit, ItemUnit.kg);
+    expect(h.api.serverItem('Tomatoes').quantity?.value, '2');
+    expect(h.api.serverItem('Tomatoes').unit?.value, ItemUnit.kg);
     expect(h.tagNames(), ['Tomatoes']);
     expect(h.basketRows(), [('Coffee', 'You')]);
   });

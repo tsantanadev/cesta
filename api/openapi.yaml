@@ -530,7 +530,8 @@ components:
           description: See Quantity.
         unit:
           type: string
-          enum: [un, kg, g, L, ml, pack]
+          # OpenAPI 3.0.3: a nullable enum must list null for null to be valid.
+          enum: [un, kg, g, L, ml, pack, null]
           nullable: true
           description: See Unit.
         note:
@@ -612,7 +613,8 @@ components:
           description: See Quantity.
         unit:
           type: string
-          enum: [un, kg, g, L, ml, pack]
+          # OpenAPI 3.0.3: a nullable enum must list null for null to be valid.
+          enum: [un, kg, g, L, ml, pack, null]
           nullable: true
           description: See Unit.
         note:
