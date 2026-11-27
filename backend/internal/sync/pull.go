@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // DefaultPullLimit and MaxPullLimit bound how many changes one pull returns.
@@ -111,8 +112,10 @@ func parseCursor(c string) (position, error) {
 	return position{seq: seq, id: id}, nil
 }
 
-// pullQuery lists, in order, every change past a position that userID ($1)
-// should see:
+// pullQuery lists, in order, every change past a position ($5, $6) to the
+// Lists given as arrays: their ids ($1), whether each is deleted ($2), when it
+// was last deleted or restored ($3) and when the User joined it ($4), as
+// packages lists and membership report them. It returns:
 //   - an Item of a List they are a Member of that is not deleted, at the later
 //     of its own change and the List becoming visible to them (joining it, or
 //     it being restored), so a newly visible List arrives whole;
@@ -120,15 +123,14 @@ func parseCursor(c string) (position, error) {
 //   - a deleted List they are a Member of, at its deletion.
 const pullQuery = `
 WITH vis AS (
-	SELECT l.id, l.deleted_at, l.visible_seq, GREATEST(m.seq, l.visible_seq) AS vseq
-	FROM list_members m JOIN lists l ON l.id = m.list_id
-	WHERE m.user_id = $1
+	SELECT v.id, v.deleted, v.visible_seq, GREATEST(v.joined_seq, v.visible_seq) AS vseq
+	FROM unnest($1::uuid[], $2::boolean[], $3::bigint[], $4::bigint[]) AS v(id, deleted, visible_seq, joined_seq)
 ), changes AS (
 	SELECT 'item' AS kind, i.id, i.list_id,
 		CASE WHEN i.deleted_at IS NULL THEN GREATEST(i.seq, v.vseq) ELSE i.seq END AS pos
-	FROM items i JOIN vis v ON v.id = i.list_id AND v.deleted_at IS NULL
+	FROM items i JOIN vis v ON v.id = i.list_id AND NOT v.deleted
 	UNION ALL
-	SELECT 'list', v.id, v.id, v.visible_seq FROM vis v WHERE v.deleted_at IS NOT NULL
+	SELECT 'list', v.id, v.id, v.visible_seq FROM vis v WHERE v.deleted
 )
 SELECT c.kind, c.id, c.list_id, c.pos, i.deleted_at IS NOT NULL,
 	i.name, trim_scale(i.quantity)::text, i.unit, i.note,
@@ -138,9 +140,9 @@ FROM changes c
 LEFT JOIN items i ON c.kind = 'item' AND i.id = c.id
 LEFT JOIN users a ON a.id = i.added_by
 LEFT JOIN users b ON b.id = i.checked_by
-WHERE (c.pos, c.id) > ($2, $3)
+WHERE (c.pos, c.id) > ($5, $6)
 ORDER BY c.pos, c.id
-LIMIT $4`
+LIMIT $7`
 
 // Pull returns the changes past cursor that userID should see, at most limit
 // of them (0 means DefaultPullLimit). An empty cursor starts from the beginning.
@@ -155,9 +157,49 @@ func (s *Service) Pull(ctx context.Context, userID uuid.UUID, cursor string, lim
 	if err != nil {
 		return Changes{}, err
 	}
-	rows, err := s.db.Query(ctx, pullQuery, userID, from.seq, from.id, limit+1)
+	var out Changes
+	// One snapshot for the Lists the User sees and their changes.
+	err = pgx.BeginTxFunc(ctx, s.db, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly},
+		func(tx pgx.Tx) error {
+			var err error
+			out, err = s.pull(ctx, tx, userID, from, limit)
+			return err
+		})
 	if err != nil {
 		return Changes{}, fmt.Errorf("sync: pull: %w", err)
+	}
+	return out, nil
+}
+
+// pull reads, inside tx, the changes past from that userID should see.
+func (s *Service) pull(ctx context.Context, tx pgx.Tx, userID uuid.UUID, from position, limit int) (Changes, error) {
+	joined, err := s.members.JoinedIn(ctx, tx, userID)
+	if err != nil {
+		return Changes{}, err
+	}
+	joinedAt := make(map[uuid.UUID]int64, len(joined))
+	ids := make([]uuid.UUID, 0, len(joined))
+	for _, j := range joined {
+		joinedAt[j.ListID] = j.Seq
+		ids = append(ids, j.ListID)
+	}
+	vis, err := s.lists.VisibilityIn(ctx, tx, ids)
+	if err != nil {
+		return Changes{}, err
+	}
+	var (
+		visIDs   = make([]uuid.UUID, 0, len(vis))
+		deleted  = make([]bool, 0, len(vis))
+		visSeqs  = make([]int64, 0, len(vis))
+		joinSeqs = make([]int64, 0, len(vis))
+	)
+	for _, v := range vis {
+		visIDs, deleted = append(visIDs, v.ID), append(deleted, v.Deleted)
+		visSeqs, joinSeqs = append(visSeqs, v.Seq), append(joinSeqs, joinedAt[v.ID])
+	}
+	rows, err := tx.Query(ctx, pullQuery, visIDs, deleted, visSeqs, joinSeqs, from.seq, from.id, limit+1)
+	if err != nil {
+		return Changes{}, err
 	}
 	defer rows.Close()
 	out := Changes{Items: []Item{}, Tombstones: []Tombstone{}}
@@ -185,7 +227,7 @@ func (s *Service) Pull(ctx context.Context, userID uuid.UUID, cursor string, lim
 			&name, &it.Quantity, &it.Unit, &it.Note,
 			&addedBy, &addedByName, &addedAt,
 			&checkedBy, &checkedByName, &it.CheckedAt, &updatedAt); err != nil {
-			return Changes{}, fmt.Errorf("sync: pull: %w", err)
+			return Changes{}, err
 		}
 		last = position{seq: pos, id: id}
 		switch {
@@ -206,7 +248,7 @@ func (s *Service) Pull(ctx context.Context, userID uuid.UUID, cursor string, lim
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return Changes{}, fmt.Errorf("sync: pull: %w", err)
+		return Changes{}, err
 	}
 	out.Cursor = last.String()
 	return out, nil

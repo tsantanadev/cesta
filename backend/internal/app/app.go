@@ -68,12 +68,12 @@ func Purge(ctx context.Context, d Deps) (int, error) {
 	if c == nil {
 		c = clock.System{}
 	}
-	return newLists(d, c).Purge(ctx, c.Now())
+	return newLists(d, c, membership.NewService(d.DB)).Purge(ctx, c.Now())
 }
 
 // newLists builds the lists module, the same way for serving and for the purge.
-func newLists(d Deps, c clock.Clock) *lists.Service {
-	return lists.NewService(d.DB, c, membership.NewService(d.DB), d.MaxListsPerUser)
+func newLists(d Deps, c clock.Clock, members *membership.Service) *lists.Service {
+	return lists.NewService(d.DB, c, members, d.MaxListsPerUser)
 }
 
 // New returns the backend's HTTP handler, instrumented with OpenTelemetry.
@@ -87,12 +87,14 @@ func New(d Deps) http.Handler {
 	if limits == (RateLimits{}) {
 		limits = DefaultRateLimits
 	}
+	members := membership.NewService(d.DB)
+	ls := newLists(d, c, members)
 	api := &httpapi.Server{
 		DB:               d.DB,
 		Logger:           d.Logger,
 		Identity:         identity.NewService(d.DB, c, d.TokenVerifier, ratelimit.New(limits.PerUser, c)),
-		Lists:            newLists(d, c),
-		Sync:             cestasync.NewService(d.DB, c, membership.NewService(d.DB), d.MaxItemsPerList),
+		Lists:            ls,
+		Sync:             cestasync.NewService(d.DB, c, ls, members, d.MaxItemsPerList),
 		PerIP:            ratelimit.New(limits.PerIP, c),
 		TrustedProxyHops: d.TrustedProxyHops,
 	}

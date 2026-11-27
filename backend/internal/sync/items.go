@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/tsantanadev/cesta/backend/internal/membership"
+	"github.com/tsantanadev/cesta/backend/internal/lists"
 	"github.com/tsantanadev/cesta/backend/internal/platform/changeseq"
 	"github.com/tsantanadev/cesta/backend/internal/platform/names"
 )
@@ -54,7 +54,7 @@ func (s *Service) create(ctx context.Context, tx pgx.Tx, userID uuid.UUID, m Mut
 	if bad != nil {
 		return *bad, nil
 	}
-	if r, ok, err := s.lockList(ctx, tx, userID, m.ListID, ReasonListNotFound); err != nil || !ok {
+	if r, ok, err := s.lockList(ctx, tx, userID, m.ListID, rejected(ReasonListNotFound, "no such List")); err != nil || !ok {
 		return r, err
 	}
 	var listID uuid.UUID
@@ -65,7 +65,7 @@ func (s *Service) create(ctx context.Context, tx pgx.Tx, userID uuid.UUID, m Mut
 	case err == nil && listID != m.ListID:
 		return rejected(ReasonInvalidItem, "another Item has this id"), nil
 	case err == nil && deletedAt != nil:
-		return rejected(ReasonItemDeleted, "the Item was removed"), nil
+		return itemDeleted(), nil
 	case err == nil:
 		// Created already under another mutation ID: set the fields like an update.
 		return s.update(ctx, tx, userID, m.EntityID, f, now)
@@ -111,7 +111,7 @@ func (s *Service) change(ctx context.Context, tx pgx.Tx, userID uuid.UUID, m Mut
 	if err != nil {
 		return Result{}, err
 	}
-	if r, ok, err := s.lockList(ctx, tx, userID, listID, ReasonItemNotFound); err != nil || !ok {
+	if r, ok, err := s.lockList(ctx, tx, userID, listID, rejected(ReasonItemNotFound, "no such Item")); err != nil || !ok {
 		return r, err
 	}
 	var deletedAt *time.Time
@@ -135,7 +135,7 @@ func (s *Service) change(ctx context.Context, tx pgx.Tx, userID uuid.UUID, m Mut
 		return applied(), nil
 	}
 	if deletedAt != nil {
-		return rejected(ReasonItemDeleted, "the Item was removed"), nil
+		return itemDeleted(), nil
 	}
 	f, bad := validate(m.Fields)
 	if bad != nil {
@@ -189,31 +189,21 @@ func (s *Service) update(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID, f
 	return applied(), nil
 }
 
-// lockList checks userID is a Member of listID and the List is not deleted,
-// and locks it until tx ends, so the change can't race a delete or another
-// change's limit check. ok false comes with the rejection: notFound if userID
-// is not a Member or the List is gone, ReasonListDeleted if it is deleted.
-func (s *Service) lockList(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID, notFound Reason) (Result, bool, error) {
-	missing := rejected(notFound, "no such List")
-	if notFound == ReasonItemNotFound {
-		missing.Message = "no such Item"
-	}
-	_, err := s.members.RoleOf(ctx, listID, userID)
-	if errors.Is(err, membership.ErrNotAMember) {
+// itemDeleted rejects a change to a removed Item: a delete wins.
+func itemDeleted() Result { return rejected(ReasonItemDeleted, "the Item was removed") }
+
+// lockList locks listID until tx ends if userID is a Member and it is not
+// deleted (package lists decides), so the change can't race a delete or
+// another change's limit check. ok false comes with the rejection:
+// ReasonListDeleted, or missing when userID is not a Member or the List is gone.
+func (s *Service) lockList(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID, missing Result) (Result, bool, error) {
+	switch err := s.lists.LockForItems(ctx, tx, userID, listID); {
+	case errors.Is(err, lists.ErrNotFound):
 		return missing, false, nil
-	}
-	if err != nil {
-		return Result{}, false, err
-	}
-	var deletedAt *time.Time
-	err = tx.QueryRow(ctx, "SELECT deleted_at FROM lists WHERE id = $1 FOR UPDATE", listID).Scan(&deletedAt)
-	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-		return missing, false, nil
+	case errors.Is(err, lists.ErrDeleted):
+		return rejected(ReasonListDeleted, "the List is deleted"), false, nil
 	case err != nil:
 		return Result{}, false, err
-	case deletedAt != nil:
-		return rejected(ReasonListDeleted, "the List is deleted"), false, nil
 	}
 	return Result{}, true, nil
 }
