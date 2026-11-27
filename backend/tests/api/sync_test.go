@@ -40,10 +40,11 @@ type tombstone struct {
 }
 
 type pulled struct {
-	Items      []item      `json:"items"`
-	Tombstones []tombstone `json:"tombstones"`
-	Cursor     string      `json:"cursor"`
-	HasMore    bool        `json:"hasMore"`
+	Items      []item         `json:"items"`
+	Tombstones []tombstone    `json:"tombstones"`
+	History    []historyEntry `json:"history"`
+	Cursor     string         `json:"cursor"`
+	HasMore    bool           `json:"hasMore"`
 }
 
 type mutationResult struct {
@@ -159,6 +160,7 @@ func pullAll(t *testing.T, c *testkit.Client, cursor string) pulled {
 		p := pullPage(t, c, cursor, 0)
 		all.Items = append(all.Items, p.Items...)
 		all.Tombstones = append(all.Tombstones, p.Tombstones...)
+		all.History = append(all.History, p.History...)
 		all.Cursor, cursor = p.Cursor, p.Cursor
 		if !p.HasMore {
 			return all
