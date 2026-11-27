@@ -329,7 +329,7 @@ type listRow struct {
 // if userID is not a Member or the List is gone (purged, or deleted longer than
 // RestoreWindow ago), and ErrNotOwner for any other Member.
 func (s *Service) lockOwned(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (listRow, error) {
-	role, err := s.members.RoleOf(ctx, listID, userID)
+	role, err := s.members.RoleIn(ctx, tx, listID, userID)
 	if errors.Is(err, membership.ErrNotAMember) {
 		return listRow{}, ErrNotFound
 	}
