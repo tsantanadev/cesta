@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../api/generated/cesta_api.dart';
@@ -66,12 +63,9 @@ final class ShownItem {
     required this.listId,
     required this.details,
     required this.addedAt,
-    required this.addedById,
-    required this.addedByName,
+    required this.addedBy,
     this.checkedAt,
-    this.checkedById,
-    this.checkedByName,
-    this.pending = false,
+    this.checkedBy,
   });
 
   final String id;
@@ -85,44 +79,32 @@ final class ShownItem {
   String? get note => details.note;
 
   /// Who added it, as the server (or, before it confirms, this device) says.
-  final String addedById;
-  final String addedByName;
+  final Actor addedBy;
 
-  /// When the Item was checked (it is In the basket); null while it is to buy.
+  /// When and by whom the Item was checked (it is In the basket); null while
+  /// it is to buy.
   final DateTime? checkedAt;
-  final String? checkedById;
-  final String? checkedByName;
-
-  /// True while a change to it is waiting to reach the server.
-  final bool pending;
+  final Actor? checkedBy;
 
   bool get checked => checkedAt != null;
 
-  /// A copy with [fields] applied, as an item_update would: a field present
-  /// in [fields] replaces the current value, and a present null clears it.
-  ShownItem _updated(
-    ItemFields fields, {
-    required DateTime at,
-    required String byId,
-    required String byName,
-    required bool pending,
-  }) {
-    final (checkedAt, checkedById, checkedByName) = switch (fields.checked) {
-      true => (at, byId, byName),
-      false => (null, null, null),
-      null => (this.checkedAt, this.checkedById, this.checkedByName),
+  /// A copy with [fields] applied, as an item_update made [at] by [by] would:
+  /// a field present in [fields] replaces the current value, and a present
+  /// null clears it.
+  ShownItem _updated(ItemFields fields, {required DateTime at, required Actor by}) {
+    final (checkedAt, checkedBy) = switch (fields.checked) {
+      true => (at, by),
+      false => (null, null),
+      null => (this.checkedAt, this.checkedBy),
     };
     return ShownItem(
       id: id,
       listId: listId,
       details: details._updated(fields),
       addedAt: addedAt,
-      addedById: addedById,
-      addedByName: addedByName,
+      addedBy: addedBy,
       checkedAt: checkedAt,
-      checkedById: checkedById,
-      checkedByName: checkedByName,
-      pending: pending,
+      checkedBy: checkedBy,
     );
   }
 }
@@ -151,23 +133,12 @@ class ItemsStore {
 
   Future<List<ShownItem>> readList(String listId) => _db.transaction(() async {
     final synced = await (_db.select(_db.syncedItems)..where((t) => t.listId.equals(listId))).get();
-    final pending =
-        await (_db.select(_db.outbox)
-              ..where((t) => t.listId.equals(listId))
-              ..orderBy([(t) => OrderingTerm.asc(t.seq)]))
-            .get();
-    return showItems(synced, pending);
+    return showItems(synced, await _outbox.forList(listId));
   });
 
   /// How many changes to List [listId] are waiting to reach the server;
   /// emits on change.
-  Stream<int> watchPendingCount(String listId) {
-    final count = _db.outbox.seq.count();
-    final query = _db.selectOnly(_db.outbox)
-      ..addColumns([count])
-      ..where(_db.outbox.listId.equals(listId) & _db.outbox.applied.equals(false));
-    return query.map((row) => row.read(count) ?? 0).watchSingle();
-  }
+  Stream<int> watchPendingCount(String listId) => _outbox.watchWaiting(listId);
 
   /// Adds a new Item with [details] to List [listId]; returns its ID.
   Future<String> add({required String listId, required Actor by, required ItemDetails details}) async {
@@ -193,9 +164,13 @@ class ItemsStore {
     fields: ItemFields(checked: checked),
   );
 
-  /// Removes Item [itemId] from List [listId].
-  Future<void> remove({required String itemId, required String listId, required Actor by}) =>
-      _outbox.enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
+  /// Removes Item [itemId] from List [listId]. An Item added on this device
+  /// that hasn't reached the server yet just goes, with its changes, so
+  /// nothing is left waiting to sync.
+  Future<void> remove({required String itemId, required String listId, required Actor by}) async {
+    if (await _outbox.dropPendingCreate(itemId)) return;
+    await _outbox.enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
+  }
 
   /// Undoes the removal of [item]: drops the removal while it is still
   /// waiting to sync, or else adds the Item again as it was (the server keeps
@@ -219,9 +194,10 @@ class ItemsStore {
 List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
   final items = <String, ShownItem>{for (final r in synced) r.id: _fromRow(r)};
   for (final m in pending) {
-    final fields = ItemFields.fromJson(jsonDecode(m.fields) as Map<String, Object?>);
+    final fields = m.fields;
     final at = DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true);
-    switch (MutationType.fromJson(m.type)) {
+    final by = (id: m.byId, displayName: m.byName);
+    switch (m.type) {
       case MutationType.itemCreate:
         items.putIfAbsent(
           m.itemId,
@@ -235,21 +211,11 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
               note: fields.note?.value,
             ),
             addedAt: at,
-            addedById: m.byId,
-            addedByName: m.byName,
-            pending: !m.applied,
+            addedBy: by,
           ),
         );
       case MutationType.itemUpdate:
-        final item = items[m.itemId];
-        if (item == null) continue;
-        items[m.itemId] = item._updated(
-          fields,
-          at: at,
-          byId: m.byId,
-          byName: m.byName,
-          pending: item.pending || !m.applied,
-        );
+        if (items[m.itemId] case final item?) items[m.itemId] = item._updated(fields, at: at, by: by);
       case MutationType.itemDelete:
         items.remove(m.itemId);
     }
@@ -270,9 +236,7 @@ ShownItem _fromRow(SyncedItem r) => ShownItem(
     note: r.note,
   ),
   addedAt: DateTime.fromMicrosecondsSinceEpoch(r.addedAtMicros, isUtc: true),
-  addedById: r.addedById,
-  addedByName: r.addedByName,
+  addedBy: (id: r.addedById, displayName: r.addedByName),
   checkedAt: r.checkedAtMicros == null ? null : DateTime.fromMicrosecondsSinceEpoch(r.checkedAtMicros!, isUtc: true),
-  checkedById: r.checkedById,
-  checkedByName: r.checkedByName,
+  checkedBy: r.checkedById == null ? null : (id: r.checkedById!, displayName: r.checkedByName ?? ''),
 );

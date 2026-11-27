@@ -10,7 +10,6 @@ import '../routes.dart';
 import '../session/session_controller.dart';
 import '../sync/sync_engine.dart';
 import '../ui/components.dart';
-import '../ui/tokens.dart';
 import 'item_form.dart';
 import 'item_limit_sheet.dart';
 import 'item_text.dart';
@@ -90,18 +89,17 @@ class _ListScreenState extends State<ListScreen> {
     if (me == null) return;
     final l10n = AppLocalizations.of(context);
     unawaited(
-      showCesFormSheet(
+      showCesItemSheet(
         context,
         title: l10n.itemEditTitle,
         closeTooltip: l10n.sheetClose,
-        sectionGap: 18,
         child: ItemForm(
           submitLabel: l10n.itemSave,
           initial: item.details,
           details: [
-            item.addedById == me.id ? l10n.itemAddedByYou : l10n.itemAddedBy(item.addedByName),
-            if (item.checked)
-              item.checkedById == me.id ? l10n.itemCheckedByYou : l10n.itemCheckedBy(item.checkedByName ?? ''),
+            item.addedBy.id == me.id ? l10n.itemAddedByYou : l10n.itemAddedBy(item.addedBy.displayName),
+            if (item.checkedBy case final checkedBy?)
+              checkedBy.id == me.id ? l10n.itemCheckedByYou : l10n.itemCheckedBy(checkedBy.displayName),
           ],
           onSubmit: (draft) => unawaited(widget.items.update(item, by: me, details: draft)),
           onRemove: () => unawaited(_remove(item, me)),
@@ -125,8 +123,9 @@ class _ListScreenState extends State<ListScreen> {
 
   /// Opens Add items, unless the List is already full (Figma "14 Item limit").
   void _addItems() {
-    if (_shown.length >= maxItemsPerList) {
-      unawaited(showItemLimitSheet(context));
+    final limit = widget.sync.itemLimit.value;
+    if (_shown.length >= limit) {
+      unawaited(showItemLimitSheet(context, limit: limit));
       return;
     }
     unawaited(context.push(Routes.addItems(widget.listId)));
@@ -135,7 +134,6 @@ class _ListScreenState extends State<ListScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
     final toBuy = _shown.where((i) => !i.checked).toList();
     final inBasket = _shown.where((i) => i.checked).toList()..sort((a, b) => a.checkedAt!.compareTo(b.checkedAt!));
     final myId = widget.session.user?.id;
@@ -173,39 +171,16 @@ class _ListScreenState extends State<ListScreen> {
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
                         sliver: SliverToBoxAdapter(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Semantics(
-                                header: true,
-                                child: Text(
-                                  _list?.name ?? '',
-                                  style: CestaDisplayType.screenTitle.copyWith(color: scheme.onSurface),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _shown.isEmpty
-                                    ? l10n.listNothingToBuyYet
-                                    : l10n.listToBuyInBasket(toBuy.length, inBasket.length),
-                                style: TextStyle(
-                                  fontFamily: CestaFonts.family,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 15,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                              // Figma "13 List offline" 38:3843: only while offline.
-                              ValueListenableBuilder(
-                                valueListenable: widget.sync.offline,
-                                builder: (context, offline, _) => offline
-                                    ? Padding(
-                                        padding: const EdgeInsets.only(top: 10),
-                                        child: CesStatusPill(label: l10n.listOffline(_pending)),
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
-                            ],
+                          // Figma "13 List offline" 38:3843: the pill shows only while offline.
+                          child: ValueListenableBuilder(
+                            valueListenable: widget.sync.offline,
+                            builder: (context, offline, _) => CesListHeading(
+                              title: _list?.name ?? '',
+                              summary: _shown.isEmpty
+                                  ? l10n.listNothingToBuyYet
+                                  : l10n.listToBuyInBasket(toBuy.length, inBasket.length),
+                              status: offline ? l10n.listOffline(_pending) : null,
+                            ),
                           ),
                         ),
                       ),
@@ -254,9 +229,9 @@ class _ListScreenState extends State<ListScreen> {
                                   padding: const EdgeInsets.only(bottom: 4),
                                   child: CesCheckedItem(
                                     name: item.name,
-                                    checkedBy: item.checkedById == myId
+                                    checkedBy: item.checkedBy?.id == myId
                                         ? l10n.listCheckedByYou
-                                        : item.checkedByName ?? '',
+                                        : item.checkedBy?.displayName ?? '',
                                     semanticHint: l10n.itemUncheck,
                                     onTap: () => _setChecked(item, false),
                                     onLongPress: () => _openItem(item),

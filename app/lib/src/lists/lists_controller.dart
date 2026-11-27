@@ -77,8 +77,9 @@ final class ListFailed extends ListFailure {
 /// the User makes to them.
 ///
 /// Lists come from the API and are cached on the device, so the Lists screen
-/// still shows them offline. Changes need the network until #7 moves them to
-/// the outbox.
+/// still shows them offline. What a sync pull learns about them (a List
+/// deleted elsewhere, a new count of Items to buy) shows at once, through
+/// [synced]. Changes to Lists still need the network (ADR-0001).
 class ListsController extends ChangeNotifier {
   ListsController({required this._api, required this._db, required this._session}) {
     _session.addListener(_onSessionChanged);
@@ -214,6 +215,28 @@ class ListsController extends ChangeNotifier {
     ApiErrorCode.limitExceeded => ListLimitReached(error.limit),
     _ => ListFailure.failed,
   };
+
+  /// A sync pull found the Lists [gone] (deleted, or the User is no longer a
+  /// Member) and recounted the Items to buy of others ([toBuy], by List ID).
+  /// The device's cache already says so.
+  void synced({required Set<String> gone, required Map<String, int> toBuy}) {
+    if (!_loaded || (gone.isEmpty && toBuy.isEmpty)) return;
+    _show([
+      for (final l in _lists)
+        if (!gone.contains(l.id))
+          switch (toBuy[l.id]) {
+            final n? when n != l.uncheckedItemCount => ListSummary(
+              id: l.id,
+              name: l.name,
+              role: l.role,
+              uncheckedItemCount: n,
+              memberCount: l.memberCount,
+              createdAt: l.createdAt,
+            ),
+            _ => l,
+          },
+    ]);
+  }
 
   void _show(List<ListSummary> lists) {
     _lists = [...lists]..sort((a, b) => b.createdAt.compareTo(a.createdAt));

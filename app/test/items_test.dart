@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cesta/src/api/generated/cesta_api.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'harness/harness.dart';
 
@@ -93,6 +94,48 @@ void main() {
     expect(h.tags(), isEmpty);
     expect(h.api.itemsToBuy(list), isEmpty);
   });
+
+  testWidgets('offline, Undo of an add leaves nothing waiting to sync', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    h.goOffline();
+
+    await h.addNewItem('Tomatoes', listName: 'Weekend feira');
+    await h.addNewItem('Bread', listName: 'Weekend feira');
+    await h.tap(find.text('Undo'));
+    await h.tap(find.text('Done'));
+
+    expect(h.tags(), ['Coffee', 'Tomatoes']);
+    expect(find.text('Offline · 1 change waiting to sync'), findsOneWidget);
+    await h.goOnline();
+    expect(h.api.itemsToBuy(list), ['Coffee', 'Tomatoes']);
+  });
+
+  for (final (locale, typed, less, stepped) in [
+    (english, '2.3', 'Less', '1.3'),
+    (brazilianPortuguese, '2,3', 'Menos', '1,3'),
+  ]) {
+    testWidgets('stepping a typed decimal keeps it exact ($locale)', (tester) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      h.api.addList(ana, name: 'Feira');
+      await h.pumpApp(locale: locale);
+      await h.openList('Feira');
+      await h.tap(find.byType(CesAddBar));
+      await h.search('Cheese');
+      await h.tap(find.byType(CesAddAsNew));
+      final quantity = find.descendant(of: find.byType(CesStepper), matching: find.byType(EditableText));
+
+      await tester.enterText(quantity, typed);
+      await h.tap(find.bySemanticsLabel(less));
+
+      expect(tester.widget<EditableText>(quantity).controller.text, stepped);
+    });
+  }
 
   testWidgets('a change the server rejects is rolled back with a message', (tester) async {
     final h = Harness(tester);
@@ -273,7 +316,14 @@ void main() {
     await h.addNewItem('Tomatoes', listName: 'Weekend feira');
 
     expect(find.text('This list is full'), findsOneWidget);
+    expect(find.text('A list can hold up to 1 items. Remove ones you no longer need to make room.'), findsOneWidget);
     expect(h.api.itemsToBuy(list), ['Coffee']);
+
+    // The limit the server reported is the one the app now checks.
+    await h.tap(find.byTooltip('Close'));
+    await h.tap(find.text('Done'));
+    await h.tap(find.text('Add an item'));
+    expect(find.text('This list is full'), findsOneWidget);
   });
 
   testWidgets('an empty List invites adding the first Item', (tester) async {

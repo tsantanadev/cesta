@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:cesta/src/api/generated/cesta_api.dart';
 import 'package:cesta/src/sync/network_status.dart';
@@ -175,7 +176,9 @@ class FakeApiClient implements ApiClient {
   void purgeListNow(String id) => _lists.remove(id);
 
   /// Deletes List [id] behind the app's back, e.g. from another device.
-  void deleteListNow(String id) => _lists[id]!.deletedAt = DateTime.now().toUtc();
+  void deleteListNow(String id) => _lists[id]!
+    ..deletedAt = DateTime.now().toUtc()
+    ..deletedSeq = ++_changeSeq;
 
   static const _restoreWindow = Duration(days: 30);
 
@@ -183,7 +186,10 @@ class FakeApiClient implements ApiClient {
     id: l.id,
     name: l.name,
     role: l.ownerUid == uid ? Role.owner : Role.editor,
-    uncheckedItemCount: l.uncheckedItemCount,
+    // Counted from its Items once it has any, as the server does.
+    uncheckedItemCount: _items.values.any((i) => i.listId == l.id)
+        ? _liveItems.where((i) => i.listId == l.id && i.checkedAt == null).length
+        : l.uncheckedItemCount,
     memberCount: l.members.length,
     createdAt: l.createdAt,
   );
@@ -482,8 +488,11 @@ class FakeApiClient implements ApiClient {
   }
 
   MutationResult _apply(FakeIdentity identity, Mutation m) {
-    MutationResult rejected(ApiErrorCode code) =>
-        MutationResult(mutationId: m.id, status: MutationResultStatus.rejected, reason: _error(code));
+    MutationResult rejected(ApiErrorCode code, {int? limit}) => MutationResult(
+      mutationId: m.id,
+      status: MutationResultStatus.rejected,
+      reason: _error(code, limit: limit),
+    );
     final applied = MutationResult(mutationId: m.id, status: MutationResultStatus.applied);
     if (rejectMutations case final code?) return rejected(code);
     final fields = m.fields ?? const ItemFields();
@@ -497,7 +506,7 @@ class FakeApiClient implements ApiClient {
         final name = fields.name?.trim() ?? '';
         if (name.isEmpty || name.runes.length > 80) return rejected(ApiErrorCode.invalidItem);
         if (_liveItems.where((i) => i.listId == listId).length >= itemLimit) {
-          return rejected(ApiErrorCode.limitExceeded);
+          return rejected(ApiErrorCode.limitExceeded, limit: itemLimit);
         }
         _items[m.entityId] = _FakeItem(
           id: m.entityId,
@@ -550,13 +559,21 @@ class FakeApiClient implements ApiClient {
       return i.seq > since && list != null && list.deletedAt == null && list.members.contains(identity.uid);
     }).toList()..sort((a, b) => a.seq.compareTo(b.seq));
     final page = changed.take(limit ?? 500).toList();
+    // Lists deleted since, sent with the last page.
+    final deleted = page.length < changed.length
+        ? const <_FakeList>[]
+        : _lists.values.where(
+            (l) => l.deletedAt != null && (l.deletedSeq ?? 0) > since && l.members.contains(identity.uid),
+          );
+    final last = [if (page.isNotEmpty) page.last.seq, for (final l in deleted) l.deletedSeq!, since].reduce(math.max);
     final answer = PullChanges200(
       _pullResponse(
         items: [for (final i in page.where((i) => !i.deleted)) _toItem(i)],
         tombstones: [
           for (final i in page.where((i) => i.deleted)) Tombstone(type: TombstoneType.item, id: i.id, listId: i.listId),
+          for (final l in deleted) Tombstone(type: TombstoneType.list, id: l.id),
         ],
-        cursor: '${page.isEmpty ? since : page.last.seq}',
+        cursor: '$last',
         hasMore: page.length < changed.length,
       ),
     );
@@ -610,6 +627,9 @@ class _FakeList {
   String name;
   final DateTime createdAt;
   final Set<String> members;
+
+  /// The change number of its deletion behind the app's back, for pulls.
+  int? deletedSeq;
   final int uncheckedItemCount;
   DateTime? deletedAt;
 }

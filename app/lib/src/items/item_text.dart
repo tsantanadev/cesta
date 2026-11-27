@@ -53,5 +53,30 @@ String? parseQuantity(String text) {
   return result;
 }
 
-/// The most Items a List can hold (the server's limit).
-const maxItemsPerList = 500;
+/// [text] as [parseQuantity] reads it, or null when it is blank or not a quantity.
+String? tryParseQuantity(String text) {
+  try {
+    return parseQuantity(text);
+  } on FormatException {
+    return null;
+  }
+}
+
+/// [quantity] (API form) as a person types it in [l10n]'s locale: the
+/// locale's decimal separator, no grouping (e.g. "1,5" in Portuguese).
+String editableQuantity(AppLocalizations l10n, String quantity) =>
+    quantity.replaceAll('.', NumberFormat.decimalPattern(l10n.localeName).symbols.DECIMAL_SEP);
+
+/// [quantity] (API form; null for none) moved by [by] whole units, exactly,
+/// keeping its decimals ("2.3" − 1 is "1.3"); null when that is below one,
+/// where the quantity goes away.
+String? stepQuantity(String? quantity, int by) {
+  final (whole, fraction) = switch (quantity?.split('.')) {
+    [final w] => (int.parse(w), ''),
+    [final w, final f] => (int.parse(w), f),
+    _ => (0, ''),
+  };
+  final next = whole + by;
+  if (next < 1) return null;
+  return fraction.isEmpty ? '$next' : '$next.$fraction';
+}

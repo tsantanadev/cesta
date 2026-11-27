@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
@@ -8,18 +7,24 @@ import '../api/generated/cesta_api.dart';
 import '../db/app_database.dart';
 
 /// The signed-in User making a change, recorded with it so the change shows
-/// who made it before the server confirms it.
+/// who made it before the server confirms it. Also who added or checked an
+/// Item, as the server reports it.
 typedef Actor = ({String id, String displayName});
 
 /// The outbox of this device's changes not yet confirmed by the server
-/// (ADR-0001), and the only writer of its rows: changes are enqueued here,
-/// marked applied when the server confirms them, and dropped when refused,
-/// undone or once a pull reflects them.
+/// (ADR-0001), and the only reader and writer of its rows: changes are
+/// enqueued here, marked applied when the server confirms them, and dropped
+/// when refused, undone or once a pull reflects them.
 class ChangeOutbox {
   ChangeOutbox(this._db);
 
   final AppDatabase _db;
   final _changes = StreamController<void>.broadcast();
+
+  /// The changes being pushed right now ([unpushed] until [settle]), by
+  /// [OutboxData.seq]: they may reach the server whatever this device does,
+  /// so undoing one can't just drop it.
+  final _inFlight = <int>{};
 
   static const _uuid = Uuid();
 
@@ -39,10 +44,10 @@ class ChangeOutbox {
         .insert(
           OutboxCompanion.insert(
             mutationId: _uuid.v4(),
-            type: type.toJson(),
+            type: type,
             itemId: itemId,
             listId: listId,
-            fields: jsonEncode(fields.toJson()),
+            fields: fields,
             clientTimestampMicros: DateTime.now().toUtc().microsecondsSinceEpoch,
             byId: by.id,
             byName: by.displayName,
@@ -51,26 +56,65 @@ class ChangeOutbox {
     _changes.add(null);
   }
 
+  /// Drops every change to Item [itemId] while its creation is still waiting
+  /// to be pushed, so the Item never reaches the server; false when it can't
+  /// (it was pushed, or is being pushed).
+  Future<bool> dropPendingCreate(String itemId) =>
+      _dropWaiting(itemId, MutationType.itemCreate, (t) => t.itemId.equals(itemId) & t.applied.equals(false));
+
   /// Drops the removal of Item [itemId] while it is still waiting to be
-  /// pushed; false when there is none.
-  Future<bool> dropPendingRemoval(String itemId) async {
-    final dropped =
-        await (_db.delete(_db.outbox)..where(
-              (t) =>
-                  t.itemId.equals(itemId) & t.type.equals(MutationType.itemDelete.toJson()) & t.applied.equals(false),
-            ))
-            .go();
+  /// pushed; false when there is none (or it is being pushed).
+  Future<bool> dropPendingRemoval(String itemId) => _dropWaiting(
+    itemId,
+    MutationType.itemDelete,
+    (t) => t.itemId.equals(itemId) & t.type.equalsValue(MutationType.itemDelete) & t.applied.equals(false),
+  );
+
+  /// When a [type] change to [itemId] is waiting and none of its changes are
+  /// in flight, drops the rows [drop] picks.
+  Future<bool> _dropWaiting(String itemId, MutationType type, Expression<bool> Function($OutboxTable t) drop) async {
+    final dropped = await _db.transaction(() async {
+      final waiting = await (_db.select(
+        _db.outbox,
+      )..where((t) => t.itemId.equals(itemId) & t.applied.equals(false))).get();
+      if (!waiting.any((r) => r.type == type) || waiting.any((r) => _inFlight.contains(r.seq))) return 0;
+      return (_db.delete(_db.outbox)..where(drop)).go();
+    });
     if (dropped > 0) _changes.add(null);
     return dropped > 0;
   }
 
-  /// The oldest [limit] changes not yet pushed.
-  Future<List<OutboxData>> unpushed(int limit) =>
+  /// The oldest [limit] changes not yet pushed, now in flight until [settle].
+  Future<List<OutboxData>> unpushed(int limit) async {
+    final batch =
+        await (_db.select(_db.outbox)
+              ..where((t) => t.applied.equals(false))
+              ..orderBy([(t) => OrderingTerm.asc(t.seq)])
+              ..limit(limit))
+            .get();
+    _inFlight.addAll(batch.map((r) => r.seq));
+    return batch;
+  }
+
+  /// The push of [batch] is over: what's left of it can be undone again.
+  void settle(List<OutboxData> batch) => _inFlight.removeAll(batch.map((r) => r.seq));
+
+  /// Every change to List [listId] still in the outbox, oldest first.
+  Future<List<OutboxData>> forList(String listId) =>
       (_db.select(_db.outbox)
-            ..where((t) => t.applied.equals(false))
-            ..orderBy([(t) => OrderingTerm.asc(t.seq)])
-            ..limit(limit))
+            ..where((t) => t.listId.equals(listId))
+            ..orderBy([(t) => OrderingTerm.asc(t.seq)]))
           .get();
+
+  /// How many changes to List [listId] are waiting to reach the server;
+  /// emits on change.
+  Stream<int> watchWaiting(String listId) {
+    final count = _db.outbox.seq.count();
+    final query = _db.selectOnly(_db.outbox)
+      ..addColumns([count])
+      ..where(_db.outbox.listId.equals(listId) & _db.outbox.applied.equals(false));
+    return query.map((row) => row.read(count) ?? 0).watchSingle();
+  }
 
   /// The server applied [change]; it stays shown until a pull reflects it.
   Future<void> markApplied(OutboxData change) => (_db.update(
@@ -81,7 +125,7 @@ class ChangeOutbox {
   /// to that Item.
   Future<void> rollBack(OutboxData change) =>
       (_db.delete(_db.outbox)..where(
-            (t) => change.type == MutationType.itemCreate.toJson()
+            (t) => change.type == MutationType.itemCreate
                 ? t.itemId.equals(change.itemId) & t.applied.equals(false)
                 : t.seq.equals(change.seq),
           ))

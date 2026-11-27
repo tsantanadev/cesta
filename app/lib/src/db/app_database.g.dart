@@ -1550,15 +1550,14 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
-  static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
-  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+  late final GeneratedColumnWithTypeConverter<MutationType, String> type = GeneratedColumn<String>(
     'type',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-  );
+  ).withConverter<MutationType>($OutboxTable.$convertertype);
   static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
   @override
   late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
@@ -1577,15 +1576,14 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _fieldsMeta = const VerificationMeta('fields');
   @override
-  late final GeneratedColumn<String> fields = GeneratedColumn<String>(
+  late final GeneratedColumnWithTypeConverter<ItemFields, String> fields = GeneratedColumn<String>(
     'fields',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-  );
+  ).withConverter<ItemFields>($OutboxTable.$converterfields);
   static const VerificationMeta _clientTimestampMicrosMeta = const VerificationMeta('clientTimestampMicros');
   @override
   late final GeneratedColumn<int> clientTimestampMicros = GeneratedColumn<int>(
@@ -1654,11 +1652,6 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
     } else if (isInserting) {
       context.missing(_mutationIdMeta);
     }
-    if (data.containsKey('type')) {
-      context.handle(_typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
-    } else if (isInserting) {
-      context.missing(_typeMeta);
-    }
     if (data.containsKey('item_id')) {
       context.handle(_itemIdMeta, itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta));
     } else if (isInserting) {
@@ -1668,11 +1661,6 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
       context.handle(_listIdMeta, listId.isAcceptableOrUnknown(data['list_id']!, _listIdMeta));
     } else if (isInserting) {
       context.missing(_listIdMeta);
-    }
-    if (data.containsKey('fields')) {
-      context.handle(_fieldsMeta, fields.isAcceptableOrUnknown(data['fields']!, _fieldsMeta));
-    } else if (isInserting) {
-      context.missing(_fieldsMeta);
     }
     if (data.containsKey('client_timestamp_micros')) {
       context.handle(
@@ -1706,10 +1694,14 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
     return OutboxData(
       seq: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}seq'])!,
       mutationId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}mutation_id'])!,
-      type: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      type: $OutboxTable.$convertertype.fromSql(
+        attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      ),
       itemId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}item_id'])!,
       listId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}list_id'])!,
-      fields: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}fields'])!,
+      fields: $OutboxTable.$converterfields.fromSql(
+        attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}fields'])!,
+      ),
       clientTimestampMicros: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}client_timestamp_micros'],
@@ -1724,6 +1716,9 @@ class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
   $OutboxTable createAlias(String alias) {
     return $OutboxTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<MutationType, String> $convertertype = const _MutationTypeConverter();
+  static TypeConverter<ItemFields, String> $converterfields = const _ItemFieldsConverter();
 }
 
 class OutboxData extends DataClass implements Insertable<OutboxData> {
@@ -1733,13 +1728,13 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
   /// The client mutation ID, so retrying a push applies it once.
   final String mutationId;
 
-  /// The [MutationType] wire value.
-  final String type;
+  /// Stored as the [MutationType] wire value.
+  final MutationType type;
   final String itemId;
   final String listId;
 
-  /// The changed fields as [ItemFields] JSON.
-  final String fields;
+  /// The changed fields, stored as [ItemFields] JSON.
+  final ItemFields fields;
   final int clientTimestampMicros;
 
   /// The signed-in User when the change was made: shown as who added or checked it.
@@ -1765,10 +1760,14 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     final map = <String, Expression>{};
     map['seq'] = Variable<int>(seq);
     map['mutation_id'] = Variable<String>(mutationId);
-    map['type'] = Variable<String>(type);
+    {
+      map['type'] = Variable<String>($OutboxTable.$convertertype.toSql(type));
+    }
     map['item_id'] = Variable<String>(itemId);
     map['list_id'] = Variable<String>(listId);
-    map['fields'] = Variable<String>(fields);
+    {
+      map['fields'] = Variable<String>($OutboxTable.$converterfields.toSql(fields));
+    }
     map['client_timestamp_micros'] = Variable<int>(clientTimestampMicros);
     map['by_id'] = Variable<String>(byId);
     map['by_name'] = Variable<String>(byName);
@@ -1796,10 +1795,10 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     return OutboxData(
       seq: serializer.fromJson<int>(json['seq']),
       mutationId: serializer.fromJson<String>(json['mutationId']),
-      type: serializer.fromJson<String>(json['type']),
+      type: serializer.fromJson<MutationType>(json['type']),
       itemId: serializer.fromJson<String>(json['itemId']),
       listId: serializer.fromJson<String>(json['listId']),
-      fields: serializer.fromJson<String>(json['fields']),
+      fields: serializer.fromJson<ItemFields>(json['fields']),
       clientTimestampMicros: serializer.fromJson<int>(json['clientTimestampMicros']),
       byId: serializer.fromJson<String>(json['byId']),
       byName: serializer.fromJson<String>(json['byName']),
@@ -1812,10 +1811,10 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
     return <String, dynamic>{
       'seq': serializer.toJson<int>(seq),
       'mutationId': serializer.toJson<String>(mutationId),
-      'type': serializer.toJson<String>(type),
+      'type': serializer.toJson<MutationType>(type),
       'itemId': serializer.toJson<String>(itemId),
       'listId': serializer.toJson<String>(listId),
-      'fields': serializer.toJson<String>(fields),
+      'fields': serializer.toJson<ItemFields>(fields),
       'clientTimestampMicros': serializer.toJson<int>(clientTimestampMicros),
       'byId': serializer.toJson<String>(byId),
       'byName': serializer.toJson<String>(byName),
@@ -1826,10 +1825,10 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
   OutboxData copyWith({
     int? seq,
     String? mutationId,
-    String? type,
+    MutationType? type,
     String? itemId,
     String? listId,
-    String? fields,
+    ItemFields? fields,
     int? clientTimestampMicros,
     String? byId,
     String? byName,
@@ -1902,10 +1901,10 @@ class OutboxData extends DataClass implements Insertable<OutboxData> {
 class OutboxCompanion extends UpdateCompanion<OutboxData> {
   final Value<int> seq;
   final Value<String> mutationId;
-  final Value<String> type;
+  final Value<MutationType> type;
   final Value<String> itemId;
   final Value<String> listId;
-  final Value<String> fields;
+  final Value<ItemFields> fields;
   final Value<int> clientTimestampMicros;
   final Value<String> byId;
   final Value<String> byName;
@@ -1925,10 +1924,10 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
   OutboxCompanion.insert({
     this.seq = const Value.absent(),
     required String mutationId,
-    required String type,
+    required MutationType type,
     required String itemId,
     required String listId,
-    required String fields,
+    required ItemFields fields,
     required int clientTimestampMicros,
     required String byId,
     required String byName,
@@ -1970,10 +1969,10 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
   OutboxCompanion copyWith({
     Value<int>? seq,
     Value<String>? mutationId,
-    Value<String>? type,
+    Value<MutationType>? type,
     Value<String>? itemId,
     Value<String>? listId,
-    Value<String>? fields,
+    Value<ItemFields>? fields,
     Value<int>? clientTimestampMicros,
     Value<String>? byId,
     Value<String>? byName,
@@ -2003,7 +2002,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
       map['mutation_id'] = Variable<String>(mutationId.value);
     }
     if (type.present) {
-      map['type'] = Variable<String>(type.value);
+      map['type'] = Variable<String>($OutboxTable.$convertertype.toSql(type.value));
     }
     if (itemId.present) {
       map['item_id'] = Variable<String>(itemId.value);
@@ -2012,7 +2011,7 @@ class OutboxCompanion extends UpdateCompanion<OutboxData> {
       map['list_id'] = Variable<String>(listId.value);
     }
     if (fields.present) {
-      map['fields'] = Variable<String>(fields.value);
+      map['fields'] = Variable<String>($OutboxTable.$converterfields.toSql(fields.value));
     }
     if (clientTimestampMicros.present) {
       map['client_timestamp_micros'] = Variable<int>(clientTimestampMicros.value);
@@ -2962,10 +2961,10 @@ typedef $$SyncedItemsTableProcessedTableManager =
 typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   Value<int> seq,
   required String mutationId,
-  required String type,
+  required MutationType type,
   required String itemId,
   required String listId,
-  required String fields,
+  required ItemFields fields,
   required int clientTimestampMicros,
   required String byId,
   required String byName,
@@ -2974,10 +2973,10 @@ typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
 typedef $$OutboxTableUpdateCompanionBuilder = OutboxCompanion Function({
   Value<int> seq,
   Value<String> mutationId,
-  Value<String> type,
+  Value<MutationType> type,
   Value<String> itemId,
   Value<String> listId,
-  Value<String> fields,
+  Value<ItemFields> fields,
   Value<int> clientTimestampMicros,
   Value<String> byId,
   Value<String> byName,
@@ -2997,7 +2996,8 @@ class $$OutboxTableFilterComposer extends Composer<_$AppDatabase, $OutboxTable> 
   ColumnFilters<String> get mutationId =>
       $composableBuilder(column: $table.mutationId, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get type => $composableBuilder(column: $table.type, builder: (column) => ColumnFilters(column));
+  ColumnWithTypeConverterFilters<MutationType, MutationType, String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => ColumnWithTypeConverterFilters(column));
 
   ColumnFilters<String> get itemId =>
       $composableBuilder(column: $table.itemId, builder: (column) => ColumnFilters(column));
@@ -3005,8 +3005,8 @@ class $$OutboxTableFilterComposer extends Composer<_$AppDatabase, $OutboxTable> 
   ColumnFilters<String> get listId =>
       $composableBuilder(column: $table.listId, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get fields =>
-      $composableBuilder(column: $table.fields, builder: (column) => ColumnFilters(column));
+  ColumnWithTypeConverterFilters<ItemFields, ItemFields, String> get fields =>
+      $composableBuilder(column: $table.fields, builder: (column) => ColumnWithTypeConverterFilters(column));
 
   ColumnFilters<int> get clientTimestampMicros =>
       $composableBuilder(column: $table.clientTimestampMicros, builder: (column) => ColumnFilters(column));
@@ -3070,13 +3070,15 @@ class $$OutboxTableAnnotationComposer extends Composer<_$AppDatabase, $OutboxTab
 
   GeneratedColumn<String> get mutationId => $composableBuilder(column: $table.mutationId, builder: (column) => column);
 
-  GeneratedColumn<String> get type => $composableBuilder(column: $table.type, builder: (column) => column);
+  GeneratedColumnWithTypeConverter<MutationType, String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
 
   GeneratedColumn<String> get itemId => $composableBuilder(column: $table.itemId, builder: (column) => column);
 
   GeneratedColumn<String> get listId => $composableBuilder(column: $table.listId, builder: (column) => column);
 
-  GeneratedColumn<String> get fields => $composableBuilder(column: $table.fields, builder: (column) => column);
+  GeneratedColumnWithTypeConverter<ItemFields, String> get fields =>
+      $composableBuilder(column: $table.fields, builder: (column) => column);
 
   GeneratedColumn<int> get clientTimestampMicros =>
       $composableBuilder(column: $table.clientTimestampMicros, builder: (column) => column);
@@ -3115,10 +3117,10 @@ class $$OutboxTableTableManager
               ({
                 Value<int> seq = const Value.absent(),
                 Value<String> mutationId = const Value.absent(),
-                Value<String> type = const Value.absent(),
+                Value<MutationType> type = const Value.absent(),
                 Value<String> itemId = const Value.absent(),
                 Value<String> listId = const Value.absent(),
-                Value<String> fields = const Value.absent(),
+                Value<ItemFields> fields = const Value.absent(),
                 Value<int> clientTimestampMicros = const Value.absent(),
                 Value<String> byId = const Value.absent(),
                 Value<String> byName = const Value.absent(),
@@ -3139,10 +3141,10 @@ class $$OutboxTableTableManager
               ({
                 Value<int> seq = const Value.absent(),
                 required String mutationId,
-                required String type,
+                required MutationType type,
                 required String itemId,
                 required String listId,
-                required String fields,
+                required ItemFields fields,
                 required int clientTimestampMicros,
                 required String byId,
                 required String byName,

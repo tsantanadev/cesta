@@ -15,6 +15,8 @@ import 'fields.dart';
 
 export 'package:cesta/src/ui/components.dart'
     show
+        CesAddAsNew,
+        CesAddBar,
         CesButton,
         CesCheckedItem,
         CesChoiceChip,

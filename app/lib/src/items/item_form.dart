@@ -1,11 +1,9 @@
-import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../api/generated/cesta_api.dart';
 import '../names.dart';
 import '../ui/components.dart';
-import '../ui/tokens.dart';
 import 'item_text.dart';
 import 'items_store.dart';
 
@@ -65,8 +63,7 @@ class _ItemFormState extends State<ItemForm> {
     if (!_quantityShown) {
       _quantityShown = true;
       if (widget.initial.quantity case final q?) {
-        final locale = AppLocalizations.of(context).localeName;
-        _quantity.text = q.replaceAll('.', NumberFormat.decimalPattern(locale).symbols.DECIMAL_SEP);
+        _quantity.text = editableQuantity(AppLocalizations.of(context), q);
       }
     }
   }
@@ -81,32 +78,16 @@ class _ItemFormState extends State<ItemForm> {
     super.dispose();
   }
 
-  /// The typed quantity as a number, or null when blank or not a number.
-  num? get _quantityValue {
-    try {
-      final q = parseQuantity(_quantity.text);
-      return q == null ? null : num.parse(q);
-    } on FormatException {
-      return null;
-    }
-  }
-
+  /// Steps the typed quantity by [by]: below one it goes away, like the
+  /// design's tags without one. What isn't a quantity counts as none.
   void _step(int by) {
-    final current = _quantityValue ?? 0;
-    final next = current + by;
-    // Below one the quantity goes away, like the design's tags without one.
-    _quantity.text = next < 1 ? '' : _plain(next);
+    final next = stepQuantity(tryParseQuantity(_quantity.text), by);
+    _quantity.text = next == null ? '' : editableQuantity(AppLocalizations.of(context), next);
   }
-
-  static String _plain(num n) => n == n.roundToDouble() ? n.toInt().toString() : n.toString();
 
   void _submit() {
-    String? quantity;
-    try {
-      quantity = parseQuantity(_quantity.text);
-    } on FormatException {
-      setState(() => _quantityInvalid = true);
-    }
+    final quantity = tryParseQuantity(_quantity.text);
+    if (quantity == null && _quantity.text.trim().isNotEmpty) setState(() => _quantityInvalid = true);
     final nameOk = _formKey.currentState?.validate() ?? false;
     if (!nameOk || _quantityInvalid) return;
     final note = _note.text.trim();
@@ -131,14 +112,8 @@ class _ItemFormState extends State<ItemForm> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    String? previewQuantity;
-    try {
-      previewQuantity = tagQuantity(l10n, parseQuantity(_quantity.text), _unit);
-    } on FormatException {
-      previewQuantity = null;
-    }
-    const gap = SizedBox(height: 18);
+    final previewQuantity = tagQuantity(l10n, tryParseQuantity(_quantity.text), _unit);
+    const gap = CesItemSheetGap();
     return Form(
       key: _formKey,
       child: Column(
@@ -157,14 +132,7 @@ class _ItemFormState extends State<ItemForm> {
             textInputAction: TextInputAction.done,
           ),
           gap,
-          Text(
-            l10n.newItemHowMuch,
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          CesFieldLabel(l10n.newItemHowMuch),
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -190,27 +158,10 @@ class _ItemFormState extends State<ItemForm> {
               ],
             ),
           ),
-          if (_quantityInvalid) ...[
-            const SizedBox(height: 8),
-            Text(
-              l10n.errorItemQuantityInvalid,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-            ),
-          ],
+          if (_quantityInvalid) ...[const SizedBox(height: 8), CesFieldError(l10n.errorItemQuantityInvalid)],
           gap,
           CesSoftField(controller: _note, hint: l10n.newItemNoteHint, maxLength: maxItemNoteLength),
-          for (final line in widget.details) ...[
-            gap,
-            Text(
-              line,
-              style: TextStyle(
-                fontFamily: CestaFonts.family,
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
+          for (final line in widget.details) ...[gap, CesItemDetail(line)],
           gap,
           CesButton(label: widget.submitLabel, icon: widget.submitIcon, onPressed: _submit),
           if (widget.onRemove case final onRemove?) ...[

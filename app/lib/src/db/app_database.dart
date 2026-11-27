@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../api/generated/cesta_api.dart';
@@ -84,13 +86,13 @@ class Outbox extends Table {
   /// The client mutation ID, so retrying a push applies it once.
   TextColumn get mutationId => text().unique()();
 
-  /// The [MutationType] wire value.
-  TextColumn get type => text()();
+  /// Stored as the [MutationType] wire value.
+  TextColumn get type => text().map(const _MutationTypeConverter())();
   TextColumn get itemId => text()();
   TextColumn get listId => text()();
 
-  /// The changed fields as [ItemFields] JSON.
-  TextColumn get fields => text()();
+  /// The changed fields, stored as [ItemFields] JSON.
+  TextColumn get fields => text().map(const _ItemFieldsConverter())();
   IntColumn get clientTimestampMicros => integer()();
 
   /// The signed-in User when the change was made: shown as who added or checked it.
@@ -119,6 +121,28 @@ class _RoleConverter extends TypeConverter<Role, String> {
 
   @override
   String toSql(Role value) => value.toJson();
+}
+
+/// Stores [MutationType] by its API wire value.
+class _MutationTypeConverter extends TypeConverter<MutationType, String> {
+  const _MutationTypeConverter();
+
+  @override
+  MutationType fromSql(String fromDb) => MutationType.fromJson(fromDb);
+
+  @override
+  String toSql(MutationType value) => value.toJson();
+}
+
+/// Stores [ItemFields] as their API JSON.
+class _ItemFieldsConverter extends TypeConverter<ItemFields, String> {
+  const _ItemFieldsConverter();
+
+  @override
+  ItemFields fromSql(String fromDb) => ItemFields.fromJson(jsonDecode(fromDb) as Map<String, Object?>);
+
+  @override
+  String toSql(ItemFields value) => jsonEncode(value.toJson());
 }
 
 /// The signed-in User as cached on the device.
@@ -192,23 +216,42 @@ class AppDatabase extends _$AppDatabase {
   /// Adds or updates one cached List.
   Future<void> saveKnownList(ListSummary list) => into(knownLists).insertOnConflictUpdate(_listRow(list));
 
+  /// Sets the to-buy count of each cached List in [listIds] from its synced
+  /// Items, which a pull just brought up to date; returns the counts by List ID.
+  Future<Map<String, int>> recountKnownLists(Iterable<String> listIds) async {
+    final counts = <String, int>{};
+    for (final id in listIds) {
+      final count = syncedItems.id.count();
+      final toBuy =
+          await (selectOnly(syncedItems)
+                ..addColumns([count])
+                ..where(syncedItems.listId.equals(id) & syncedItems.checkedAtMicros.isNull()))
+              .map((row) => row.read(count) ?? 0)
+              .getSingle();
+      await (update(
+        knownLists,
+      )..where((t) => t.id.equals(id))).write(KnownListsCompanion(uncheckedItemCount: Value(toBuy)));
+      counts[id] = toBuy;
+    }
+    return counts;
+  }
+
   Future<void> forgetKnownList(String id) => (delete(knownLists)..where((t) => t.id.equals(id))).go();
 
   /// The cached Lists, newest first.
   Future<List<ListSummary>> readKnownLists() async {
     final rows = await (select(knownLists)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
-    return [
-      for (final r in rows)
-        ListSummary(
-          id: r.id,
-          name: r.name,
-          role: r.role,
-          uncheckedItemCount: r.uncheckedItemCount,
-          memberCount: r.memberCount,
-          createdAt: r.createdAt.toUtc(),
-        ),
-    ];
+    return [for (final r in rows) _summary(r)];
   }
+
+  static ListSummary _summary(KnownList r) => ListSummary(
+    id: r.id,
+    name: r.name,
+    role: r.role,
+    uncheckedItemCount: r.uncheckedItemCount,
+    memberCount: r.memberCount,
+    createdAt: r.createdAt.toUtc(),
+  );
 
   Future<void> clearKnownLists() => delete(knownLists).go();
 

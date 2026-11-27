@@ -528,3 +528,78 @@ class CesStatusPill extends StatelessWidget {
     );
   }
 }
+
+/// A List's heading on its screen (Figma "04 List" 4:148): the [title] in
+/// Bricolage, the [summary] under it (e.g. "3 to buy · 1 in the basket"),
+/// then, when given, a [status] pill such as "Offline · 2 changes waiting".
+class CesListHeading extends StatelessWidget {
+  const CesListHeading({super.key, required this.title, required this.summary, this.status});
+
+  final String title;
+  final String summary;
+  final String? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(title, style: CestaDisplayType.screenTitle.copyWith(color: scheme.onSurface)),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          summary,
+          style: TextStyle(
+            fontFamily: CestaFonts.family,
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        if (status case final status?) ...[const SizedBox(height: 10), CesStatusPill(label: status)],
+      ],
+    );
+  }
+}
+
+/// A bar's text action, e.g. "Done" beside the search field (Figma 4:272):
+/// Plus Jakarta Sans Bold 16 in Folha, 44 dp tall.
+class CesBarAction extends StatelessWidget {
+  const CesBarAction({super.key, required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    onPressed: onPressed,
+    style: TextButton.styleFrom(
+      foregroundColor: Theme.of(context).colorScheme.primary,
+      padding: EdgeInsets.zero,
+      minimumSize: const Size(44, 44),
+      textStyle: const TextStyle(fontFamily: CestaFonts.family, fontWeight: FontWeight.w700, fontSize: 16),
+    ),
+    child: Text(label),
+  );
+}
+
+/// A line of detail about an Item in its sheet, e.g. "Added by Ana": 14 dp, muted.
+class CesItemDetail extends StatelessWidget {
+  const CesItemDetail(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: TextStyle(
+      fontFamily: CestaFonts.family,
+      fontWeight: FontWeight.w500,
+      fontSize: 14,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
+  );
+}

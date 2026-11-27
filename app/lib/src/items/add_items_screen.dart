@@ -7,7 +7,6 @@ import '../../l10n/app_localizations.dart';
 import '../lists/lists_controller.dart';
 import '../session/session_controller.dart';
 import '../ui/components.dart';
-import '../ui/tokens.dart';
 import 'item_form.dart';
 import 'items_store.dart';
 
@@ -48,11 +47,10 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     if (user == null) return;
     final me = (id: user.id, displayName: user.displayName);
     unawaited(
-      showCesFormSheet(
+      showCesItemSheet(
         context,
         title: l10n.newItemTitle,
         closeTooltip: l10n.sheetClose,
-        sectionGap: 18,
         child: ItemForm(
           submitLabel: l10n.newItemAddTo(_listName),
           submitIcon: CesIcons.plus,
@@ -77,7 +75,6 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
     final query = _search.text.trim();
     return Scaffold(
       body: SafeArea(
@@ -101,20 +98,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  TextButton(
-                    onPressed: () => context.pop(),
-                    style: TextButton.styleFrom(
-                      foregroundColor: scheme.primary,
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(44, 44),
-                      textStyle: const TextStyle(
-                        fontFamily: CestaFonts.family,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                    ),
-                    child: Text(l10n.addItemsDone),
-                  ),
+                  CesBarAction(label: l10n.addItemsDone, onPressed: () => context.pop()),
                 ],
               ),
             ),

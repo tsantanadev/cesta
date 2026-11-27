@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
@@ -17,17 +16,31 @@ import 'outbox.dart';
 /// A change made on this device that the server refused. It has already been
 /// rolled back locally when this is reported.
 final class RejectedChange {
-  const RejectedChange({required this.type, required this.itemName, required this.listId, this.reason});
-
-  final MutationType type;
+  const RejectedChange({required this.itemName, this.reason, this.limit});
 
   /// The Item's name as the device showed it before the rollback.
   final String itemName;
-  final String listId;
 
   /// Why, as the server said (e.g. `limit_exceeded`, `item_deleted`).
   final ApiErrorCode? reason;
+
+  /// For `limit_exceeded`, how many Items a List can hold.
+  final int? limit;
 }
+
+/// What a pull changed about the User's Lists, already saved on the device.
+final class PulledLists {
+  const PulledLists({required this.gone, required this.toBuy});
+
+  /// Lists the User can no longer see (deleted).
+  final Set<String> gone;
+
+  /// The new count of Items to buy of each List whose Items changed, by List ID.
+  final Map<String, int> toBuy;
+}
+
+/// How many Items a List can hold until the server says otherwise.
+const defaultMaxItemsPerList = 500;
 
 /// Brings the device and the server in step (ADR-0001): pushes the outbox,
 /// then pulls what changed since the last cursor.
@@ -65,11 +78,21 @@ class SyncEngine {
   /// Changes the server refused, after they were rolled back.
   Stream<RejectedChange> get rejections => _rejections.stream;
 
+  final _pulledLists = StreamController<PulledLists>.broadcast();
+
+  /// What each pull changed about the User's Lists, once saved.
+  Stream<PulledLists> get pulledLists => _pulledLists.stream;
+
   final _offline = ValueNotifier(false);
 
   /// True while the phone has no connection or the server can't be reached;
   /// false again once a sync gets through.
   ValueListenable<bool> get offline => _offline;
+
+  final _itemLimit = ValueNotifier(defaultMaxItemsPerList);
+
+  /// How many Items a List can hold: the server's limit, as it last reported it.
+  ValueListenable<int> get itemLimit => _itemLimit;
 
   bool _started = false;
 
@@ -189,30 +212,41 @@ class SyncEngine {
     while (!stopped()) {
       final batch = await _outbox.unpushed(size);
       if (batch.isEmpty) return;
-      final answer = await _send(batch);
-      if (stopped()) return;
-      // Items whose refused create took their later changes with it: those
-      // changes' own results are moot and already reported.
-      final droppedItems = <String>{};
-      for (final row in batch) {
-        if (stopped()) return;
-        if (droppedItems.contains(row.itemId)) continue;
-        final r = answer.results[row.mutationId];
-        if (r == null) {
-          if (batch.length > 1) {
-            size = 1; // find which change it is
-            break;
-          }
-          await _rollBack(row, answer.refusal, generation);
-        } else if (r.status == MutationResultStatus.applied) {
-          await _outbox.markApplied(row);
-          continue;
-        } else {
-          await _rollBack(row, r.reason?.code, generation);
-        }
-        if (row.type == MutationType.itemCreate.toJson()) droppedItems.add(row.itemId);
+      try {
+        size = await _settle(batch, await _send(batch), generation) ?? size;
+      } finally {
+        _outbox.settle(batch);
       }
     }
+  }
+
+  /// Marks applied or rolls back each change of [batch] by the server's
+  /// [answer]; the batch size to push next when the answer can't say which
+  /// change of a batch was refused.
+  Future<int?> _settle(
+    List<OutboxData> batch,
+    ({Map<String, MutationResult> results, ApiErrorCode? refusal}) answer,
+    int generation,
+  ) async {
+    // Items whose refused create took their later changes with it: those
+    // changes' own results are moot and already reported.
+    final droppedItems = <String>{};
+    for (final row in batch) {
+      if (generation != _generation) return null;
+      if (droppedItems.contains(row.itemId)) continue;
+      final r = answer.results[row.mutationId];
+      if (r == null) {
+        if (batch.length > 1) return 1; // find which change it is
+        await _rollBack(row, answer.refusal, null, generation);
+      } else if (r.status == MutationResultStatus.applied) {
+        await _outbox.markApplied(row);
+        continue;
+      } else {
+        await _rollBack(row, r.reason?.code, r.reason?.limit, generation);
+      }
+      if (row.type == MutationType.itemCreate) droppedItems.add(row.itemId);
+    }
+    return null;
   }
 
   /// Sends [batch]; the results by mutation ID, or none and why when the
@@ -232,33 +266,25 @@ class SyncEngine {
     }
   }
 
-  static Mutation _mutation(OutboxData m) {
-    final type = MutationType.fromJson(m.type);
-    return Mutation(
-      id: m.mutationId,
-      type: type,
-      entityId: m.itemId,
-      listId: type == MutationType.itemCreate ? m.listId : null,
-      fields: type == MutationType.itemDelete
-          ? null
-          : ItemFields.fromJson(jsonDecode(m.fields) as Map<String, Object?>),
-      clientTimestamp: DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true),
-    );
-  }
+  static Mutation _mutation(OutboxData m) => Mutation(
+    id: m.mutationId,
+    type: m.type,
+    entityId: m.itemId,
+    listId: m.type == MutationType.itemCreate ? m.listId : null,
+    fields: m.type == MutationType.itemDelete ? null : m.fields,
+    clientTimestamp: DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true),
+  );
 
   /// Drops the refused change [row] (and, for a refused create, every later
-  /// change to that Item), then reports it.
-  Future<void> _rollBack(OutboxData row, ApiErrorCode? reason, int generation) async {
+  /// change to that Item), then reports it. [limit] comes with
+  /// `limit_exceeded`.
+  Future<void> _rollBack(OutboxData row, ApiErrorCode? reason, int? limit, int generation) async {
     final shown = await _items.readList(row.listId);
-    final name =
-        shown.where((i) => i.id == row.itemId).firstOrNull?.name ??
-        ItemFields.fromJson(jsonDecode(row.fields) as Map<String, Object?>).name ??
-        '';
+    final name = shown.where((i) => i.id == row.itemId).firstOrNull?.name ?? row.fields.name ?? '';
     if (generation != _generation) return;
     await _outbox.rollBack(row);
-    _rejections.add(
-      RejectedChange(type: MutationType.fromJson(row.type), itemName: name, listId: row.listId, reason: reason),
-    );
+    if (limit != null) _itemLimit.value = limit;
+    _rejections.add(RejectedChange(itemName: name, reason: reason, limit: limit));
   }
 
   Future<void> _pull(int generation) async {
@@ -270,22 +296,30 @@ class SyncEngine {
         PullChanges200(:final value) => value,
         _ => throw _Refused(result),
       };
+      final gone = <String>{};
+      var toBuy = const <String, int>{};
       await _db.transaction(() async {
         // Checked inside the transaction: data cleared at sign-out waits for it.
         if (stopped()) return;
+        // Lists whose Items changed, to recount their Items to buy.
+        final touched = <String>{};
         for (final item in page.items) {
           await _db.into(_db.syncedItems).insertOnConflictUpdate(_row(item));
+          touched.add(item.listId);
         }
         for (final t in page.tombstones) {
           switch (t.type) {
             case TombstoneType.item:
               await (_db.delete(_db.syncedItems)..where((r) => r.id.equals(t.id))).go();
+              if (t.listId case final listId?) touched.add(listId);
             case TombstoneType.list:
               await (_db.delete(_db.syncedItems)..where((r) => r.listId.equals(t.id))).go();
               await _outbox.dropList(t.id);
               await _db.forgetKnownList(t.id);
+              gone.add(t.id);
           }
         }
+        toBuy = await _db.recountKnownLists(touched.difference(gone));
         await _db
             .into(_db.syncCursor)
             .insertOnConflictUpdate(SyncCursorCompanion.insert(id: const Value(1), cursor: page.cursor));
@@ -293,6 +327,8 @@ class SyncEngine {
         // overlays can go without the display flickering back.
         if (!page.hasMore) await _outbox.dropApplied();
       });
+      if (stopped()) return;
+      if (gone.isNotEmpty || toBuy.isNotEmpty) _pulledLists.add(PulledLists(gone: gone, toBuy: toBuy));
       cursor = page.cursor;
       if (!page.hasMore) return;
     }
@@ -316,7 +352,9 @@ class SyncEngine {
   Future<void> dispose() async {
     await stop();
     await _rejections.close();
+    await _pulledLists.close();
     _offline.dispose();
+    _itemLimit.dispose();
   }
 }
 

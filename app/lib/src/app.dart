@@ -56,6 +56,7 @@ class _CestaAppState extends State<CestaApp> {
   late final SyncEngine _sync;
   late final GoRouter _router;
   late final StreamSubscription<RejectedChange> _rejections;
+  late final StreamSubscription<PulledLists> _pulledLists;
   final _messenger = GlobalKey<ScaffoldMessengerState>();
 
   @override
@@ -68,6 +69,7 @@ class _CestaAppState extends State<CestaApp> {
     _sync = SyncEngine(api: widget.api, db: widget.database, items: _items, outbox: _outbox, network: widget.network);
     _session.addListener(_followSession);
     _rejections = _sync.rejections.listen(_tellRejected);
+    _pulledLists = _sync.pulledLists.listen((p) => _lists.synced(gone: p.gone, toBuy: p.toBuy));
     _router = buildRouter(
       session: _session,
       lists: _lists,
@@ -95,7 +97,7 @@ class _CestaAppState extends State<CestaApp> {
   void _tellRejected(RejectedChange change) {
     if (change.reason == ApiErrorCode.limitExceeded) {
       if (_router.routerDelegate.navigatorKey.currentContext case final context?) {
-        unawaited(showItemLimitSheet(context));
+        unawaited(showItemLimitSheet(context, limit: change.limit ?? _sync.itemLimit.value));
         return;
       }
     }
@@ -116,6 +118,7 @@ class _CestaAppState extends State<CestaApp> {
   @override
   void dispose() {
     unawaited(_rejections.cancel());
+    unawaited(_pulledLists.cancel());
     _session.removeListener(_followSession);
     unawaited(_sync.dispose());
     _outbox.dispose();
