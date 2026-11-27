@@ -1524,6 +1524,493 @@ class SyncedItemsCompanion extends UpdateCompanion<SyncedItem> {
   }
 }
 
+class $SyncedHistoryTable extends SyncedHistory with TableInfo<$SyncedHistoryTable, SyncedHistoryData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncedHistoryTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
+    'item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _listIdMeta = const VerificationMeta('listId');
+  @override
+  late final GeneratedColumn<String> listId = GeneratedColumn<String>(
+    'list_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta('quantity');
+  @override
+  late final GeneratedColumn<String> quantity = GeneratedColumn<String>(
+    'quantity',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _clearedAtMicrosMeta = const VerificationMeta('clearedAtMicros');
+  @override
+  late final GeneratedColumn<int> clearedAtMicros = GeneratedColumn<int>(
+    'cleared_at_micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _clearedByIdMeta = const VerificationMeta('clearedById');
+  @override
+  late final GeneratedColumn<String> clearedById = GeneratedColumn<String>(
+    'cleared_by_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _clearedByNameMeta = const VerificationMeta('clearedByName');
+  @override
+  late final GeneratedColumn<String> clearedByName = GeneratedColumn<String>(
+    'cleared_by_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    itemId,
+    listId,
+    name,
+    quantity,
+    unit,
+    note,
+    clearedAtMicros,
+    clearedById,
+    clearedByName,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'synced_history';
+  @override
+  VerificationContext validateIntegrity(Insertable<SyncedHistoryData> instance, {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('item_id')) {
+      context.handle(_itemIdMeta, itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta));
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('list_id')) {
+      context.handle(_listIdMeta, listId.isAcceptableOrUnknown(data['list_id']!, _listIdMeta));
+    } else if (isInserting) {
+      context.missing(_listIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(_nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(_quantityMeta, quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
+    }
+    if (data.containsKey('unit')) {
+      context.handle(_unitMeta, unit.isAcceptableOrUnknown(data['unit']!, _unitMeta));
+    }
+    if (data.containsKey('note')) {
+      context.handle(_noteMeta, note.isAcceptableOrUnknown(data['note']!, _noteMeta));
+    }
+    if (data.containsKey('cleared_at_micros')) {
+      context.handle(
+        _clearedAtMicrosMeta,
+        clearedAtMicros.isAcceptableOrUnknown(data['cleared_at_micros']!, _clearedAtMicrosMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_clearedAtMicrosMeta);
+    }
+    if (data.containsKey('cleared_by_id')) {
+      context.handle(_clearedByIdMeta, clearedById.isAcceptableOrUnknown(data['cleared_by_id']!, _clearedByIdMeta));
+    } else if (isInserting) {
+      context.missing(_clearedByIdMeta);
+    }
+    if (data.containsKey('cleared_by_name')) {
+      context.handle(
+        _clearedByNameMeta,
+        clearedByName.isAcceptableOrUnknown(data['cleared_by_name']!, _clearedByNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_clearedByNameMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {itemId};
+  @override
+  SyncedHistoryData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncedHistoryData(
+      itemId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}item_id'])!,
+      listId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}list_id'])!,
+      name: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      quantity: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}quantity']),
+      unit: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}unit']),
+      note: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}note']),
+      clearedAtMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cleared_at_micros'],
+      )!,
+      clearedById: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}cleared_by_id'])!,
+      clearedByName: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}cleared_by_name'])!,
+    );
+  }
+
+  @override
+  $SyncedHistoryTable createAlias(String alias) {
+    return $SyncedHistoryTable(attachedDatabase, alias);
+  }
+}
+
+class SyncedHistoryData extends DataClass implements Insertable<SyncedHistoryData> {
+  final String itemId;
+  final String listId;
+  final String name;
+  final String? quantity;
+
+  /// The [ItemUnit] wire value.
+  final String? unit;
+  final String? note;
+
+  /// Microseconds since the epoch (UTC), the order history shows in.
+  final int clearedAtMicros;
+  final String clearedById;
+  final String clearedByName;
+  const SyncedHistoryData({
+    required this.itemId,
+    required this.listId,
+    required this.name,
+    this.quantity,
+    this.unit,
+    this.note,
+    required this.clearedAtMicros,
+    required this.clearedById,
+    required this.clearedByName,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['item_id'] = Variable<String>(itemId);
+    map['list_id'] = Variable<String>(listId);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || quantity != null) {
+      map['quantity'] = Variable<String>(quantity);
+    }
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['cleared_at_micros'] = Variable<int>(clearedAtMicros);
+    map['cleared_by_id'] = Variable<String>(clearedById);
+    map['cleared_by_name'] = Variable<String>(clearedByName);
+    return map;
+  }
+
+  SyncedHistoryCompanion toCompanion(bool nullToAbsent) {
+    return SyncedHistoryCompanion(
+      itemId: Value(itemId),
+      listId: Value(listId),
+      name: Value(name),
+      quantity: quantity == null && nullToAbsent ? const Value.absent() : Value(quantity),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      clearedAtMicros: Value(clearedAtMicros),
+      clearedById: Value(clearedById),
+      clearedByName: Value(clearedByName),
+    );
+  }
+
+  factory SyncedHistoryData.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncedHistoryData(
+      itemId: serializer.fromJson<String>(json['itemId']),
+      listId: serializer.fromJson<String>(json['listId']),
+      name: serializer.fromJson<String>(json['name']),
+      quantity: serializer.fromJson<String?>(json['quantity']),
+      unit: serializer.fromJson<String?>(json['unit']),
+      note: serializer.fromJson<String?>(json['note']),
+      clearedAtMicros: serializer.fromJson<int>(json['clearedAtMicros']),
+      clearedById: serializer.fromJson<String>(json['clearedById']),
+      clearedByName: serializer.fromJson<String>(json['clearedByName']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'itemId': serializer.toJson<String>(itemId),
+      'listId': serializer.toJson<String>(listId),
+      'name': serializer.toJson<String>(name),
+      'quantity': serializer.toJson<String?>(quantity),
+      'unit': serializer.toJson<String?>(unit),
+      'note': serializer.toJson<String?>(note),
+      'clearedAtMicros': serializer.toJson<int>(clearedAtMicros),
+      'clearedById': serializer.toJson<String>(clearedById),
+      'clearedByName': serializer.toJson<String>(clearedByName),
+    };
+  }
+
+  SyncedHistoryData copyWith({
+    String? itemId,
+    String? listId,
+    String? name,
+    Value<String?> quantity = const Value.absent(),
+    Value<String?> unit = const Value.absent(),
+    Value<String?> note = const Value.absent(),
+    int? clearedAtMicros,
+    String? clearedById,
+    String? clearedByName,
+  }) => SyncedHistoryData(
+    itemId: itemId ?? this.itemId,
+    listId: listId ?? this.listId,
+    name: name ?? this.name,
+    quantity: quantity.present ? quantity.value : this.quantity,
+    unit: unit.present ? unit.value : this.unit,
+    note: note.present ? note.value : this.note,
+    clearedAtMicros: clearedAtMicros ?? this.clearedAtMicros,
+    clearedById: clearedById ?? this.clearedById,
+    clearedByName: clearedByName ?? this.clearedByName,
+  );
+  SyncedHistoryData copyWithCompanion(SyncedHistoryCompanion data) {
+    return SyncedHistoryData(
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      listId: data.listId.present ? data.listId.value : this.listId,
+      name: data.name.present ? data.name.value : this.name,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      note: data.note.present ? data.note.value : this.note,
+      clearedAtMicros: data.clearedAtMicros.present ? data.clearedAtMicros.value : this.clearedAtMicros,
+      clearedById: data.clearedById.present ? data.clearedById.value : this.clearedById,
+      clearedByName: data.clearedByName.present ? data.clearedByName.value : this.clearedByName,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncedHistoryData(')
+          ..write('itemId: $itemId, ')
+          ..write('listId: $listId, ')
+          ..write('name: $name, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('note: $note, ')
+          ..write('clearedAtMicros: $clearedAtMicros, ')
+          ..write('clearedById: $clearedById, ')
+          ..write('clearedByName: $clearedByName')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(itemId, listId, name, quantity, unit, note, clearedAtMicros, clearedById, clearedByName);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncedHistoryData &&
+          other.itemId == this.itemId &&
+          other.listId == this.listId &&
+          other.name == this.name &&
+          other.quantity == this.quantity &&
+          other.unit == this.unit &&
+          other.note == this.note &&
+          other.clearedAtMicros == this.clearedAtMicros &&
+          other.clearedById == this.clearedById &&
+          other.clearedByName == this.clearedByName);
+}
+
+class SyncedHistoryCompanion extends UpdateCompanion<SyncedHistoryData> {
+  final Value<String> itemId;
+  final Value<String> listId;
+  final Value<String> name;
+  final Value<String?> quantity;
+  final Value<String?> unit;
+  final Value<String?> note;
+  final Value<int> clearedAtMicros;
+  final Value<String> clearedById;
+  final Value<String> clearedByName;
+  final Value<int> rowid;
+  const SyncedHistoryCompanion({
+    this.itemId = const Value.absent(),
+    this.listId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.note = const Value.absent(),
+    this.clearedAtMicros = const Value.absent(),
+    this.clearedById = const Value.absent(),
+    this.clearedByName = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncedHistoryCompanion.insert({
+    required String itemId,
+    required String listId,
+    required String name,
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.note = const Value.absent(),
+    required int clearedAtMicros,
+    required String clearedById,
+    required String clearedByName,
+    this.rowid = const Value.absent(),
+  }) : itemId = Value(itemId),
+       listId = Value(listId),
+       name = Value(name),
+       clearedAtMicros = Value(clearedAtMicros),
+       clearedById = Value(clearedById),
+       clearedByName = Value(clearedByName);
+  static Insertable<SyncedHistoryData> custom({
+    Expression<String>? itemId,
+    Expression<String>? listId,
+    Expression<String>? name,
+    Expression<String>? quantity,
+    Expression<String>? unit,
+    Expression<String>? note,
+    Expression<int>? clearedAtMicros,
+    Expression<String>? clearedById,
+    Expression<String>? clearedByName,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (itemId != null) 'item_id': itemId,
+      if (listId != null) 'list_id': listId,
+      if (name != null) 'name': name,
+      if (quantity != null) 'quantity': quantity,
+      if (unit != null) 'unit': unit,
+      if (note != null) 'note': note,
+      if (clearedAtMicros != null) 'cleared_at_micros': clearedAtMicros,
+      if (clearedById != null) 'cleared_by_id': clearedById,
+      if (clearedByName != null) 'cleared_by_name': clearedByName,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncedHistoryCompanion copyWith({
+    Value<String>? itemId,
+    Value<String>? listId,
+    Value<String>? name,
+    Value<String?>? quantity,
+    Value<String?>? unit,
+    Value<String?>? note,
+    Value<int>? clearedAtMicros,
+    Value<String>? clearedById,
+    Value<String>? clearedByName,
+    Value<int>? rowid,
+  }) {
+    return SyncedHistoryCompanion(
+      itemId: itemId ?? this.itemId,
+      listId: listId ?? this.listId,
+      name: name ?? this.name,
+      quantity: quantity ?? this.quantity,
+      unit: unit ?? this.unit,
+      note: note ?? this.note,
+      clearedAtMicros: clearedAtMicros ?? this.clearedAtMicros,
+      clearedById: clearedById ?? this.clearedById,
+      clearedByName: clearedByName ?? this.clearedByName,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (itemId.present) {
+      map['item_id'] = Variable<String>(itemId.value);
+    }
+    if (listId.present) {
+      map['list_id'] = Variable<String>(listId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<String>(quantity.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (clearedAtMicros.present) {
+      map['cleared_at_micros'] = Variable<int>(clearedAtMicros.value);
+    }
+    if (clearedById.present) {
+      map['cleared_by_id'] = Variable<String>(clearedById.value);
+    }
+    if (clearedByName.present) {
+      map['cleared_by_name'] = Variable<String>(clearedByName.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncedHistoryCompanion(')
+          ..write('itemId: $itemId, ')
+          ..write('listId: $listId, ')
+          ..write('name: $name, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('note: $note, ')
+          ..write('clearedAtMicros: $clearedAtMicros, ')
+          ..write('clearedById: $clearedById, ')
+          ..write('clearedByName: $clearedByName, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -2204,6 +2691,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SignedInUserTable signedInUser = $SignedInUserTable(this);
   late final $KnownListsTable knownLists = $KnownListsTable(this);
   late final $SyncedItemsTable syncedItems = $SyncedItemsTable(this);
+  late final $SyncedHistoryTable syncedHistory = $SyncedHistoryTable(this);
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncCursorTable syncCursor = $SyncCursorTable(this);
   @override
@@ -2214,6 +2702,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     signedInUser,
     knownLists,
     syncedItems,
+    syncedHistory,
     outbox,
     syncCursor,
   ];
@@ -2958,6 +3447,228 @@ typedef $$SyncedItemsTableProcessedTableManager =
       SyncedItem,
       PrefetchHooks Function()
     >;
+typedef $$SyncedHistoryTableCreateCompanionBuilder = SyncedHistoryCompanion Function({
+  required String itemId,
+  required String listId,
+  required String name,
+  Value<String?> quantity,
+  Value<String?> unit,
+  Value<String?> note,
+  required int clearedAtMicros,
+  required String clearedById,
+  required String clearedByName,
+  Value<int> rowid,
+});
+typedef $$SyncedHistoryTableUpdateCompanionBuilder = SyncedHistoryCompanion Function({
+  Value<String> itemId,
+  Value<String> listId,
+  Value<String> name,
+  Value<String?> quantity,
+  Value<String?> unit,
+  Value<String?> note,
+  Value<int> clearedAtMicros,
+  Value<String> clearedById,
+  Value<String> clearedByName,
+  Value<int> rowid,
+});
+
+class $$SyncedHistoryTableFilterComposer extends Composer<_$AppDatabase, $SyncedHistoryTable> {
+  $$SyncedHistoryTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get listId =>
+      $composableBuilder(column: $table.listId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get unit => $composableBuilder(column: $table.unit, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get note => $composableBuilder(column: $table.note, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get clearedAtMicros =>
+      $composableBuilder(column: $table.clearedAtMicros, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get clearedById =>
+      $composableBuilder(column: $table.clearedById, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get clearedByName =>
+      $composableBuilder(column: $table.clearedByName, builder: (column) => ColumnFilters(column));
+}
+
+class $$SyncedHistoryTableOrderingComposer extends Composer<_$AppDatabase, $SyncedHistoryTable> {
+  $$SyncedHistoryTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get listId =>
+      $composableBuilder(column: $table.listId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get clearedAtMicros =>
+      $composableBuilder(column: $table.clearedAtMicros, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get clearedById =>
+      $composableBuilder(column: $table.clearedById, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get clearedByName =>
+      $composableBuilder(column: $table.clearedByName, builder: (column) => ColumnOrderings(column));
+}
+
+class $$SyncedHistoryTableAnnotationComposer extends Composer<_$AppDatabase, $SyncedHistoryTable> {
+  $$SyncedHistoryTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get itemId => $composableBuilder(column: $table.itemId, builder: (column) => column);
+
+  GeneratedColumn<String> get listId => $composableBuilder(column: $table.listId, builder: (column) => column);
+
+  GeneratedColumn<String> get name => $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get quantity => $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<String> get unit => $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<String> get note => $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<int> get clearedAtMicros =>
+      $composableBuilder(column: $table.clearedAtMicros, builder: (column) => column);
+
+  GeneratedColumn<String> get clearedById =>
+      $composableBuilder(column: $table.clearedById, builder: (column) => column);
+
+  GeneratedColumn<String> get clearedByName =>
+      $composableBuilder(column: $table.clearedByName, builder: (column) => column);
+}
+
+class $$SyncedHistoryTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncedHistoryTable,
+          SyncedHistoryData,
+          $$SyncedHistoryTableFilterComposer,
+          $$SyncedHistoryTableOrderingComposer,
+          $$SyncedHistoryTableAnnotationComposer,
+          $$SyncedHistoryTableCreateCompanionBuilder,
+          $$SyncedHistoryTableUpdateCompanionBuilder,
+          (SyncedHistoryData, BaseReferences<_$AppDatabase, $SyncedHistoryTable, SyncedHistoryData>),
+          SyncedHistoryData,
+          PrefetchHooks Function()
+        > {
+  $$SyncedHistoryTableTableManager(_$AppDatabase db, $SyncedHistoryTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () => $$SyncedHistoryTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () => $$SyncedHistoryTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () => $$SyncedHistoryTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> itemId = const Value.absent(),
+                Value<String> listId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> quantity = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<int> clearedAtMicros = const Value.absent(),
+                Value<String> clearedById = const Value.absent(),
+                Value<String> clearedByName = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncedHistoryCompanion(
+                itemId: itemId,
+                listId: listId,
+                name: name,
+                quantity: quantity,
+                unit: unit,
+                note: note,
+                clearedAtMicros: clearedAtMicros,
+                clearedById: clearedById,
+                clearedByName: clearedByName,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String itemId,
+                required String listId,
+                required String name,
+                Value<String?> quantity = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                required int clearedAtMicros,
+                required String clearedById,
+                required String clearedByName,
+                Value<int> rowid = const Value.absent(),
+              }) => SyncedHistoryCompanion.insert(
+                itemId: itemId,
+                listId: listId,
+                name: name,
+                quantity: quantity,
+                unit: unit,
+                note: note,
+                clearedAtMicros: clearedAtMicros,
+                clearedById: clearedById,
+                clearedByName: clearedByName,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SyncedHistoryTable, SyncedHistoryData>(table),
+                  BaseReferences<_$AppDatabase, $SyncedHistoryTable, SyncedHistoryData>(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncedHistoryTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncedHistoryTable,
+      SyncedHistoryData,
+      $$SyncedHistoryTableFilterComposer,
+      $$SyncedHistoryTableOrderingComposer,
+      $$SyncedHistoryTableAnnotationComposer,
+      $$SyncedHistoryTableCreateCompanionBuilder,
+      $$SyncedHistoryTableUpdateCompanionBuilder,
+      (SyncedHistoryData, BaseReferences<_$AppDatabase, $SyncedHistoryTable, SyncedHistoryData>),
+      SyncedHistoryData,
+      PrefetchHooks Function()
+    >;
 typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   Value<int> seq,
   required String mutationId,
@@ -3296,6 +4007,7 @@ class $AppDatabaseManager {
   $$SignedInUserTableTableManager get signedInUser => $$SignedInUserTableTableManager(_db, _db.signedInUser);
   $$KnownListsTableTableManager get knownLists => $$KnownListsTableTableManager(_db, _db.knownLists);
   $$SyncedItemsTableTableManager get syncedItems => $$SyncedItemsTableTableManager(_db, _db.syncedItems);
+  $$SyncedHistoryTableTableManager get syncedHistory => $$SyncedHistoryTableTableManager(_db, _db.syncedHistory);
   $$OutboxTableTableManager get outbox => $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncCursorTableTableManager get syncCursor => $$SyncCursorTableTableManager(_db, _db.syncCursor);
 }

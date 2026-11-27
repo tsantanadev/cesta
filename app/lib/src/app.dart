@@ -93,16 +93,40 @@ class _CestaAppState extends State<CestaApp> {
     }
   }
 
+  /// Clears the Checked Items of List [listId] as the signed-in User.
+  Future<void> _clearChecked(String listId) async {
+    final user = _session.user;
+    if (user == null) return;
+    await _items.clearChecked(listId: listId, by: (id: user.id, displayName: user.displayName));
+  }
+
   /// Says that a change was rolled back (Figma "13b Change not saved"
   /// 38:2815). A create refused because the List is full opens the Item limit
   /// sheet instead (Figma "14 Item limit").
   void _tellRejected(RejectedChange change) {
-    if (change.reason == ApiErrorCode.limitExceeded) {
-      if (_router.routerDelegate.navigatorKey.currentContext case final context?) {
-        unawaited(showItemLimitSheet(context, limit: change.limit ?? _sync.itemLimit.value));
-        return;
-      }
+    if (change.reason == ApiErrorCode.limitExceeded && _router.routerDelegate.navigatorKey.currentContext != null) {
+      unawaited(_showItemLimit(change));
+      return;
     }
+    _toastRejected(change);
+  }
+
+  /// Opens the Item limit sheet for the List [change] was refused on,
+  /// offering Clear checked when it has Checked Items.
+  Future<void> _showItemLimit(RejectedChange change) async {
+    final anyChecked = (await _items.readList(change.listId)).any((i) => i.checked);
+    if (_router.routerDelegate.navigatorKey.currentContext case final context? when context.mounted) {
+      await showItemLimitSheet(
+        context,
+        limit: change.limit ?? _sync.itemLimit.value,
+        onClearChecked: anyChecked ? () => unawaited(_clearChecked(change.listId)) : null,
+      );
+    } else {
+      _toastRejected(change);
+    }
+  }
+
+  void _toastRejected(RejectedChange change) {
     final messenger = _messenger.currentState;
     if (messenger == null) return;
     final l10n = AppLocalizations.of(messenger.context);
@@ -112,6 +136,7 @@ class _CestaAppState extends State<CestaApp> {
       message: switch (change.reason) {
         ApiErrorCode.itemDeleted || ApiErrorCode.itemNotFound => l10n.itemRejectedRemoved(name),
         ApiErrorCode.listDeleted || ApiErrorCode.listNotFound => l10n.itemRejectedListGone(name),
+        ApiErrorCode.itemNotChecked => l10n.itemRejectedNotChecked(name),
         _ => l10n.itemRejected(name),
       },
     );

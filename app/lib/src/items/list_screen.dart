@@ -83,6 +83,13 @@ class _ListScreenState extends State<ListScreen> {
     unawaited(widget.items.setChecked(item, checked: checked, by: me));
   }
 
+  /// Clears every Checked Item into the List's Item history.
+  void _clearChecked() {
+    final me = _me;
+    if (me == null) return;
+    unawaited(widget.items.clearChecked(listId: widget.listId, by: me));
+  }
+
   /// Opens [item] to edit or remove it (Figma "12 Opened item").
   void _openItem(ShownItem item) {
     final me = _me;
@@ -94,7 +101,8 @@ class _ListScreenState extends State<ListScreen> {
   void _addItems() {
     final limit = widget.sync.itemLimit.value;
     if (_shown.length >= limit) {
-      unawaited(showItemLimitSheet(context, limit: limit));
+      final anyChecked = _shown.any((i) => i.checked);
+      unawaited(showItemLimitSheet(context, limit: limit, onClearChecked: anyChecked ? _clearChecked : null));
       return;
     }
     unawaited(context.push(Routes.addItems(widget.listId)));
@@ -188,9 +196,15 @@ class _ListScreenState extends State<ListScreen> {
                           padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
                           sliver: SliverList.list(
                             children: [
+                              // The heading, with Clear checked on its right.
                               Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: CesSectionHeading(l10n.listInTheBasket),
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Row(
+                                  children: [
+                                    Expanded(child: CesSectionHeading(l10n.listInTheBasket)),
+                                    CesBarAction(label: l10n.listClearChecked, onPressed: _clearChecked),
+                                  ],
+                                ),
                               ),
                               for (final item in inBasket)
                                 Padding(

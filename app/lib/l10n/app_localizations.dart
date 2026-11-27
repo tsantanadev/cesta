@@ -704,6 +704,12 @@ abstract class AppLocalizations {
   /// **'In the basket'**
   String get listInTheBasket;
 
+  /// Removes every Checked Item from the List, keeping them in its Item history.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear checked'**
+  String get listClearChecked;
+
   /// The bar at the bottom of a List's screen that opens Add items.
   ///
   /// In en, this message translates to:
@@ -956,6 +962,12 @@ abstract class AppLocalizations {
   /// **'Couldn’t save “{name}”. The list is no longer available.'**
   String itemRejectedListGone(String name);
 
+  /// Toast: Clear checked left this Item on the List because someone put it back to buy meanwhile.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t clear “{name}”. It’s no longer checked.'**
+  String itemRejectedNotChecked(String name);
+
   /// Toast: the server refused a change made on this device, which was undone.
   ///
   /// In en, this message translates to:
@@ -968,11 +980,17 @@ abstract class AppLocalizations {
   /// **'This list is full'**
   String get itemLimitTitle;
 
-  /// Body of the Item limit sheet.
+  /// Body of the Item limit sheet, when the List has no Checked Items.
   ///
   /// In en, this message translates to:
   /// **'A list can hold up to {max} items. Remove ones you no longer need to make room.'**
   String itemLimitBody(int max);
+
+  /// Body of the Item limit sheet when the List has Checked Items: the sheet then offers Clear checked.
+  ///
+  /// In en, this message translates to:
+  /// **'A list can hold up to {max} items. Clear checked items, or remove ones you no longer need, to make room.'**
+  String itemLimitBodyClearChecked(int max);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
