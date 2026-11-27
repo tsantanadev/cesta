@@ -56,16 +56,9 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
         child: ItemForm(
           submitLabel: l10n.newItemAddTo(_listName),
           submitIcon: CesIcons.plus,
-          initial: (name: _search.text.trim(), quantity: null, unit: null, note: null),
+          initial: ItemDetails(name: _search.text.trim()),
           onSubmit: (draft) async {
-            final id = await widget.items.add(
-              listId: widget.listId,
-              by: me,
-              name: draft.name,
-              quantity: draft.quantity,
-              unit: draft.unit,
-              note: draft.note,
-            );
+            final id = await widget.items.add(listId: widget.listId, by: me, details: draft);
             if (!mounted) return;
             _search.clear();
             setState(() {});
