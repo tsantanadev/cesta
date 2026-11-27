@@ -2,6 +2,8 @@ import 'dart:ui' show Tristate;
 
 import 'package:cesta/src/app.dart';
 import 'package:cesta/src/db/app_database.dart';
+import 'package:cesta/src/items/items_store.dart';
+import 'package:cesta/src/sync/outbox.dart';
 import 'package:cesta/src/ui/components.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
@@ -289,6 +291,19 @@ class Harness {
 
   /// Taps the In the basket row of the Item named [name] (unchecks it).
   Future<void> tapBasketRow(String name) => tap(find.widgetWithText(CesCheckedItem, name));
+
+  /// List [listId]'s Item history on the device, most recent first, as
+  /// screens read it.
+  Future<List<HistoryItem>> itemHistory(String listId) => tester
+      .runAsync(() async {
+        final outbox = ChangeOutbox(db);
+        try {
+          return await ItemsStore(db, outbox).readHistory(listId);
+        } finally {
+          outbox.dispose();
+        }
+      })
+      .then((h) => h!);
 
   /// The text in the field labelled [label].
   String textInField(String label) => fieldController(tester, label).text;

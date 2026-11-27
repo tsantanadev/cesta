@@ -75,6 +75,29 @@ class SyncedItems extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Each List's Item history as the server reported it through sync pulls:
+/// the Items bought (checked, then cleared), so screens can search it
+/// offline. One row per cleared Item; a row never changes. Dropped with its
+/// List, and cleared on sign out.
+class SyncedHistory extends Table {
+  TextColumn get itemId => text()();
+  TextColumn get listId => text()();
+  TextColumn get name => text()();
+  TextColumn get quantity => text().nullable()();
+
+  /// The [ItemUnit] wire value.
+  TextColumn get unit => text().nullable()();
+  TextColumn get note => text().nullable()();
+
+  /// Microseconds since the epoch (UTC), the order history shows in.
+  IntColumn get clearedAtMicros => integer()();
+  TextColumn get clearedById => text()();
+  TextColumn get clearedByName => text()();
+
+  @override
+  Set<Column> get primaryKey => {itemId};
+}
+
 /// The device's Item changes not yet confirmed by the server, oldest first
 /// (ADR-0001). A change stays here, shown on top of [SyncedItems], until the
 /// server applied it and a pull brought its result back, or until the server
@@ -179,12 +202,12 @@ class _HealthDatabaseConverter extends TypeConverter<HealthDatabase, String> {
 ///
 /// Production opens it with `driftDatabase(name: 'cesta')`; tests pass
 /// `NativeDatabase.memory()`.
-@DriftDatabase(tables: [KnownHealth, SignedInUser, KnownLists, SyncedItems, Outbox, SyncCursor])
+@DriftDatabase(tables: [KnownHealth, SignedInUser, KnownLists, SyncedItems, SyncedHistory, Outbox, SyncCursor])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -196,13 +219,20 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(outbox);
         await m.createTable(syncCursor);
       }
+      if (from < 5) {
+        await m.createTable(syncedHistory);
+        // Pull everything again, so the history of Items cleared before the
+        // table existed comes too.
+        await delete(syncCursor).go();
+      }
     },
   );
 
-  /// Forgets every Item, pending change and the pull cursor (sign out, or
-  /// another User signing in).
+  /// Forgets every Item, the Item history, pending changes and the pull
+  /// cursor (sign out, or another User signing in).
   Future<void> clearSyncedData() => transaction(() async {
     await delete(syncedItems).go();
+    await delete(syncedHistory).go();
     await delete(outbox).go();
     await delete(syncCursor).go();
   });

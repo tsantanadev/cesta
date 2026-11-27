@@ -348,6 +348,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get listInTheBasket => 'In the basket';
 
   @override
+  String get listClearChecked => 'Clear checked';
+
+  @override
   String get listAddAnItem => 'Add an item';
 
   @override
@@ -501,6 +504,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String itemRejectedNotChecked(String name) {
+    return 'Couldn’t clear “$name”. It’s no longer checked.';
+  }
+
+  @override
   String itemRejected(String name) {
     return 'Couldn’t save “$name”.';
   }
@@ -511,5 +519,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String itemLimitBody(int max) {
     return 'A list can hold up to $max items. Remove ones you no longer need to make room.';
+  }
+
+  @override
+  String itemLimitBodyClearChecked(int max) {
+    return 'A list can hold up to $max items. Clear checked items, or remove ones you no longer need, to make room.';
   }
 }

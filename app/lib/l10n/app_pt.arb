@@ -103,6 +103,7 @@
   "errorListNotRestorable": "Esta lista não está mais disponível e não pode ser restaurada.",
   "listToBuyInBasket": "{toBuy} a comprar, {inBasket} na cesta",
   "listInTheBasket": "Na cesta",
+  "listClearChecked": "Limpar marcados",
   "listAddAnItem": "Adicionar um item",
   "listCheckedByYou": "Você",
   "itemCheck": "Marcar como comprado",
@@ -145,7 +146,9 @@
   "itemRemoved": "{item} removido",
   "itemRejectedRemoved": "Não foi possível salvar “{name}”. Ele foi removido.",
   "itemRejectedListGone": "Não foi possível salvar “{name}”. A lista não está mais disponível.",
+  "itemRejectedNotChecked": "Não foi possível limpar “{name}”. Ele não está mais marcado.",
   "itemRejected": "Não foi possível salvar “{name}”.",
   "itemLimitTitle": "Esta lista está cheia",
-  "itemLimitBody": "Uma lista pode ter até {max} itens. Remova os que você não precisa mais para abrir espaço."
+  "itemLimitBody": "Uma lista pode ter até {max} itens. Remova os que você não precisa mais para abrir espaço.",
+  "itemLimitBodyClearChecked": "Uma lista pode ter até {max} itens. Limpe os itens marcados ou remova os que você não precisa mais para abrir espaço."
 }

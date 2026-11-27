@@ -16,7 +16,10 @@ import 'outbox.dart';
 /// A change made on this device that the server refused. It has already been
 /// rolled back locally when this is reported.
 final class RejectedChange {
-  const RejectedChange({required this.itemName, this.reason, this.limit});
+  const RejectedChange({required this.listId, required this.itemName, this.reason, this.limit});
+
+  /// The List of the Item changed.
+  final String listId;
 
   /// The Item's name as the device showed it before the rollback.
   final String itemName;
@@ -280,7 +283,8 @@ class SyncEngine {
     type: m.type,
     entityId: m.itemId,
     listId: m.type == MutationType.itemCreate ? m.listId : null,
-    fields: m.type == MutationType.itemDelete ? null : m.fields,
+    // A remove or a clear carries nothing but the Item.
+    fields: m.type == MutationType.itemDelete || m.type == MutationType.itemClear ? null : m.fields,
     clientTimestamp: DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true),
   );
 
@@ -288,13 +292,18 @@ class SyncEngine {
   /// change to that Item), then reports it. [limit] comes with
   /// `limit_exceeded`.
   Future<void> _rollBack(OutboxData row, ApiErrorCode? reason, int? limit, int generation) async {
-    final shown = await _items.readList(row.listId);
-    final name = shown.where((i) => i.id == row.itemId).firstOrNull?.name ?? row.fields.name ?? '';
+    final before = (await _items.readList(row.listId)).where((i) => i.id == row.itemId).firstOrNull?.name;
     if (generation != _generation) return;
     await _outbox.rollBack(row);
+    // A removed or cleared Item shows again once its change is rolled back.
+    final name =
+        before ??
+        (await _items.readList(row.listId)).where((i) => i.id == row.itemId).firstOrNull?.name ??
+        row.fields.name ??
+        '';
     unawaited(_recount({row.listId}));
     if (limit != null) _itemLimit.value = limit;
-    _rejections.add(RejectedChange(itemName: name, reason: reason, limit: limit));
+    _rejections.add(RejectedChange(listId: row.listId, itemName: name, reason: reason, limit: limit));
   }
 
   Future<void> _pull(int generation) async {
@@ -315,6 +324,9 @@ class SyncEngine {
           await _db.into(_db.syncedItems).insertOnConflictUpdate(_row(item));
           touched.add(item.listId);
         }
+        for (final entry in page.history) {
+          await _db.into(_db.syncedHistory).insertOnConflictUpdate(_historyRow(entry));
+        }
         for (final t in page.tombstones) {
           switch (t.type) {
             case TombstoneType.item:
@@ -322,6 +334,7 @@ class SyncEngine {
               if (t.listId case final listId?) touched.add(listId);
             case TombstoneType.list:
               await (_db.delete(_db.syncedItems)..where((r) => r.listId.equals(t.id))).go();
+              await (_db.delete(_db.syncedHistory)..where((r) => r.listId.equals(t.id))).go();
               await _outbox.dropList(t.id);
               await _db.forgetKnownList(t.id);
               gone.add(t.id);
@@ -372,6 +385,18 @@ class SyncEngine {
     checkedAtMicros: Value(i.checkedAt?.value?.microsecondsSinceEpoch),
     checkedById: Value(i.checkedBy?.value?.id),
     checkedByName: Value(i.checkedBy?.value?.displayName),
+  );
+
+  static SyncedHistoryCompanion _historyRow(HistoryEntry e) => SyncedHistoryCompanion.insert(
+    itemId: e.itemId,
+    listId: e.listId,
+    name: e.name,
+    quantity: Value(e.quantity),
+    unit: Value(e.unit?.toJson()),
+    note: Value(e.note),
+    clearedAtMicros: e.clearedAt.microsecondsSinceEpoch,
+    clearedById: e.clearedBy.id,
+    clearedByName: e.clearedBy.displayName,
   );
 
   Future<void> dispose() async {
