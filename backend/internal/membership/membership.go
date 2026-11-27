@@ -15,6 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/tsantanadev/cesta/backend/internal/platform/changeseq"
 )
 
 // Role is a Member's level of access on a List.
@@ -48,11 +50,16 @@ func NewService(db *pgxpool.Pool) *Service {
 }
 
 // Grant makes userID a Member of listID with role, as of at, inside the
-// caller's transaction tx.
+// caller's transaction tx. Joining is a numbered change (package changeseq),
+// so the User's next sync pull brings the whole List.
 func (s *Service) Grant(ctx context.Context, tx pgx.Tx, listID, userID uuid.UUID, role Role, at time.Time) error {
+	seq, err := changeseq.Next(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("membership: grant: %w", err)
+	}
 	if _, err := tx.Exec(ctx,
-		"INSERT INTO list_members (list_id, user_id, role, joined_at) VALUES ($1, $2, $3, $4)",
-		listID, userID, string(role), at); err != nil {
+		"INSERT INTO list_members (list_id, user_id, role, joined_at, seq) VALUES ($1, $2, $3, $4, $5)",
+		listID, userID, string(role), at, seq); err != nil {
 		return fmt.Errorf("membership: grant: %w", err)
 	}
 	return nil
