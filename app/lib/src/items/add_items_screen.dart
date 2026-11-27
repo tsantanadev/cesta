@@ -8,10 +8,16 @@ import '../lists/lists_controller.dart';
 import '../session/session_controller.dart';
 import '../ui/components.dart';
 import 'item_form.dart';
+import 'item_text.dart';
 import 'items_store.dart';
+import 'matches.dart';
+import 'opened_item.dart';
 
-/// Add items (Figma "05 Add items" 4:269): search what to add; "Add “…” as a
-/// new item" opens the New item sheet. Matches and Bought before come with #8.
+/// Add items (Figma "05 Add items" 4:269): search what to add. As the Member
+/// types, Matches (4:280) shows the List's Items to buy whose names match,
+/// highlighted; tapping one opens that Item instead of adding a duplicate.
+/// "Add “…” as a new item" opens the New item sheet, even when something
+/// matches. Bought before comes with #8.
 class AddItemsScreen extends StatefulWidget {
   const AddItemsScreen({
     super.key,
@@ -32,20 +38,40 @@ class AddItemsScreen extends StatefulWidget {
 
 class _AddItemsScreenState extends State<AddItemsScreen> {
   final _search = TextEditingController();
+  List<ShownItem> _onList = const [];
+  StreamSubscription<List<ShownItem>>? _itemsSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _itemsSub = widget.items.watchList(widget.listId).listen((items) => setState(() => _onList = items));
+  }
 
   @override
   void dispose() {
+    unawaited(_itemsSub?.cancel());
     _search.dispose();
     super.dispose();
+  }
+
+  Actor? get _me => switch (widget.session.user) {
+    final user? => (id: user.id, displayName: user.displayName),
+    null => null,
+  };
+
+  /// Opens [item], already on the List, instead of adding it again.
+  void _openItem(ShownItem item) {
+    final me = _me;
+    if (me == null) return;
+    showOpenedItem(context, items: widget.items, item: item, me: me);
   }
 
   String get _listName => widget.lists.lists.where((l) => l.id == widget.listId).firstOrNull?.name ?? '';
 
   void _addAsNew() {
     final l10n = AppLocalizations.of(context);
-    final user = widget.session.user;
-    if (user == null) return;
-    final me = (id: user.id, displayName: user.displayName);
+    final me = _me;
+    if (me == null) return;
     unawaited(
       showCesItemSheet(
         context,
@@ -76,6 +102,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final query = _search.text.trim();
+    final matches = listMatches(_onList, query);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -102,6 +129,32 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                 ],
               ),
             ),
+            // Matches (Figma 4:280): the List's Items to buy, as on the List.
+            if (matches.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    CesSectionHeading(l10n.addItemsMatches),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 11,
+                      runSpacing: 11,
+                      children: [
+                        for (final item in matches)
+                          CesItemTile(
+                            key: ValueKey(item.id),
+                            name: item.name,
+                            quantity: tagQuantity(l10n, item.quantity, item.unit),
+                            semanticHint: l10n.itemOpen,
+                            onTap: () => _openItem(item),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             if (query.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
