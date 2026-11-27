@@ -290,8 +290,7 @@ class SyncEngine {
     type: m.type,
     entityId: m.itemId,
     listId: m.type == MutationType.itemCreate ? m.listId : null,
-    // A remove or a clear carries nothing but the Item.
-    fields: m.type == MutationType.itemDelete || m.type == MutationType.itemClear ? null : m.fields,
+    fields: m.type.removesItem ? null : m.fields,
     clientTimestamp: DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true),
   );
 
@@ -299,15 +298,14 @@ class SyncEngine {
   /// (see [ChangeOutbox.rollBack]), then reports it; the seqs dropped.
   /// [limit] comes with `limit_exceeded`.
   Future<Set<int>> _rollBack(OutboxData row, ApiErrorCode? reason, int? limit, int generation) async {
-    final before = (await _items.readList(row.listId)).where((i) => i.id == row.itemId).firstOrNull?.name;
+    Future<String?> shownName() async =>
+        (await _items.readList(row.listId)).where((i) => i.id == row.itemId).firstOrNull?.name;
+    // Named as the device showed it before the rollback; a removed or
+    // cleared Item (or one a later clear hides) as it shows again after.
+    final before = row.type.removesItem ? null : await shownName();
     if (generation != _generation) return const {};
     final dropped = await _outbox.rollBack(row);
-    // A removed or cleared Item shows again once its change is rolled back.
-    final name =
-        before ??
-        (await _items.readList(row.listId)).where((i) => i.id == row.itemId).firstOrNull?.name ??
-        row.fields.name ??
-        '';
+    final name = before ?? await shownName() ?? row.fields.name ?? '';
     unawaited(_recount({row.listId}));
     if (limit != null) _itemLimit.value = limit;
     _rejections.add(RejectedChange(listId: row.listId, itemName: name, reason: reason, limit: limit));

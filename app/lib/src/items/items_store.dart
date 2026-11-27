@@ -278,6 +278,13 @@ class ItemsStore {
   }
 }
 
+/// What a change does to its Item.
+extension ItemChange on MutationType {
+  /// A remove or a clear: the Item leaves the List, and the change carries
+  /// nothing but the Item.
+  bool get removesItem => this == MutationType.itemDelete || this == MutationType.itemClear;
+}
+
 /// [synced] Items with the [pending] outbox changes (oldest first) applied on top.
 List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
   final items = <String, ShownItem>{for (final r in synced) r.id: _fromRow(r)};
@@ -285,27 +292,26 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
     final fields = m.fields;
     final at = DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true);
     final by = (id: m.byId, displayName: m.byName);
-    switch (m.type) {
-      case MutationType.itemCreate:
-        items.putIfAbsent(
-          m.itemId,
-          () => ShownItem(
-            id: m.itemId,
-            listId: m.listId,
-            details: ItemDetails(
-              name: fields.name ?? '',
-              quantity: fields.quantity?.value,
-              unit: _unit(fields.unit?.value),
-              note: fields.note?.value,
-            ),
-            addedAt: at,
-            addedBy: by,
+    if (m.type.removesItem) {
+      items.remove(m.itemId);
+    } else if (m.type == MutationType.itemCreate) {
+      items.putIfAbsent(
+        m.itemId,
+        () => ShownItem(
+          id: m.itemId,
+          listId: m.listId,
+          details: ItemDetails(
+            name: fields.name ?? '',
+            quantity: fields.quantity?.value,
+            unit: _unit(fields.unit?.value),
+            note: fields.note?.value,
           ),
-        );
-      case MutationType.itemUpdate:
-        if (items[m.itemId] case final item?) items[m.itemId] = item._updated(fields, at: at, by: by);
-      case MutationType.itemDelete || MutationType.itemClear:
-        items.remove(m.itemId);
+          addedAt: at,
+          addedBy: by,
+        ),
+      );
+    } else if (items[m.itemId] case final item?) {
+      items[m.itemId] = item._updated(fields, at: at, by: by);
     }
   }
   return items.values.toList()..sort((a, b) {
