@@ -429,4 +429,50 @@ void main() {
 
     expect(h.basketRows(), [('Coffee', 'Rui')]);
   });
+
+  for (final status in [400, 403]) {
+    testWidgets('a push the server refuses outright ($status) is rolled back with a message, and later changes sync', (
+      tester,
+    ) async {
+      final h = Harness(tester);
+      final ana = h.signedIn();
+      final list = h.api.addList(ana, name: 'Weekend feira');
+      h.api.addItem(list, name: 'Coffee', addedBy: ana);
+      h.api.addItem(list, name: 'Milk', addedBy: ana);
+      await h.pumpApp();
+      await h.openList('Weekend feira');
+      h.api.refusePushes = status;
+
+      await h.tapTag('Coffee');
+
+      expect(find.text('Couldn’t save “Coffee”.'), findsOneWidget);
+      expect(h.tags(), ['Coffee', 'Milk']);
+
+      h.api.refusePushes = null;
+      await h.tapTag('Milk');
+
+      expect(h.api.itemsInBasket(list), ['Milk']);
+    });
+  }
+
+  testWidgets('a push the server can’t take right now (503) waits and syncs once it can', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    h.api.refusePushes = 503;
+
+    await h.tapTag('Coffee');
+
+    expect(find.textContaining('Couldn’t save'), findsNothing);
+    expect(h.basketRows(), [('Coffee', 'You')]);
+
+    h.api.refusePushes = null;
+    await tester.pump(const Duration(seconds: 2)); // the next retry
+    await tester.pumpAndSettle();
+
+    expect(h.api.itemsInBasket(list), ['Coffee']);
+  });
 }

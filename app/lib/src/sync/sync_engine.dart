@@ -173,43 +173,66 @@ class SyncEngine {
     _retry = Timer(delay > maxRetry ? maxRetry : delay, () => unawaited(sync()));
   }
 
+  /// Pushes the outbox, oldest change first.
+  ///
+  /// A push the server can't take right now (no connection, 5xx, 429, 401)
+  /// throws, to be retried later. One it refuses for good (another 4xx, or
+  /// an answer without a result for a change) must not block the outbox:
+  /// the changes are then pushed one at a time, and each one still refused
+  /// is rolled back and reported.
   Future<void> _push(int generation) async {
     bool stopped() => generation != _generation;
+    var size = pushBatch;
     while (!stopped()) {
       final batch =
           await (_db.select(_db.outbox)
                 ..where((t) => t.applied.equals(false))
                 ..orderBy([(t) => OrderingTerm.asc(t.seq)])
-                ..limit(pushBatch))
+                ..limit(size))
               .get();
       if (batch.isEmpty) return;
-      final result = await _api.pushMutations(body: PushRequest(mutations: [for (final m in batch) _mutation(m)]));
-      final results = switch (result) {
-        PushMutations200(:final value) => value.results,
-        _ => throw _Refused(result),
-      };
+      final answer = await _send(batch);
       if (stopped()) return;
-      final byId = {for (final r in results) r.mutationId: r};
-      var progressed = false;
       // Items whose refused create took their later changes with it: those
       // changes' own results are moot and already reported.
       final droppedItems = <String>{};
       for (final row in batch) {
         if (stopped()) return;
-        final r = byId[row.mutationId];
-        if (r == null) continue;
-        progressed = true;
         if (droppedItems.contains(row.itemId)) continue;
-        if (r.status == MutationResultStatus.applied) {
+        final r = answer.results[row.mutationId];
+        if (r == null) {
+          if (batch.length > 1) {
+            size = 1; // find which change it is
+            break;
+          }
+          await _rollBack(row, answer.refusal);
+        } else if (r.status == MutationResultStatus.applied) {
           await (_db.update(
             _db.outbox,
           )..where((t) => t.seq.equals(row.seq))).write(const OutboxCompanion(applied: Value(true)));
+          continue;
         } else {
           await _rollBack(row, r.reason?.code);
-          if (row.type == MutationType.itemCreate.toJson()) droppedItems.add(row.itemId);
         }
+        if (row.type == MutationType.itemCreate.toJson()) droppedItems.add(row.itemId);
       }
-      if (!progressed) throw _Refused(result);
+    }
+  }
+
+  /// Sends [batch]; the results by mutation ID, or none and why when the
+  /// server refused it as a whole. Throws when it should be tried again later.
+  Future<({Map<String, MutationResult> results, ApiErrorCode? refusal})> _send(List<OutboxData> batch) async {
+    try {
+      return switch (await _api.pushMutations(body: PushRequest(mutations: [for (final m in batch) _mutation(m)]))) {
+        PushMutations200(:final value) => (results: {for (final r in value.results) r.mutationId: r}, refusal: null),
+        PushMutations400(:final value) => (results: const <String, MutationResult>{}, refusal: value.code),
+        // Signed out, or too many requests: try again later.
+        final other => throw _Refused(other),
+      };
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == null || status >= 500 || status == 408) rethrow;
+      return (results: const <String, MutationResult>{}, refusal: null);
     }
   }
 

@@ -354,6 +354,10 @@ class FakeApiClient implements ApiClient {
   /// slow network: the server has already answered by then.
   Completer<void>? slowSync;
 
+  /// When set, the server refuses every push as a whole with this HTTP
+  /// status (e.g. 400, 403, 503) instead of answering it.
+  int? refusePushes;
+
   /// When set, every pushed mutation is rejected with this code, as when the
   /// User was removed from the List meanwhile.
   ApiErrorCode? rejectMutations;
@@ -456,6 +460,19 @@ class FakeApiClient implements ApiClient {
     if (identity == null) return const PushMutations401(_unauthenticated);
     // Read the request as the server would: from the JSON on the wire.
     body = PushRequest.fromJson(_wire(body.toJson()));
+    switch (refusePushes) {
+      case null:
+        break;
+      case 400:
+        return PushMutations400(_error(ApiErrorCode.invalidItem));
+      case final status:
+        final request = RequestOptions(path: '/api/sync/push');
+        throw DioException.badResponse(
+          statusCode: status,
+          requestOptions: request,
+          response: Response(requestOptions: request, statusCode: status),
+        );
+    }
     if (body.mutations.isEmpty || body.mutations.length > 100) {
       return PushMutations400(_error(ApiErrorCode.invalidItem));
     }
