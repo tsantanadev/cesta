@@ -502,6 +502,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String itemLimitBody(int max) {
-    return 'Uma lista pode ter até $max itens. Limpe os itens marcados ou remova os que você não precisa mais para abrir espaço.';
+    return 'Uma lista pode ter até $max itens. Remova os que você não precisa mais para abrir espaço.';
   }
 }

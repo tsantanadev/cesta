@@ -253,12 +253,7 @@ void main() {
     await h.tap(find.text('Add an item'));
 
     expect(find.text('This list is full'), findsOneWidget);
-    expect(
-      find.text(
-        'A list can hold up to 500 items. Clear checked items, or remove ones you no longer need, to make room.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('A list can hold up to 500 items. Remove ones you no longer need to make room.'), findsOneWidget);
     expect(find.widgetWithText(CesButton, 'Clear checked'), findsNothing); // Clear checked isn't in the app yet
     expect(find.byType(CesSearchField), findsNothing);
 

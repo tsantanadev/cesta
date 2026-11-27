@@ -288,6 +288,6 @@
   "@itemRejected": {"description": "Toast: the server refused a change made on this device, which was undone.", "placeholders": {"name": {"type": "String"}}},
   "itemLimitTitle": "This list is full",
   "@itemLimitTitle": {"description": "Title of the Item limit sheet (Figma 14)."},
-  "itemLimitBody": "A list can hold up to {max} items. Clear checked items, or remove ones you no longer need, to make room.",
+  "itemLimitBody": "A list can hold up to {max} items. Remove ones you no longer need to make room.",
   "@itemLimitBody": {"description": "Body of the Item limit sheet.", "placeholders": {"max": {"type": "int"}}}
 }

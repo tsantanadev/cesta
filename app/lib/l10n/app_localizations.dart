@@ -959,7 +959,7 @@ abstract class AppLocalizations {
   /// Body of the Item limit sheet.
   ///
   /// In en, this message translates to:
-  /// **'A list can hold up to {max} items. Clear checked items, or remove ones you no longer need, to make room.'**
+  /// **'A list can hold up to {max} items. Remove ones you no longer need to make room.'**
   String itemLimitBody(int max);
 }
 
