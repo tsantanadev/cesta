@@ -103,11 +103,7 @@ class _CestaAppState extends State<CestaApp> {
   }
 
   /// Clears the Checked Items of List [listId] as the signed-in User.
-  Future<void> _clearChecked(String listId) async {
-    final user = _session.user;
-    if (user == null) return;
-    await _items.clearChecked(listId: listId, by: (id: user.id, displayName: user.displayName));
-  }
+  void _clearChecked(String listId) => _session.asMe((me) => unawaited(_items.clearChecked(listId: listId, by: me)));
 
   /// Says that a change was rolled back (Figma "13b Change not saved"
   /// 38:2815). A create refused because the List is full opens the Item limit
@@ -123,12 +119,13 @@ class _CestaAppState extends State<CestaApp> {
   /// Opens the Item limit sheet for the List [change] was refused on,
   /// offering Clear checked when it has Checked Items.
   Future<void> _showItemLimit(RejectedChange change) async {
-    final anyChecked = (await _items.readList(change.listId)).any((i) => i.checked);
+    final items = await _items.readList(change.listId);
     if (_router.routerDelegate.navigatorKey.currentContext case final context? when context.mounted) {
       await showItemLimitSheet(
         context,
         limit: change.limit ?? _sync.itemLimit.value,
-        onClearChecked: anyChecked ? () => unawaited(_clearChecked(change.listId)) : null,
+        items: items,
+        onClearChecked: () => _clearChecked(change.listId),
       );
     } else {
       _toastRejected(change);

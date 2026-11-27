@@ -61,34 +61,26 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     super.dispose();
   }
 
-  Actor? get _me => switch (widget.session.user) {
-    final user? => (id: user.id, displayName: user.displayName),
-    null => null,
-  };
-
   /// Opens [item], already on the List, instead of adding it again.
-  void _openItem(ShownItem item) {
-    final me = _me;
-    if (me == null) return;
-    showOpenedItem(context, items: widget.items, item: item, me: me);
-  }
+  void _openItem(ShownItem item) =>
+      widget.session.asMe((me) => showOpenedItem(context, items: widget.items, item: item, me: me));
 
   String get _listName => widget.lists.lists.where((l) => l.id == widget.listId).firstOrNull?.name ?? '';
 
   void _addAsNew() {
     final l10n = AppLocalizations.of(context);
-    final me = _me;
-    if (me == null) return;
-    unawaited(
-      showCesItemSheet(
-        context,
-        title: l10n.newItemTitle,
-        closeTooltip: l10n.sheetClose,
-        child: ItemForm(
-          submitLabel: l10n.newItemAddTo(_listName),
-          submitIcon: CesIcons.plus,
-          initial: ItemDetails(name: _search.text.trim()),
-          onSubmit: (draft) => unawaited(_add(draft, me)),
+    widget.session.asMe(
+      (me) => unawaited(
+        showCesItemSheet(
+          context,
+          title: l10n.newItemTitle,
+          closeTooltip: l10n.sheetClose,
+          child: ItemForm(
+            submitLabel: l10n.newItemAddTo(_listName),
+            submitIcon: CesIcons.plus,
+            initial: ItemDetails(name: _search.text.trim()),
+            onSubmit: (draft) => unawaited(_add(draft, me)),
+          ),
         ),
       ),
     );
@@ -111,11 +103,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
   }
 
   /// Adds [entry] of the Item history again, as it was last bought.
-  void _addAgain(HistoryEntry entry) {
-    final me = _me;
-    if (me == null) return;
-    unawaited(_add(entry.details, me));
-  }
+  void _addAgain(HistoryEntry entry) => widget.session.asMe((me) => unawaited(_add(entry.details, me)));
 
   Widget _section(String heading, List<Widget> tiles) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),

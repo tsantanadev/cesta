@@ -72,37 +72,22 @@ class _ListScreenState extends State<ListScreen> {
 
   ListSummary? get _list => widget.lists.lists.where((l) => l.id == widget.listId).firstOrNull;
 
-  Actor? get _me => switch (widget.session.user) {
-    final user? => (id: user.id, displayName: user.displayName),
-    null => null,
-  };
-
-  void _setChecked(ShownItem item, bool checked) {
-    final me = _me;
-    if (me == null) return;
-    unawaited(widget.items.setChecked(item, checked: checked, by: me));
-  }
+  void _setChecked(ShownItem item, bool checked) =>
+      widget.session.asMe((me) => unawaited(widget.items.setChecked(item, checked: checked, by: me)));
 
   /// Clears every Checked Item into the List's Item history.
-  void _clearChecked() {
-    final me = _me;
-    if (me == null) return;
-    unawaited(widget.items.clearChecked(listId: widget.listId, by: me));
-  }
+  void _clearChecked() =>
+      widget.session.asMe((me) => unawaited(widget.items.clearChecked(listId: widget.listId, by: me)));
 
-  /// Opens [item] to edit or remove it (Figma "12 Opened item").
-  void _openItem(ShownItem item) {
-    final me = _me;
-    if (me == null) return;
-    showOpenedItem(context, items: widget.items, item: item, me: me);
-  }
+  /// Opens [item] to edit or remove it (Figma "12 Opened item" 38:2519).
+  void _openItem(ShownItem item) =>
+      widget.session.asMe((me) => showOpenedItem(context, items: widget.items, item: item, me: me));
 
   /// Opens Add items, unless the List is already full (Figma "14 Item limit").
   void _addItems() {
     final limit = widget.sync.itemLimit.value;
     if (_shown.length >= limit) {
-      final anyChecked = _shown.any((i) => i.checked);
-      unawaited(showItemLimitSheet(context, limit: limit, onClearChecked: anyChecked ? _clearChecked : null));
+      unawaited(showItemLimitSheet(context, limit: limit, items: _shown, onClearChecked: _clearChecked));
       return;
     }
     unawaited(context.push(Routes.addItems(widget.listId)));
