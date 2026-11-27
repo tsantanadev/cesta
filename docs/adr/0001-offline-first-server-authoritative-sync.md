@@ -16,3 +16,5 @@ Members shop in supermarkets with poor signal, so the app must let them edit Lis
 ## Notes
 
 - **2026-11-26 (#6):** Lists shipped online-only at first. The app caches the User's Lists so the Lists screen shows them offline, but creating, renaming, deleting and restoring a List need the network. List mutations move to the outbox with #7, which brings the outbox and sync. They already carry client-generated IDs, so creates retry idempotently.
+- **2026-11-27 (#7):** Conflicts resolve last-write-wins per field in the order the server receives the mutations. The client timestamp each mutation carries is recorded only for diagnosis and never decides a conflict.
+- **2026-11-27 (#7):** List mutations (create, rename, delete, restore) stay online-only for now. Contrary to the note above, #7 put only Item mutations in the outbox; moving List mutations there is left to #28.

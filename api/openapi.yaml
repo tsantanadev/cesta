@@ -221,6 +221,76 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "429":
           $ref: "#/components/responses/RateLimited"
+  /api/sync/push:
+    post:
+      operationId: pushMutations
+      summary: Apply a batch of the device's outbox mutations
+      description: >-
+        Mutations are applied in order. Each one is idempotent by its client mutation
+        ID: pushing a mutation the server already received returns its original result
+        and changes nothing. Authorization is re-checked per mutation (the User must be
+        a Member of the Item's List). Conflicts resolve last-write-wins per field, in
+        order of server receipt (clientTimestamp is recorded, never used for ordering).
+        A delete wins over concurrent edits: editing a removed Item is rejected with
+        item_deleted and does not bring it back. A List holds at most the configured
+        limit of Items (default 500); the create past it is rejected with limit_exceeded.
+        One mutation's rejection never fails the batch.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushRequest"
+      responses:
+        "200":
+          description: One result per mutation, in request order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/sync/pull:
+    get:
+      operationId: pullChanges
+      summary: Changes since a cursor, for Lists the signed-in User is a Member of
+      description: >-
+        Returns the current state of every Item changed since the cursor, plus
+        tombstones for Items removed and for Lists the User can no longer see (deleted,
+        or the User stopped being a Member). Omit cursor for a full snapshot. Keep
+        pulling with the returned cursor while hasMore is true.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from a previous pull.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 500
+      responses:
+        "200":
+          description: Changes since the cursor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 components:
   parameters:
     ListId:
@@ -299,6 +369,9 @@ components:
             - list_deleted
             - list_id_taken
             - limit_exceeded
+            - invalid_item
+            - item_not_found
+            - item_deleted
             - internal
         message:
           type: string
@@ -421,3 +494,175 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DeletedList"
+    UserRef:
+      type: object
+      required: [id, displayName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+    ItemFields:
+      type: object
+      description: >-
+        The fields a mutation sets. On item_update only the fields present change;
+        sending null clears an optional field. checked true marks the Item bought by the
+        pushing User at receipt time; false unchecks it.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Trimmed; required on item_create and can't be cleared.
+        quantity:
+          type: string
+          pattern: '^[0-9]{1,6}(\.[0-9]{1,3})?$'
+          nullable: true
+          description: A positive decimal as a string, to keep it exact (e.g. "1.5"). Zero is not allowed.
+        unit:
+          type: string
+          # OpenAPI 3.0.3: a nullable enum must list null for null to be valid.
+          enum: [un, kg, g, L, ml, pack, null]
+          nullable: true
+          description: Fixed set, not extendable. The app shows "un" as "units" in English.
+        note:
+          type: string
+          maxLength: 200
+          nullable: true
+        checked:
+          type: boolean
+    Mutation:
+      type: object
+      required: [id, type, entityId, clientTimestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Client mutation ID; retrying the same ID is safe.
+        type:
+          type: string
+          enum: [item_create, item_update, item_delete]
+        entityId:
+          type: string
+          format: uuid
+          description: The Item's ID, chosen by the client on item_create.
+        listId:
+          type: string
+          format: uuid
+          description: Required on item_create; ignored otherwise.
+        fields:
+          $ref: "#/components/schemas/ItemFields"
+        clientTimestamp:
+          type: string
+          format: date-time
+    PushRequest:
+      type: object
+      required: [mutations]
+      properties:
+        mutations:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/Mutation"
+    MutationResult:
+      type: object
+      required: [mutationId, status]
+      properties:
+        mutationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [applied, rejected]
+        reason:
+          $ref: "#/components/schemas/ApiError"
+    PushResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/MutationResult"
+    Item:
+      type: object
+      required: [id, listId, name, addedBy, addedAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        listId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        quantity:
+          type: string
+          pattern: '^[0-9]{1,6}(\.[0-9]{1,3})?$'
+          nullable: true
+          description: A positive decimal as a string, to keep it exact (e.g. "1.5"). Zero is not allowed.
+        unit:
+          type: string
+          # OpenAPI 3.0.3: a nullable enum must list null for null to be valid.
+          enum: [un, kg, g, L, ml, pack, null]
+          nullable: true
+          description: Fixed set, not extendable. The app shows "un" as "units" in English.
+        note:
+          type: string
+          nullable: true
+        addedBy:
+          $ref: "#/components/schemas/UserRef"
+        addedAt:
+          type: string
+          format: date-time
+        checkedAt:
+          type: string
+          format: date-time
+          nullable: true
+        checkedBy:
+          type: object
+          nullable: true
+          required: [id, displayName]
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+        updatedAt:
+          type: string
+          format: date-time
+    Tombstone:
+      type: object
+      required: [type, id]
+      properties:
+        type:
+          type: string
+          enum: [item, list]
+          description: list means the User can no longer see the List; drop it and all its Items.
+        id:
+          type: string
+          format: uuid
+        listId:
+          type: string
+          format: uuid
+          description: Present when type is item.
+    PullResponse:
+      type: object
+      required: [items, tombstones, cursor, hasMore]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        tombstones:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tombstone"
+        cursor:
+          type: string
+          description: Opaque; pass to the next pull.
+        hasMore:
+          type: boolean

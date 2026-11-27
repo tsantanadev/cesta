@@ -62,60 +62,71 @@ class CesStatusCard extends StatelessWidget {
 
 /// A card for one List: its [name], a [subtitle], an optional top-right
 /// [action] (e.g. the options button, Figma 35:2085) and [trailing] widgets
-/// (e.g. a [CesCountSign]).
+/// (e.g. a [CesCountSign]). Tapping it runs [onTap] (opens the List).
 class CesListCard extends StatelessWidget {
-  const CesListCard({super.key, required this.name, required this.subtitle, this.action, this.trailing = const []});
+  const CesListCard({
+    super.key,
+    required this.name,
+    required this.subtitle,
+    this.action,
+    this.trailing = const [],
+    this.onTap,
+  });
 
   final String name;
   final String subtitle;
   final Widget? action;
   final List<Widget> trailing;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasAction = action != null;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(CestaRadii.listCard),
-      ),
-      child: Padding(
-        padding: hasAction
-            ? const EdgeInsets.fromLTRB(20, 12, 12, 16)
-            : EdgeInsets.fromLTRB(20, 18, trailing.isEmpty ? context.spacing.md : 12, 18),
-        child: Row(
-          crossAxisAlignment: hasAction ? CrossAxisAlignment.start : CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(top: hasAction ? 6 : 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name, style: CestaDisplayType.listName.copyWith(color: theme.colorScheme.onSurface)),
-                    const SizedBox(height: 6),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                        color: theme.colorScheme.onSurfaceVariant,
+    final radius = BorderRadius.circular(CestaRadii.listCard);
+    return Material(
+      color: theme.colorScheme.surfaceContainerLowest,
+      borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: hasAction
+              ? const EdgeInsets.fromLTRB(20, 12, 12, 16)
+              : EdgeInsets.fromLTRB(20, 18, trailing.isEmpty ? context.spacing.md : 12, 18),
+          child: Row(
+            crossAxisAlignment: hasAction ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(top: hasAction ? 6 : 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: CestaDisplayType.listName.copyWith(color: theme.colorScheme.onSurface)),
+                      const SizedBox(height: 6),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (hasAction) ...[
-              const SizedBox(width: 12),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [action!, ...trailing],
-              ),
-            ] else
-              for (final w in trailing) ...[SizedBox(width: context.spacing.sm), w],
-          ],
+              if (hasAction) ...[
+                const SizedBox(width: 12),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [action!, ...trailing],
+                ),
+              ] else
+                for (final w in trailing) ...[SizedBox(width: context.spacing.sm), w],
+            ],
+          ),
         ),
       ),
     );
@@ -183,74 +194,162 @@ class CesCountSign extends StatelessWidget {
   }
 }
 
-/// An Item as a Banana price tag (Figma "Item tile" 3:46): an [icon] and an
-/// optional [quantity] on top, the [name] at the bottom, and the hole the tag
-/// hangs from. It is drawn at a fixed size, so it doesn't grow with the text size.
+/// An Item as a Banana price tag (Figma "Item tile" 3:46): an optional
+/// [quantity] on top, the [name] at the bottom, and the hole the tag hangs
+/// from. The welcome screen's decorative tags also carry an [icon], with the
+/// quantity small beside it. It is drawn at a fixed size, so it doesn't grow
+/// with the text size. With [onTap] or [onLongPress] it is a button.
 class CesItemTile extends StatelessWidget {
-  const CesItemTile({super.key, required this.name, required this.icon, this.quantity, this.size = 112});
+  const CesItemTile({
+    super.key,
+    required this.name,
+    this.icon,
+    this.quantity,
+    this.size = 112,
+    this.onTap,
+    this.onLongPress,
+    this.semanticHint,
+  }) : _blank = false;
+
+  /// An empty white tag (Figma "Item tile" State=Suggestion 3:39, as the empty
+  /// List shows it): Branco with a Checked outline and hole.
+  const CesItemTile.blank({super.key, this.size = 112})
+    : name = '',
+      icon = null,
+      quantity = null,
+      onTap = null,
+      onLongPress = null,
+      semanticHint = null,
+      _blank = true;
+
+  final bool _blank;
 
   final String name;
-  final IconData icon;
+  final IconData? icon;
   final String? quantity;
   final double size;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  /// What tapping does, for screen readers (e.g. "Check").
+  final String? semanticHint;
 
   /// Where the hanging string meets the tile, from its top-left corner.
   static const holeCentre = Offset(56, 10);
+
+  /// The quantity on a List's tag (Figma text 2eywko): Bricolage 24, -2%.
+  static const _quantityStyle = TextStyle(
+    fontFamily: CestaFonts.display,
+    fontWeight: FontWeight.w800,
+    fontSize: 24,
+    height: 1,
+    letterSpacing: -0.48,
+  );
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final ink = palette.onToBuy;
+    final icon = this.icon;
+    final quantity = this.quantity;
+    final nameText = Text(
+      name,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: CestaDisplayType.itemName.copyWith(color: ink),
+    );
+    final Widget content = icon == null
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (quantity != null)
+                Text(
+                  quantity,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _quantityStyle.copyWith(color: ink),
+                )
+              else
+                const SizedBox.shrink(),
+              nameText,
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 30, color: ink),
+                  if (quantity != null)
+                    Flexible(
+                      child: Text(
+                        quantity,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: CestaFonts.family,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: ink,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              nameText,
+            ],
+          );
+    final radius = BorderRadius.circular(CestaRadii.sign);
+    final interactive = onTap != null || onLongPress != null;
+    final scheme = Theme.of(context).colorScheme;
+    final outline = BorderSide(color: palette.bought, width: 1.5);
+    Widget tile = Material(
+      color: _blank ? scheme.surfaceContainerLow : palette.toBuy,
+      shape: RoundedRectangleBorder(borderRadius: radius, side: _blank ? outline : BorderSide.none),
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Padding(
+          // The List's tags leave room for the hole above the quantity (Figma 3:32).
+          padding: icon == null ? const EdgeInsets.fromLTRB(12, 22, 12, 12) : const EdgeInsets.all(12),
+          child: content,
+        ),
+      ),
+    );
+    if (interactive) {
+      tile = Semantics(
+        button: true,
+        hint: semanticHint,
+        label: [?quantity, name].join(' '),
+        excludeSemantics: true,
+        child: tile,
+      );
+    }
     return MediaQuery.withNoTextScaling(
-      child: Container(
+      child: SizedBox(
         width: size,
         height: size,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: palette.toBuy, borderRadius: BorderRadius.circular(CestaRadii.sign)),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(icon, size: 30, color: ink),
-                    if (quantity case final quantity?)
-                      Flexible(
-                        child: Text(
-                          quantity,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontFamily: CestaFonts.family,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: ink,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                Text(
-                  name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: CestaDisplayType.itemName.copyWith(color: ink),
-                ),
-              ],
-            ),
-            // The hole, in the screen's ground colour (positioned from the tile's corner, not its padding).
+            Positioned.fill(child: tile),
+            // The hole, in the screen's ground colour.
             Positioned(
-              left: holeCentre.dx - 4 - 12,
-              top: holeCentre.dy - 4 - 12,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, shape: BoxShape.circle),
+              left: holeCentre.dx - 4,
+              top: holeCentre.dy - 4,
+              child: IgnorePointer(
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: _blank
+                      ? BoxDecoration(border: Border.fromBorderSide(outline), shape: BoxShape.circle)
+                      : BoxDecoration(color: scheme.surface, shape: BoxShape.circle),
+                ),
               ),
             ),
           ],
@@ -376,4 +475,76 @@ class CesNamePreview extends StatelessWidget {
       ),
     ],
   );
+}
+
+/// The New item sheet's preview (Figma "Preview" 9:443): the Item's tag, as
+/// it will look on the List, hanging on a string.
+class CesItemPreview extends StatelessWidget {
+  const CesItemPreview({super.key, required this.name, this.quantity});
+
+  final String name;
+  final String? quantity;
+
+  @override
+  Widget build(BuildContext context) => _HangingTiles(
+    canvas: const Size(350, 138),
+    tiles: [
+      _HangingTile(
+        left: 119,
+        top: 22,
+        degrees: 3,
+        tile: CesItemTile(name: name, quantity: quantity),
+      ),
+    ],
+  );
+}
+
+/// A List with no Items (Figma "15 Empty list" 39:3859): an empty tag on its
+/// string, a [title] and a [body], centred.
+class CesEmptyListState extends StatelessWidget {
+  const CesEmptyListState({super.key, required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _HangingTiles(
+          canvas: Size(350, 138),
+          tiles: [_HangingTile(left: 119, top: 22, degrees: 3, tile: CesItemTile.blank())],
+        ),
+        const SizedBox(height: 12),
+        Semantics(
+          header: true,
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: CestaFonts.display,
+              fontWeight: FontWeight.w800,
+              fontSize: 24,
+              letterSpacing: -0.48,
+              color: scheme.onSurface,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          body,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: CestaFonts.family,
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
+            height: 1.4,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
 }

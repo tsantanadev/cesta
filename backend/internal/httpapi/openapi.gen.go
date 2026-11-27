@@ -10,6 +10,7 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/oapi-codegen/nullable"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
@@ -26,8 +28,11 @@ import (
 const (
 	ApiErrorCodeInternal           ApiErrorCode = "internal"
 	ApiErrorCodeInvalidDisplayName ApiErrorCode = "invalid_display_name"
+	ApiErrorCodeInvalidItem        ApiErrorCode = "invalid_item"
 	ApiErrorCodeInvalidListName    ApiErrorCode = "invalid_list_name"
 	ApiErrorCodeInvalidRequest     ApiErrorCode = "invalid_request"
+	ApiErrorCodeItemDeleted        ApiErrorCode = "item_deleted"
+	ApiErrorCodeItemNotFound       ApiErrorCode = "item_not_found"
 	ApiErrorCodeLimitExceeded      ApiErrorCode = "limit_exceeded"
 	ApiErrorCodeListDeleted        ApiErrorCode = "list_deleted"
 	ApiErrorCodeListIdTaken        ApiErrorCode = "list_id_taken"
@@ -44,9 +49,15 @@ func (e ApiErrorCode) Valid() bool {
 		return true
 	case ApiErrorCodeInvalidDisplayName:
 		return true
+	case ApiErrorCodeInvalidItem:
+		return true
 	case ApiErrorCodeInvalidListName:
 		return true
 	case ApiErrorCodeInvalidRequest:
+		return true
+	case ApiErrorCodeItemDeleted:
+		return true
+	case ApiErrorCodeItemNotFound:
 		return true
 	case ApiErrorCodeLimitExceeded:
 		return true
@@ -103,6 +114,111 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// Defines values for ItemUnit.
+const (
+	ItemUnitG           ItemUnit = "g"
+	ItemUnitKg          ItemUnit = "kg"
+	ItemUnitL           ItemUnit = "L"
+	ItemUnitLessThannil ItemUnit = "<nil>"
+	ItemUnitMl          ItemUnit = "ml"
+	ItemUnitPack        ItemUnit = "pack"
+	ItemUnitUn          ItemUnit = "un"
+)
+
+// Valid indicates whether the value is a known member of the ItemUnit enum.
+func (e ItemUnit) Valid() bool {
+	switch e {
+	case ItemUnitG:
+		return true
+	case ItemUnitKg:
+		return true
+	case ItemUnitL:
+		return true
+	case ItemUnitLessThannil:
+		return true
+	case ItemUnitMl:
+		return true
+	case ItemUnitPack:
+		return true
+	case ItemUnitUn:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ItemFieldsUnit.
+const (
+	ItemFieldsUnitG           ItemFieldsUnit = "g"
+	ItemFieldsUnitKg          ItemFieldsUnit = "kg"
+	ItemFieldsUnitL           ItemFieldsUnit = "L"
+	ItemFieldsUnitLessThannil ItemFieldsUnit = "<nil>"
+	ItemFieldsUnitMl          ItemFieldsUnit = "ml"
+	ItemFieldsUnitPack        ItemFieldsUnit = "pack"
+	ItemFieldsUnitUn          ItemFieldsUnit = "un"
+)
+
+// Valid indicates whether the value is a known member of the ItemFieldsUnit enum.
+func (e ItemFieldsUnit) Valid() bool {
+	switch e {
+	case ItemFieldsUnitG:
+		return true
+	case ItemFieldsUnitKg:
+		return true
+	case ItemFieldsUnitL:
+		return true
+	case ItemFieldsUnitLessThannil:
+		return true
+	case ItemFieldsUnitMl:
+		return true
+	case ItemFieldsUnitPack:
+		return true
+	case ItemFieldsUnitUn:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MutationType.
+const (
+	ItemCreate MutationType = "item_create"
+	ItemDelete MutationType = "item_delete"
+	ItemUpdate MutationType = "item_update"
+)
+
+// Valid indicates whether the value is a known member of the MutationType enum.
+func (e MutationType) Valid() bool {
+	switch e {
+	case ItemCreate:
+		return true
+	case ItemDelete:
+		return true
+	case ItemUpdate:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MutationResultStatus.
+const (
+	Applied  MutationResultStatus = "applied"
+	Rejected MutationResultStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the MutationResultStatus enum.
+func (e MutationResultStatus) Valid() bool {
+	switch e {
+	case Applied:
+		return true
+	case Rejected:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Role.
 const (
 	Editor Role = "editor"
@@ -115,6 +231,24 @@ func (e Role) Valid() bool {
 	case Editor:
 		return true
 	case Owner:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TombstoneType.
+const (
+	TombstoneTypeItem TombstoneType = "item"
+	TombstoneTypeList TombstoneType = "list"
+)
+
+// Valid indicates whether the value is a known member of the TombstoneType enum.
+func (e TombstoneType) Valid() bool {
+	switch e {
+	case TombstoneTypeItem:
+		return true
+	case TombstoneTypeList:
 		return true
 	default:
 		return false
@@ -163,6 +297,49 @@ type HealthDatabase string
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// Item defines model for Item.
+type Item struct {
+	AddedAt   time.Time                    `json:"addedAt"`
+	AddedBy   UserRef                      `json:"addedBy"`
+	CheckedAt nullable.Nullable[time.Time] `json:"checkedAt,omitempty"`
+	CheckedBy nullable.Nullable[struct {
+		DisplayName string             `json:"displayName"`
+		Id          openapi_types.UUID `json:"id"`
+	}] `json:"checkedBy,omitempty"`
+	Id     openapi_types.UUID        `json:"id"`
+	ListId openapi_types.UUID        `json:"listId"`
+	Name   string                    `json:"name"`
+	Note   nullable.Nullable[string] `json:"note,omitempty"`
+
+	// Quantity A positive decimal as a string, to keep it exact (e.g. "1.5"). Zero is not allowed.
+	Quantity nullable.Nullable[string] `json:"quantity,omitempty"`
+
+	// Unit Fixed set, not extendable. The app shows "un" as "units" in English.
+	Unit      nullable.Nullable[ItemUnit] `json:"unit,omitempty"`
+	UpdatedAt time.Time                   `json:"updatedAt"`
+}
+
+// ItemUnit Fixed set, not extendable. The app shows "un" as "units" in English.
+type ItemUnit string
+
+// ItemFields The fields a mutation sets. On item_update only the fields present change; sending null clears an optional field. checked true marks the Item bought by the pushing User at receipt time; false unchecks it.
+type ItemFields struct {
+	Checked *bool `json:"checked,omitempty"`
+
+	// Name Trimmed; required on item_create and can't be cleared.
+	Name *string                   `json:"name,omitempty"`
+	Note nullable.Nullable[string] `json:"note,omitempty"`
+
+	// Quantity A positive decimal as a string, to keep it exact (e.g. "1.5"). Zero is not allowed.
+	Quantity nullable.Nullable[string] `json:"quantity,omitempty"`
+
+	// Unit Fixed set, not extendable. The app shows "un" as "units" in English.
+	Unit nullable.Nullable[ItemFieldsUnit] `json:"unit,omitempty"`
+}
+
+// ItemFieldsUnit Fixed set, not extendable. The app shows "un" as "units" in English.
+type ItemFieldsUnit string
+
 // ListCreate defines model for ListCreate.
 type ListCreate struct {
 	// Id Chosen by the client, so the List can be created offline and retried safely.
@@ -202,8 +379,72 @@ type ListSummary struct {
 	UncheckedItemCount int `json:"uncheckedItemCount"`
 }
 
+// Mutation defines model for Mutation.
+type Mutation struct {
+	ClientTimestamp time.Time `json:"clientTimestamp"`
+
+	// EntityId The Item's ID, chosen by the client on item_create.
+	EntityId openapi_types.UUID `json:"entityId"`
+
+	// Fields The fields a mutation sets. On item_update only the fields present change; sending null clears an optional field. checked true marks the Item bought by the pushing User at receipt time; false unchecks it.
+	Fields *ItemFields `json:"fields,omitempty"`
+
+	// Id Client mutation ID; retrying the same ID is safe.
+	Id openapi_types.UUID `json:"id"`
+
+	// ListId Required on item_create; ignored otherwise.
+	ListId *openapi_types.UUID `json:"listId,omitempty"`
+	Type   MutationType        `json:"type"`
+}
+
+// MutationType defines model for Mutation.Type.
+type MutationType string
+
+// MutationResult defines model for MutationResult.
+type MutationResult struct {
+	MutationId openapi_types.UUID   `json:"mutationId"`
+	Reason     *ApiError            `json:"reason,omitempty"`
+	Status     MutationResultStatus `json:"status"`
+}
+
+// MutationResultStatus defines model for MutationResult.Status.
+type MutationResultStatus string
+
+// PullResponse defines model for PullResponse.
+type PullResponse struct {
+	// Cursor Opaque; pass to the next pull.
+	Cursor     string      `json:"cursor"`
+	HasMore    bool        `json:"hasMore"`
+	Items      []Item      `json:"items"`
+	Tombstones []Tombstone `json:"tombstones"`
+}
+
+// PushRequest defines model for PushRequest.
+type PushRequest struct {
+	Mutations []Mutation `json:"mutations"`
+}
+
+// PushResponse defines model for PushResponse.
+type PushResponse struct {
+	Results []MutationResult `json:"results"`
+}
+
 // Role The signed-in User's Role on the List.
 type Role string
+
+// Tombstone defines model for Tombstone.
+type Tombstone struct {
+	Id openapi_types.UUID `json:"id"`
+
+	// ListId Present when type is item.
+	ListId *openapi_types.UUID `json:"listId,omitempty"`
+
+	// Type list means the User can no longer see the List; drop it and all its Items.
+	Type TombstoneType `json:"type"`
+}
+
+// TombstoneType list means the User can no longer see the List; drop it and all its Items.
+type TombstoneType string
 
 // User defines model for User.
 type User struct {
@@ -216,6 +457,12 @@ type User struct {
 
 	// Id Internal User ID.
 	Id openapi_types.UUID `json:"id"`
+}
+
+// UserRef defines model for UserRef.
+type UserRef struct {
+	DisplayName string             `json:"displayName"`
+	Id          openapi_types.UUID `json:"id"`
 }
 
 // UserUpdate defines model for UserUpdate.
@@ -245,6 +492,13 @@ type RateLimited = ApiError
 // Unauthenticated defines model for Unauthenticated.
 type Unauthenticated = ApiError
 
+// PullChangesParams defines parameters for PullChanges.
+type PullChangesParams struct {
+	// Cursor Opaque cursor from a previous pull.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // CreateListJSONRequestBody defines body for CreateList for application/json ContentType.
 type CreateListJSONRequestBody = ListCreate
 
@@ -253,6 +507,9 @@ type RenameListJSONRequestBody = ListRename
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UserUpdate
+
+// PushMutationsJSONRequestBody defines body for PushMutations for application/json ContentType.
+type PushMutationsJSONRequestBody = PushRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -280,6 +537,12 @@ type ServerInterface interface {
 	// UpdateMe Set the signed-in User's display name
 	// (PATCH /api/me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// PullChanges Changes since a cursor, for Lists the signed-in User is a Member of
+	// (GET /api/sync/pull)
+	PullChanges(w http.ResponseWriter, r *http.Request, params PullChangesParams)
+	// PushMutations Apply a batch of the device's outbox mutations
+	// (POST /api/sync/push)
+	PushMutations(w http.ResponseWriter, r *http.Request)
 	// GetHealth Liveness and database readiness
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -442,6 +705,66 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// PullChanges operation middleware
+func (siw *ServerInterfaceWrapper) PullChanges(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PullChangesParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PullChanges(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PushMutations operation middleware
+func (siw *ServerInterfaceWrapper) PushMutations(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PushMutations(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -585,6 +908,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/lists/{listId}", wrapper.RenameList)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/lists/{listId}/restore", wrapper.RestoreList)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/deleted-lists", wrapper.ListDeletedLists)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/sync/push", wrapper.PushMutations)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/sync/pull", wrapper.PullChanges)
 
 	return m
 }
@@ -1288,6 +1613,152 @@ func (response UpdateMe429JSONResponse) VisitUpdateMeResponse(w http.ResponseWri
 	return err
 }
 
+type PullChangesRequestObject struct {
+	Params PullChangesParams
+}
+
+type PullChangesResponseObject interface {
+	VisitPullChangesResponse(w http.ResponseWriter) error
+}
+
+type PullChanges200JSONResponse PullResponse
+
+func (response PullChanges200JSONResponse) VisitPullChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PullChanges400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response PullChanges400JSONResponse) VisitPullChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PullChanges401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response PullChanges401JSONResponse) VisitPullChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PullChanges429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response PullChanges429JSONResponse) VisitPullChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PushMutationsRequestObject struct {
+	Body *PushMutationsJSONRequestBody
+}
+
+type PushMutationsResponseObject interface {
+	VisitPushMutationsResponse(w http.ResponseWriter) error
+}
+
+type PushMutations200JSONResponse PushResponse
+
+func (response PushMutations200JSONResponse) VisitPushMutationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PushMutations400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response PushMutations400JSONResponse) VisitPushMutationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PushMutations401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response PushMutations401JSONResponse) VisitPushMutationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PushMutations429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response PushMutations429JSONResponse) VisitPushMutationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealthRequestObject struct {
 }
 
@@ -1372,6 +1843,12 @@ type StrictServerInterface interface {
 	// UpdateMe Set the signed-in User's display name
 	// (PATCH /api/me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// PullChanges Changes since a cursor, for Lists the signed-in User is a Member of
+	// (GET /api/sync/pull)
+	PullChanges(ctx context.Context, request PullChangesRequestObject) (PullChangesResponseObject, error)
+	// PushMutations Apply a batch of the device's outbox mutations
+	// (POST /api/sync/push)
+	PushMutations(ctx context.Context, request PushMutationsRequestObject) (PushMutationsResponseObject, error)
 	// GetHealth Liveness and database readiness
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -1638,6 +2115,63 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// PullChanges operation middleware
+func (sh *strictHandler) PullChanges(w http.ResponseWriter, r *http.Request, params PullChangesParams) {
+	var request PullChangesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.PullChanges(ctx, request.(PullChangesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PullChanges")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PullChangesResponseObject); ok {
+		if err := validResponse.VisitPullChangesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PushMutations operation middleware
+func (sh *strictHandler) PushMutations(w http.ResponseWriter, r *http.Request) {
+	var request PushMutationsRequestObject
+
+	var body PushMutationsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.PushMutations(ctx, request.(PushMutationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PushMutations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PushMutationsResponseObject); ok {
+		if err := validResponse.VisitPushMutationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -1667,48 +2201,70 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"80xbN/1l8suEbS43/x0A",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

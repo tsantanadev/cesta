@@ -4,6 +4,9 @@ import 'api/generated/cesta_api.dart';
 import 'auth/auth_gateway.dart';
 import 'db/app_database.dart';
 import 'health/health_screen.dart';
+import 'items/add_items_screen.dart';
+import 'items/items_store.dart';
+import 'items/list_screen.dart';
 import 'lists/lists_controller.dart';
 import 'lists/lists_screen.dart';
 import 'lists/recently_deleted_screen.dart';
@@ -14,6 +17,7 @@ import 'session/reset_password_screen.dart';
 import 'session/session_controller.dart';
 import 'session/splash_screen.dart';
 import 'session/welcome_screen.dart';
+import 'sync/sync_engine.dart';
 
 /// Screens a signed-out visitor may see.
 const _signedOutRoutes = {Routes.welcome, Routes.signIn, Routes.signUp, Routes.resetPassword};
@@ -56,6 +60,8 @@ String? sessionRedirect(SessionController session, Uri uri) {
 GoRouter buildRouter({
   required SessionController session,
   required ListsController lists,
+  required ItemsStore items,
+  required SyncEngine sync,
   required AuthGateway auth,
   required ApiClient api,
   required AppDatabase database,
@@ -96,6 +102,18 @@ GoRouter buildRouter({
     GoRoute(
       path: Routes.recentlyDeleted,
       builder: (_, _) => RecentlyDeletedScreen(lists: lists),
+    ),
+    GoRoute(
+      path: '/lists/:listId',
+      builder: (_, state) =>
+          ListScreen(listId: state.pathParameters['listId']!, session: session, lists: lists, items: items, sync: sync),
+      routes: [
+        GoRoute(
+          path: 'add',
+          builder: (_, state) =>
+              AddItemsScreen(listId: state.pathParameters['listId']!, session: session, lists: lists, items: items),
+        ),
+      ],
     ),
     GoRoute(
       path: Routes.changeDisplayName,

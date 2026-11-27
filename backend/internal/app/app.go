@@ -21,6 +21,7 @@ import (
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
 	"github.com/tsantanadev/cesta/backend/internal/platform/hosting"
 	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
+	cestasync "github.com/tsantanadev/cesta/backend/internal/sync"
 )
 
 // Deps are the external dependencies of the backend.
@@ -41,6 +42,9 @@ type Deps struct {
 	// MaxListsPerUser is how many Lists a User can own that are not deleted.
 	// 0 means lists.DefaultMaxPerUser.
 	MaxListsPerUser int
+	// MaxItemsPerList is how many Items a List can hold. 0 means
+	// lists.DefaultMaxItemsPerList.
+	MaxItemsPerList int
 }
 
 // RateLimits are the per-client-IP and per-User request limits.
@@ -64,12 +68,12 @@ func Purge(ctx context.Context, d Deps) (int, error) {
 	if c == nil {
 		c = clock.System{}
 	}
-	return newLists(d, c).Purge(ctx, c.Now())
+	return newLists(d, c, membership.NewService(d.DB)).Purge(ctx, c.Now())
 }
 
 // newLists builds the lists module, the same way for serving and for the purge.
-func newLists(d Deps, c clock.Clock) *lists.Service {
-	return lists.NewService(d.DB, c, membership.NewService(d.DB), d.MaxListsPerUser)
+func newLists(d Deps, c clock.Clock, members *membership.Service) *lists.Service {
+	return lists.NewService(d.DB, c, members, lists.Limits{ListsPerUser: d.MaxListsPerUser, ItemsPerList: d.MaxItemsPerList})
 }
 
 // New returns the backend's HTTP handler, instrumented with OpenTelemetry.
@@ -83,11 +87,15 @@ func New(d Deps) http.Handler {
 	if limits == (RateLimits{}) {
 		limits = DefaultRateLimits
 	}
+	members := membership.NewService(d.DB)
+	ls := newLists(d, c, members)
+	users := identity.NewService(d.DB, c, d.TokenVerifier, ratelimit.New(limits.PerUser, c))
 	api := &httpapi.Server{
 		DB:               d.DB,
 		Logger:           d.Logger,
-		Identity:         identity.NewService(d.DB, c, d.TokenVerifier, ratelimit.New(limits.PerUser, c)),
-		Lists:            newLists(d, c),
+		Identity:         users,
+		Lists:            ls,
+		Sync:             cestasync.NewService(d.DB, c, ls, members, users),
 		PerIP:            ratelimit.New(limits.PerIP, c),
 		TrustedProxyHops: d.TrustedProxyHops,
 	}

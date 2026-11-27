@@ -12,6 +12,7 @@
 //	RATE_LIMIT_PER_IP            requests allowed per client IP, as <burst>/<every> (default 120/250ms)
 //	RATE_LIMIT_PER_USER          requests allowed per User, as <burst>/<every> (default 60/500ms)
 //	MAX_LISTS_PER_USER           live Lists a User can own (default 100)
+//	MAX_ITEMS_PER_LIST           Items a List can hold (default 500)
 //	PORT                         HTTP port (default 8080)
 //	LOG_LEVEL                    debug, info, warn or error (default info)
 //	PUBLIC_HOST                  custom domain served by Firebase Hosting; other requests get 404 (off when unset)
@@ -162,11 +163,13 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	maxLists := 0
-	if v := os.Getenv("MAX_LISTS_PER_USER"); v != "" {
-		if maxLists, err = strconv.Atoi(v); err != nil || maxLists <= 0 {
-			return fmt.Errorf("MAX_LISTS_PER_USER = %q, want a positive integer", v)
-		}
+	maxLists, err := positiveEnv("MAX_LISTS_PER_USER")
+	if err != nil {
+		return err
+	}
+	maxItems, err := positiveEnv("MAX_ITEMS_PER_LIST")
+	if err != nil {
+		return err
 	}
 	publicHost := os.Getenv("PUBLIC_HOST")
 	port := os.Getenv("PORT")
@@ -202,6 +205,7 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 			RateLimits:       limits,
 			PublicHost:       publicHost,
 			MaxListsPerUser:  maxLists,
+			MaxItemsPerList:  maxItems,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -220,4 +224,17 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// positiveEnv returns the positive integer in environment variable name, or 0 when it is unset.
+func positiveEnv(name string) (int, error) {
+	v := os.Getenv(name)
+	if v == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("%s = %q, want a positive integer", name, v)
+	}
+	return n, nil
 }

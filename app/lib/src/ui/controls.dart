@@ -274,25 +274,49 @@ class _LabelledField extends StatelessWidget {
   final Widget child;
 
   @override
+  Widget build(BuildContext context) => MergeSemantics(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CesFieldLabel(label),
+        SizedBox(height: context.spacing.sm),
+        child,
+      ],
+    ),
+  );
+}
+
+/// The label above a field or a group of controls, e.g. "How much": 13 dp
+/// semibold, muted.
+class CesFieldLabel extends StatelessWidget {
+  const CesFieldLabel(this.text, {super.key});
+
+  final String text;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return MergeSemantics(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          SizedBox(height: context.spacing.sm),
-          child,
-        ],
+    return Text(
+      text,
+      style: theme.textTheme.labelMedium?.copyWith(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: theme.colorScheme.onSurfaceVariant,
       ),
     );
+  }
+}
+
+/// What is wrong with a field or a group of controls, under it, in the error colour.
+class CesFieldError extends StatelessWidget {
+  const CesFieldError(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(text, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error));
   }
 }
 

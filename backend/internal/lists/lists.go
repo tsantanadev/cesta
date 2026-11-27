@@ -1,5 +1,11 @@
-// Package lists owns Lists: creating, naming, deleting and restoring them, and
-// purging deleted ones after RestoreWindow. Items arrive with #7.
+// Package lists owns Lists and their Items: creating, naming, deleting and
+// restoring Lists, purging deleted ones after RestoreWindow, and adding,
+// changing, checking and removing Items. Package sync carries Item changes to
+// and from devices (ADR-0001) and calls this package to apply and read them.
+//
+// Every change a sync pull must see is numbered by package changeseq: an
+// Item's every change, and a List's deletion and restore, so pulls tell
+// Members the List went away or came back.
 //
 // Who may see or change a List is decided by package membership; this package
 // asks it and never reads list_members itself. Users are known only by ID.
@@ -16,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tsantanadev/cesta/backend/internal/membership"
+	"github.com/tsantanadev/cesta/backend/internal/platform/changeseq"
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
 	"github.com/tsantanadev/cesta/backend/internal/platform/names"
 )
@@ -71,14 +78,26 @@ type Service struct {
 	clock      clock.Clock
 	members    *membership.Service
 	maxPerUser int
+	maxItems   int
 }
 
-// NewService returns a Service backed by db. maxPerUser <= 0 means DefaultMaxPerUser.
-func NewService(db *pgxpool.Pool, c clock.Clock, members *membership.Service, maxPerUser int) *Service {
-	if maxPerUser <= 0 {
-		maxPerUser = DefaultMaxPerUser
+// Limits are how much a User and a List can hold. Zero fields take the defaults.
+type Limits struct {
+	// ListsPerUser is how many live Lists a User can own; 0 means DefaultMaxPerUser.
+	ListsPerUser int
+	// ItemsPerList is how many Items a List can hold; 0 means DefaultMaxItemsPerList.
+	ItemsPerList int
+}
+
+// NewService returns a Service backed by db, with limits.
+func NewService(db *pgxpool.Pool, c clock.Clock, members *membership.Service, limits Limits) *Service {
+	if limits.ListsPerUser <= 0 {
+		limits.ListsPerUser = DefaultMaxPerUser
 	}
-	return &Service{db: db, clock: c, members: members, maxPerUser: maxPerUser}
+	if limits.ItemsPerList <= 0 {
+		limits.ItemsPerList = DefaultMaxItemsPerList
+	}
+	return &Service{db: db, clock: c, members: members, maxPerUser: limits.ListsPerUser, maxItems: limits.ItemsPerList}
 }
 
 // MaxPerUser returns the configured maximum number of live Lists a User can own.
@@ -209,7 +228,12 @@ func (s *Service) Delete(ctx context.Context, userID, listID uuid.UUID) (Deleted
 			return nil
 		}
 		d.DeletedAt = s.clock.Now()
-		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = $2, updated_at = $2 WHERE id = $1", listID, d.DeletedAt)
+		seq, err := changeseq.Next(ctx, tx)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = $2, updated_at = $2, visible_seq = $3 WHERE id = $1",
+			listID, d.DeletedAt, seq)
 		return err
 	})
 	if err != nil {
@@ -234,7 +258,12 @@ func (s *Service) Restore(ctx context.Context, userID, listID uuid.UUID) (Summar
 		if err := s.requireRoomFor(ctx, tx, userID); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = NULL, updated_at = $2 WHERE id = $1", listID, s.clock.Now())
+		seq, err := changeseq.Next(ctx, tx)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = NULL, updated_at = $2, visible_seq = $3 WHERE id = $1",
+			listID, s.clock.Now(), seq)
 		return err
 	})
 	if err != nil {
@@ -316,7 +345,7 @@ type listRow struct {
 // if userID is not a Member or the List is gone (purged, or deleted longer than
 // RestoreWindow ago), and ErrNotOwner for any other Member.
 func (s *Service) lockOwned(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (listRow, error) {
-	role, err := s.members.RoleOf(ctx, listID, userID)
+	role, err := s.members.RoleIn(ctx, tx, listID, userID)
 	if errors.Is(err, membership.ErrNotAMember) {
 		return listRow{}, ErrNotFound
 	}
@@ -377,6 +406,9 @@ func (e listError) Error() string { return string(e) }
 
 // wrap adds context to unexpected errors and passes sentinel errors through.
 func wrap(what string, err error) error {
+	if err == nil {
+		return nil
+	}
 	if _, ok := errors.AsType[listError](err); ok {
 		return err
 	}

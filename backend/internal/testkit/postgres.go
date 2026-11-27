@@ -90,7 +90,9 @@ func newDatabase(t testing.TB) (*pgxpool.Pool, string) {
 	if _, err := cluster.admin.Exec(ctx, "CREATE DATABASE "+ident+" TEMPLATE "+templateDB); err != nil {
 		t.Fatalf("testkit: create database: %v", err)
 	}
-	pool, err := db.Open(ctx, cluster.baseURL(name))
+	// A small pool, like CI runners get by default, so a transaction that
+	// needs a second connection deadlocks here too, not only in CI.
+	pool, err := db.Open(ctx, cluster.baseURL(name)+"&pool_max_conns=4")
 	if err != nil {
 		t.Fatalf("testkit: open database: %v", err)
 	}

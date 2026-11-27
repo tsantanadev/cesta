@@ -1,7 +1,11 @@
+import 'dart:ui' show Tristate;
+
 import 'package:cesta/src/app.dart';
 import 'package:cesta/src/db/app_database.dart';
 import 'package:cesta/src/ui/components.dart';
+import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -9,7 +13,19 @@ import 'fake_api_client.dart';
 import 'fake_auth_gateway.dart';
 import 'fields.dart';
 
-export 'package:cesta/src/ui/components.dart' show CesButton, CesItemTile, CesMessage;
+export 'package:cesta/src/ui/components.dart'
+    show
+        CesAddAsNew,
+        CesAddBar,
+        CesButton,
+        CesCheckedItem,
+        CesChoiceChip,
+        CesItemTile,
+        CesMessage,
+        CesSearchField,
+        CesSoftField,
+        CesStatusPill,
+        CesStepper;
 
 export 'fake_api_client.dart';
 export 'fake_auth_gateway.dart';
@@ -27,13 +43,21 @@ const iPhone = Size(390, 844);
 /// and [auth] can be reused across [pumpApp] calls to simulate the app
 /// restarting with the same storage and the same stored session.
 class Harness {
-  Harness(this.tester) : auth = FakeAuthGateway(), db = AppDatabase(NativeDatabase.memory()) {
+  Harness(this.tester)
+    : auth = FakeAuthGateway(),
+      db = AppDatabase(
+        // Close stream queries at once when their listener goes, rather than on a
+        // later timer that a widget test's fake clock would never run.
+        DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true),
+      ) {
     api = FakeApiClient(auth: auth);
+    addTearDown(api.close);
     addTearDown(db.close);
   }
 
   final WidgetTester tester;
   final FakeAuthGateway auth;
+
   late final FakeApiClient api;
   final AppDatabase db;
 
@@ -57,6 +81,7 @@ class Harness {
         api: api,
         auth: auth,
         database: db,
+        network: api.network,
         locale: locale,
         themeMode: themeMode,
         initialLocation: initialLocation,
@@ -133,6 +158,14 @@ class Harness {
     auth.offline = true;
   }
 
+  /// The network and both servers become reachable again; waits for the app
+  /// to notice and sync.
+  Future<void> goOnline() async {
+    api.goOnline();
+    auth.offline = false;
+    await tester.pumpAndSettle();
+  }
+
   /// Scrolls [target] into view, taps it and waits for the app to settle.
   Future<void> tap(Finder target) async {
     await tester.ensureVisible(target);
@@ -183,6 +216,74 @@ class Harness {
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
   }
+
+  /// Opens the List named [name] from the Lists screen.
+  Future<void> openList(String name) => tap(find.text(name));
+
+  /// The Item tags to buy, in order, as they read on screen: the quantity,
+  /// if any, then the name (e.g. "1 kg Tomatoes").
+  List<String> tags() => [for (final n in find.semantics.byHint(_check).evaluate()) n.label];
+
+  /// The rows In the basket, in order: each Checked Item's name and who
+  /// checked it, as they read on screen.
+  List<(String, String)> basketRows() => [
+    for (final n in find.semantics.byHint(_uncheck).evaluate())
+      switch (n.label.split('\n')) {
+        [final name, final checkedBy] => (name, checkedBy),
+        final other => throw StateError('Unexpected basket row: $other'),
+      },
+  ];
+
+  /// What tapping a tag or a basket row does, as screen readers say it.
+  static final _check = RegExp(r'^(Check|Marcar como comprado)$');
+  static final _uncheck = RegExp(r'^(Uncheck|Desmarcar)$');
+
+  /// From a List's screen, adds a new Item named [name] through Add items and
+  /// the New item sheet, pressing + [steps] times and picking [unit] (as its
+  /// chip reads); stays on Add items.
+  Future<void> addNewItem(String name, {required String listName, int steps = 0, String? unit}) async {
+    if (find.byType(CesSearchField).evaluate().isEmpty) await tap(find.text('Add an item'));
+    await search(name);
+    await tap(find.text('Add “$name” as a new item'));
+    for (var i = 0; i < steps; i++) {
+      await tap(find.bySemanticsLabel('More'));
+    }
+    if (unit != null) await tap(find.widgetWithText(CesChoiceChip, unit));
+    await tap(find.widgetWithText(CesButton, 'Add to $listName'));
+  }
+
+  /// Types [text] in Add items' search field.
+  Future<void> search(String text) async {
+    await tester.enterText(find.descendant(of: find.byType(CesSearchField), matching: find.byType(EditableText)), text);
+    await tester.pumpAndSettle();
+  }
+
+  /// Taps the tag of the Item named [name] (checks it).
+  Future<void> tapTag(String name) => tap(find.widgetWithText(CesItemTile, name));
+
+  /// Long-presses the tag of the Item named [name] (opens it).
+  Future<void> openItem(String name) async {
+    await tester.longPress(find.widgetWithText(CesItemTile, name));
+    await tester.pumpAndSettle();
+  }
+
+  /// The quantity typed in the open Item sheet's stepper.
+  String get quantityText => tester
+      .widget<EditableText>(find.descendant(of: find.byType(CesStepper), matching: find.byType(EditableText)))
+      .controller
+      .text;
+
+  /// The label of the selected unit chip, or null.
+  String? get selectedUnit =>
+      find.semantics.byPredicate((n) => n.flagsCollection.isSelected == Tristate.isTrue).evaluate().firstOrNull?.label;
+
+  /// The note field of the open Item sheet.
+  Finder get noteField => find.descendant(of: find.byType(CesSoftField), matching: find.byType(EditableText));
+
+  String get noteText => tester.widget<EditableText>(noteField).controller.text;
+
+  /// Taps the In the basket row of the Item named [name] (unchecks it).
+  Future<void> tapBasketRow(String name) => tap(find.widgetWithText(CesCheckedItem, name));
 
   /// The text in the field labelled [label].
   String textInField(String label) => fieldController(tester, label).text;

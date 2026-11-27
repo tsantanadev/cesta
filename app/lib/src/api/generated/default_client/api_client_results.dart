@@ -6,6 +6,8 @@ import 'models/deleted_lists.dart' as models show DeletedLists;
 import 'models/health.dart' as models show Health;
 import 'models/list_summaries.dart' as models show ListSummaries;
 import 'models/list_summary.dart' as models show ListSummary;
+import 'models/pull_response.dart' as models show PullResponse;
+import 'models/push_response.dart' as models show PushResponse;
 import 'models/user.dart' as models show User;
 
 sealed class GetHealthResult {}
@@ -274,6 +276,58 @@ final class ListDeletedLists401 implements ListDeletedListsResult {
 
 final class ListDeletedLists429 implements ListDeletedListsResult {
   const ListDeletedLists429(this.value);
+
+  final models.ApiError value;
+}
+
+sealed class PushMutationsResult {}
+
+final class PushMutations200 implements PushMutationsResult {
+  const PushMutations200(this.value);
+
+  final models.PushResponse value;
+}
+
+final class PushMutations400 implements PushMutationsResult {
+  const PushMutations400(this.value);
+
+  final models.ApiError value;
+}
+
+final class PushMutations401 implements PushMutationsResult {
+  const PushMutations401(this.value);
+
+  final models.ApiError value;
+}
+
+final class PushMutations429 implements PushMutationsResult {
+  const PushMutations429(this.value);
+
+  final models.ApiError value;
+}
+
+sealed class PullChangesResult {}
+
+final class PullChanges200 implements PullChangesResult {
+  const PullChanges200(this.value);
+
+  final models.PullResponse value;
+}
+
+final class PullChanges400 implements PullChangesResult {
+  const PullChanges400(this.value);
+
+  final models.ApiError value;
+}
+
+final class PullChanges401 implements PullChangesResult {
+  const PullChanges401(this.value);
+
+  final models.ApiError value;
+}
+
+final class PullChanges429 implements PullChangesResult {
+  const PullChanges429(this.value);
 
   final models.ApiError value;
 }

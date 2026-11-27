@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
+
 import 'package:cesta/src/api/generated/cesta_api.dart';
+import 'package:cesta/src/sync/network_status.dart';
 import 'package:dio/dio.dart';
 
 import 'fake_auth_gateway.dart';
@@ -9,7 +14,8 @@ const _maxDisplayNameLength = 50;
 /// Seam 2 fake: stands in for the generated [ApiClient].
 ///
 /// It answers from in-memory state and can be switched [offline], in which
-/// case every call fails the way Dio does when the network is unreachable.
+/// case every call fails the way Dio does when the network is unreachable,
+/// and its [network] reports the phone's connection gone.
 /// It acts on behalf of whoever is signed in to [auth], as the real client
 /// does by sending that User's ID token.
 class FakeApiClient implements ApiClient {
@@ -29,8 +35,23 @@ class FakeApiClient implements ApiClient {
   /// The health the fake backend reports.
   Health health;
 
-  /// When true, every call throws a connection error.
-  bool offline = false;
+  /// When true, every call throws a connection error and [network] reports
+  /// no connection.
+  bool get offline => _offline;
+  set offline(bool value) {
+    if (value == _offline) return;
+    _offline = value;
+    _connectivity.add(!value);
+  }
+
+  bool _offline = false;
+  final _connectivity = StreamController<bool>.broadcast();
+
+  /// The phone's connection as the OS reports it, which follows [offline]: so
+  /// tests switch one thing to take the phone off the network.
+  late final NetworkStatus network = _FakeNetworkStatus(this);
+
+  Future<void> close() => _connectivity.close();
 
   /// When set, every call throws this instead of answering, e.g. a parse
   /// failure on a malformed response.
@@ -155,7 +176,9 @@ class FakeApiClient implements ApiClient {
   void purgeListNow(String id) => _lists.remove(id);
 
   /// Deletes List [id] behind the app's back, e.g. from another device.
-  void deleteListNow(String id) => _lists[id]!.deletedAt = DateTime.now().toUtc();
+  void deleteListNow(String id) => _lists[id]!
+    ..deletedAt = DateTime.now().toUtc()
+    ..deletedSeq = ++_changeSeq;
 
   static const _restoreWindow = Duration(days: 30);
 
@@ -163,7 +186,10 @@ class FakeApiClient implements ApiClient {
     id: l.id,
     name: l.name,
     role: l.ownerUid == uid ? Role.owner : Role.editor,
-    uncheckedItemCount: l.uncheckedItemCount,
+    // Counted from its Items once it has any, as the server does.
+    uncheckedItemCount: _items.values.any((i) => i.listId == l.id)
+        ? _liveItems.where((i) => i.listId == l.id && i.checkedAt == null).length
+        : l.uncheckedItemCount,
     memberCount: l.members.length,
     createdAt: l.createdAt,
   );
@@ -325,7 +351,250 @@ class FakeApiClient implements ApiClient {
     return ListDeletedLists200(DeletedLists(lists: [for (final l in deleted) _deleted(l)]));
   }
 
+  // ---- Items and sync ---------------------------------------------------
+
+  /// How many Items a List may hold, like the server's 500.
+  int itemLimit = 500;
+
+  /// While set, sync answers reach the app only once it completes, as over a
+  /// slow network: the server has already answered by then.
+  Completer<void>? slowSync;
+
+  /// When set, the server refuses every push as a whole with this HTTP
+  /// status (e.g. 400, 403, 503) instead of answering it.
+  int? refusePushes;
+
+  /// When set, every pushed mutation is rejected with this code, as when the
+  /// User was removed from the List meanwhile.
+  ApiErrorCode? rejectMutations;
+
+  /// Every Item the fake backend knows, removed or not, in creation order.
+  final _items = <String, _FakeItem>{};
+  final _mutationResults = <String, MutationResult>{};
+  int _changeSeq = 0;
+  int _nextItemId = 1;
+
+  /// Stores an Item on List [listId], as if added earlier by [addedBy].
+  /// [checkedBy] checks it.
+  String addItem(
+    String listId, {
+    required String name,
+    required FakeIdentity addedBy,
+    String? quantity,
+    ItemUnit? unit,
+    String? note,
+    FakeIdentity? checkedBy,
+  }) {
+    final id = '00000000-0000-4000-9000-${(_nextItemId++).toString().padLeft(12, '0')}';
+    final now = DateTime.now().toUtc();
+    _items[id] = _FakeItem(
+      id: id,
+      listId: listId,
+      name: name,
+      quantity: quantity,
+      unit: unit?.toJson(),
+      note: note,
+      addedByUid: addedBy.uid,
+      addedAt: now.add(Duration(milliseconds: _nextItemId)),
+      checkedByUid: checkedBy?.uid,
+      checkedAt: checkedBy == null ? null : now,
+      seq: ++_changeSeq,
+    );
+    return id;
+  }
+
+  /// [by] checks the Item named [name] behind the app's back, e.g. on another phone.
+  void checkItemNow(String name, {required FakeIdentity by}) => _liveItems.firstWhere((i) => i.name == name)
+    ..checkedByUid = by.uid
+    ..checkedAt = DateTime.now().toUtc()
+    ..seq = ++_changeSeq;
+
+  /// Someone removes the Item named [name] behind the app's back.
+  void removeItemNow(String name) => _liveItems.firstWhere((i) => i.name == name)
+    ..deleted = true
+    ..seq = ++_changeSeq;
+
+  Iterable<_FakeItem> get _liveItems => _items.values.where((i) => !i.deleted);
+
+  /// Names of the Items on List [listId] still to buy, in insertion order.
+  List<String> itemsToBuy(String listId) => [
+    for (final i in _liveItems)
+      if (i.listId == listId && i.checkedAt == null) i.name,
+  ];
+
+  /// Names of the Checked Items on List [listId].
+  List<String> itemsInBasket(String listId) => [
+    for (final i in _liveItems)
+      if (i.listId == listId && i.checkedAt != null) i.name,
+  ];
+
+  /// The Item named [name], as the server stores it.
+  Item serverItem(String name) => _toItem(_liveItems.firstWhere((i) => i.name == name));
+
+  String _displayNameOf(String uid) => _users[uid]?.displayName ?? uid;
+
+  String _userIdOf(String uid) => _users[uid]?.id ?? 'user-$uid';
+
+  Item _toItem(_FakeItem i) => Item(
+    id: i.id,
+    listId: i.listId,
+    name: i.name,
+    // Like the server, every optional field is sent, as null when empty.
+    quantity: (value: i.quantity),
+    unit: (value: i.unit == null ? null : ItemUnit.fromJson(i.unit)),
+    note: (value: i.note),
+    addedBy: UserRef(id: _userIdOf(i.addedByUid), displayName: _displayNameOf(i.addedByUid)),
+    addedAt: i.addedAt,
+    checkedAt: (value: i.checkedAt),
+    checkedBy: (
+      value: i.checkedByUid == null
+          ? null
+          : ItemCheckedBy(id: _userIdOf(i.checkedByUid!), displayName: _displayNameOf(i.checkedByUid!)),
+    ),
+    updatedAt: i.addedAt,
+  );
+
+  @override
+  Future<PushMutationsResult> pushMutations({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required PushRequest body,
+  }) async {
+    _failIfOffline('/api/sync/push');
+    final identity = auth.current;
+    if (identity == null) return const PushMutations401(_unauthenticated);
+    // Read the request as the server would: from the JSON on the wire.
+    body = PushRequest.fromJson(_wire(body.toJson()));
+    switch (refusePushes) {
+      case null:
+        break;
+      case 400:
+        return PushMutations400(_error(ApiErrorCode.invalidItem));
+      case final status:
+        final request = RequestOptions(path: '/api/sync/push');
+        throw DioException.badResponse(
+          statusCode: status,
+          requestOptions: request,
+          response: Response(requestOptions: request, statusCode: status),
+        );
+    }
+    if (body.mutations.isEmpty || body.mutations.length > 100) {
+      return PushMutations400(_error(ApiErrorCode.invalidItem));
+    }
+    return PushMutations200(
+      PushResponse(results: [for (final m in body.mutations) _mutationResults[m.id] ??= _apply(identity, m)]),
+    );
+  }
+
+  MutationResult _apply(FakeIdentity identity, Mutation m) {
+    MutationResult rejected(ApiErrorCode code, {int? limit}) => MutationResult(
+      mutationId: m.id,
+      status: MutationResultStatus.rejected,
+      reason: _error(code, limit: limit),
+    );
+    final applied = MutationResult(mutationId: m.id, status: MutationResultStatus.applied);
+    if (rejectMutations case final code?) return rejected(code);
+    final fields = m.fields ?? const ItemFields();
+    switch (m.type) {
+      case MutationType.itemCreate:
+        final listId = m.listId;
+        final list = listId == null ? null : _visible(listId, identity.uid);
+        if (listId == null || list == null) return rejected(ApiErrorCode.listNotFound);
+        if (list.deletedAt != null) return rejected(ApiErrorCode.listDeleted);
+        if (_items.containsKey(m.entityId)) return rejected(ApiErrorCode.invalidItem);
+        final name = fields.name?.trim() ?? '';
+        if (name.isEmpty || name.runes.length > 80) return rejected(ApiErrorCode.invalidItem);
+        if (_liveItems.where((i) => i.listId == listId).length >= itemLimit) {
+          return rejected(ApiErrorCode.limitExceeded, limit: itemLimit);
+        }
+        _items[m.entityId] = _FakeItem(
+          id: m.entityId,
+          listId: listId,
+          name: name,
+          quantity: fields.quantity?.value,
+          unit: fields.unit?.value?.toJson(),
+          note: fields.note?.value,
+          addedByUid: identity.uid,
+          addedAt: DateTime.now().toUtc(),
+          seq: ++_changeSeq,
+        );
+        return applied;
+      case MutationType.itemUpdate || MutationType.itemDelete:
+        final item = _items[m.entityId];
+        if (item == null || _visible(item.listId, identity.uid) == null) return rejected(ApiErrorCode.itemNotFound);
+        if (item.deleted) return rejected(ApiErrorCode.itemDeleted);
+        if (m.type == MutationType.itemDelete) {
+          item.deleted = true;
+        } else {
+          if (fields.name case final name?) item.name = name.trim();
+          // A field present as null clears it.
+          if (fields.quantity case final q?) item.quantity = q.value;
+          if (fields.unit case final u?) item.unit = u.value?.toJson();
+          if (fields.note case final n?) item.note = n.value;
+          if (fields.checked case final checked?) {
+            item.checkedAt = checked ? DateTime.now().toUtc() : null;
+            item.checkedByUid = checked ? identity.uid : null;
+          }
+        }
+        item.seq = ++_changeSeq;
+        return applied;
+    }
+  }
+
+  @override
+  Future<PullChangesResult> pullChanges({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    String? cursor,
+    int? limit,
+  }) async {
+    _failIfOffline('/api/sync/pull');
+    final identity = auth.current;
+    if (identity == null) return const PullChanges401(_unauthenticated);
+    final since = cursor == null ? 0 : int.parse(cursor);
+    final changed = _items.values.where((i) {
+      final list = _lists[i.listId];
+      return i.seq > since && list != null && list.deletedAt == null && list.members.contains(identity.uid);
+    }).toList()..sort((a, b) => a.seq.compareTo(b.seq));
+    final page = changed.take(limit ?? 500).toList();
+    // Lists deleted since, sent with the last page.
+    final deleted = page.length < changed.length
+        ? const <_FakeList>[]
+        : _lists.values.where(
+            (l) => l.deletedAt != null && (l.deletedSeq ?? 0) > since && l.members.contains(identity.uid),
+          );
+    final last = [if (page.isNotEmpty) page.last.seq, for (final l in deleted) l.deletedSeq!, since].reduce(math.max);
+    final answer = PullChanges200(
+      _pullResponse(
+        items: [for (final i in page.where((i) => !i.deleted)) _toItem(i)],
+        tombstones: [
+          for (final i in page.where((i) => i.deleted)) Tombstone(type: TombstoneType.item, id: i.id, listId: i.listId),
+          for (final l in deleted) Tombstone(type: TombstoneType.list, id: l.id),
+        ],
+        cursor: '$last',
+        hasMore: page.length < changed.length,
+      ),
+    );
+    await slowSync?.future;
+    return answer;
+  }
+
   static const _unauthenticated = ApiError(code: ApiErrorCode.unauthenticated, message: 'no valid token');
+
+  /// [json] as it arrives after a trip over the wire.
+  static Map<String, Object?> _wire(Map<String, Object?> json) => jsonDecode(jsonEncode(json)) as Map<String, Object?>;
+
+  /// A pull response as the app's client decodes it from the wire.
+  static PullResponse _pullResponse({
+    required List<Item> items,
+    required List<Tombstone> tombstones,
+    required String cursor,
+    required bool hasMore,
+  }) => PullResponse.fromJson(
+    _wire(PullResponse(items: items, tombstones: tombstones, cursor: cursor, hasMore: hasMore).toJson()),
+  );
 
   void _failIfOffline(String path) {
     if (offline) {
@@ -358,6 +627,54 @@ class _FakeList {
   String name;
   final DateTime createdAt;
   final Set<String> members;
+
+  /// The change number of its deletion behind the app's back, for pulls.
+  int? deletedSeq;
   final int uncheckedItemCount;
   DateTime? deletedAt;
+}
+
+/// An Item as the fake backend stores it.
+class _FakeItem {
+  _FakeItem({
+    required this.id,
+    required this.listId,
+    required this.name,
+    required this.addedByUid,
+    required this.addedAt,
+    required this.seq,
+    this.quantity,
+    this.unit,
+    this.note,
+    this.checkedByUid,
+    this.checkedAt,
+  });
+
+  final String id;
+  final String listId;
+  String name;
+  String? quantity;
+  String? unit;
+  String? note;
+  final String addedByUid;
+  final DateTime addedAt;
+  String? checkedByUid;
+  DateTime? checkedAt;
+  bool deleted = false;
+
+  /// The server's change sequence when this Item last changed: the pull cursor.
+  int seq;
+}
+
+/// The OS's connectivity report, following [FakeApiClient.offline].
+class _FakeNetworkStatus implements NetworkStatus {
+  _FakeNetworkStatus(this._api);
+
+  final FakeApiClient _api;
+
+  @override
+  Future<bool> isConnected() async => !_api.offline;
+
+  @override
+  Stream<bool> get changes => _api._connectivity.stream;
 }

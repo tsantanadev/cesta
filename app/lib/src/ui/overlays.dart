@@ -170,8 +170,18 @@ class CesSheetItem extends StatelessWidget {
 
 /// Shows a short message at the bottom of the screen (the design's Toast),
 /// with an optional action such as "Undo".
-void showCesToast(BuildContext context, {required String message, String? actionLabel, VoidCallback? onAction}) {
-  ScaffoldMessenger.of(context)
+void showCesToast(BuildContext context, {required String message, String? actionLabel, VoidCallback? onAction}) =>
+    showCesToastOn(ScaffoldMessenger.of(context), message: message, actionLabel: actionLabel, onAction: onAction);
+
+/// [showCesToast] through a given [messenger], e.g. the app's, for messages
+/// that don't belong to one screen.
+void showCesToastOn(
+  ScaffoldMessengerState messenger, {
+  required String message,
+  String? actionLabel,
+  VoidCallback? onAction,
+}) {
+  messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
@@ -198,6 +208,51 @@ Future<void> showCesFormSheet(
   builder: (context) =>
       _CesSheet(title: title, closeTooltip: closeTooltip, sectionGap: context.spacing.lg, child: child),
 );
+
+/// Shows an Item sheet: like [showCesFormSheet], with its sections
+/// [CesItemSheetGap] apart (Figma "07 New item" 9:436, "12 Opened item"
+/// 38:2519, "14 Item limit" 38:2928).
+Future<void> showCesItemSheet(
+  BuildContext context, {
+  required String title,
+  required String closeTooltip,
+  required Widget child,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  builder: (context) =>
+      _CesSheet(title: title, closeTooltip: closeTooltip, sectionGap: CesItemSheetGap.height, child: child),
+);
+
+/// The gap between the sections of an Item sheet (18 dp).
+class CesItemSheetGap extends StatelessWidget {
+  const CesItemSheetGap({super.key});
+
+  static const height = 18.0;
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(height: height);
+}
+
+/// A sheet's running text, e.g. why the List can't take more Items: 15 dp,
+/// muted.
+class CesSheetText extends StatelessWidget {
+  const CesSheetText(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: TextStyle(
+      fontFamily: CestaFonts.family,
+      fontWeight: FontWeight.w500,
+      fontSize: 15,
+      height: 1.4,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
+  );
+}
 
 /// The round close button of a sheet (Figma 9:440, 32:1496, 32:1394): 36 dp,
 /// Alface ground.

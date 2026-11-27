@@ -338,4 +338,172 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorListNotRestorable => 'This List is no longer available and can\'t be restored.';
+
+  @override
+  String listToBuyInBasket(int toBuy, int inBasket) {
+    return '$toBuy to buy, $inBasket in the basket';
+  }
+
+  @override
+  String get listInTheBasket => 'In the basket';
+
+  @override
+  String get listAddAnItem => 'Add an item';
+
+  @override
+  String get listCheckedByYou => 'You';
+
+  @override
+  String get itemCheck => 'Check';
+
+  @override
+  String get itemUncheck => 'Uncheck';
+
+  @override
+  String get addItemsSearch => 'Search items';
+
+  @override
+  String get addItemsDone => 'Done';
+
+  @override
+  String addItemsAddAsNew(String name) {
+    return 'Add “$name” as a new item';
+  }
+
+  @override
+  String get newItemTitle => 'New item';
+
+  @override
+  String get newItemName => 'Name';
+
+  @override
+  String get newItemHowMuch => 'How much';
+
+  @override
+  String get newItemQuantity => 'Quantity';
+
+  @override
+  String get newItemLess => 'Less';
+
+  @override
+  String get newItemMore => 'More';
+
+  @override
+  String get newItemNoteHint => 'Add a note, like “ripe ones”';
+
+  @override
+  String newItemAddTo(String list) {
+    return 'Add to $list';
+  }
+
+  @override
+  String get unitUn => 'units';
+
+  @override
+  String get unitKg => 'kg';
+
+  @override
+  String get unitG => 'g';
+
+  @override
+  String get unitL => 'L';
+
+  @override
+  String get unitMl => 'ml';
+
+  @override
+  String get unitPack => 'pack';
+
+  @override
+  String itemAdded(String item, String list) {
+    return '$item added to $list';
+  }
+
+  @override
+  String get itemUndo => 'Undo';
+
+  @override
+  String get errorItemNameRequired => 'Enter a name.';
+
+  @override
+  String errorItemNameTooLong(int max) {
+    return 'Use $max characters or fewer.';
+  }
+
+  @override
+  String get errorItemQuantityInvalid => 'Use a number above zero, like 2 or 1.5.';
+
+  @override
+  String listOffline(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Offline · $count changes waiting to sync',
+      one: 'Offline · 1 change waiting to sync',
+      zero: 'Offline',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get listNothingToBuyYet => 'Nothing to buy yet';
+
+  @override
+  String get listEmptyTitle => 'Start your list';
+
+  @override
+  String get listEmptyBody => 'Add what you need. Everyone on this list sees it right away.';
+
+  @override
+  String get itemEditTitle => 'Edit item';
+
+  @override
+  String get itemSave => 'Save';
+
+  @override
+  String itemAddedBy(String name) {
+    return 'Added by $name';
+  }
+
+  @override
+  String get itemAddedByYou => 'Added by you';
+
+  @override
+  String itemCheckedBy(String name) {
+    return 'Checked by $name';
+  }
+
+  @override
+  String get itemCheckedByYou => 'Checked by you';
+
+  @override
+  String get itemRemove => 'Remove item';
+
+  @override
+  String itemRemoved(String item) {
+    return '$item removed';
+  }
+
+  @override
+  String itemRejectedRemoved(String name) {
+    return 'Couldn’t save “$name”. It was removed.';
+  }
+
+  @override
+  String itemRejectedListGone(String name) {
+    return 'Couldn’t save “$name”. The list is no longer available.';
+  }
+
+  @override
+  String itemRejected(String name) {
+    return 'Couldn’t save “$name”.';
+  }
+
+  @override
+  String get itemLimitTitle => 'This list is full';
+
+  @override
+  String itemLimitBody(int max) {
+    return 'A list can hold up to $max items. Remove ones you no longer need to make room.';
+  }
 }

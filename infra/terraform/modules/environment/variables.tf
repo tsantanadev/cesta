@@ -94,6 +94,16 @@ variable "max_lists_per_user" {
   }
 }
 
+variable "max_items_per_list" {
+  description = "Backend MAX_ITEMS_PER_LIST: Items a List can hold."
+  type        = number
+  default     = 500
+  validation {
+    condition     = var.max_items_per_list > 0 && floor(var.max_items_per_list) == var.max_items_per_list
+    error_message = "max_items_per_list must be a positive integer."
+  }
+}
+
 variable "image_reader_members" {
   description = "Extra principals allowed to pull from this environment's image repository (prod's deployer, on dev)."
   type        = list(string)

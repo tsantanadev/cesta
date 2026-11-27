@@ -13,6 +13,9 @@ import 'models/list_create.dart' as models show ListCreate;
 import 'models/list_rename.dart' as models show ListRename;
 import 'models/list_summaries.dart' as models show ListSummaries;
 import 'models/list_summary.dart' as models show ListSummary;
+import 'models/pull_response.dart' as models show PullResponse;
+import 'models/push_request.dart' as models show PushRequest;
+import 'models/push_response.dart' as models show PushResponse;
 import 'models/user.dart' as models show User;
 import 'models/user_update.dart' as models show UserUpdate;
 
@@ -453,6 +456,106 @@ class ApiClient {
       200 => ListDeletedLists200(models.DeletedLists.fromJson(response.data as Map<String, Object?>)),
       401 => ListDeletedLists401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       429 => ListDeletedLists429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Apply a batch of the device's outbox mutations
+  ///
+  /// Mutations are applied in order. Each one is idempotent by its client mutation ID: pushing a mutation the server already received returns its original result and changes nothing. Authorization is re-checked per mutation (the User must be a Member of the Item's List). Conflicts resolve last-write-wins per field, in order of server receipt (clientTimestamp is recorded, never used for ordering). A delete wins over concurrent edits: editing a removed Item is rejected with item_deleted and does not bring it back. A List holds at most the configured limit of Items (default 500); the create past it is rejected with limit_exceeded. One mutation's rejection never fails the batch.
+  Future<PushMutationsResult> pushMutations({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+    required models.PushRequest body,
+  }) async {
+    final _options = (options ?? Options()).copyWith(
+      method: "POST",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      contentType: "application/json",
+      headers: {
+        for (final entry in (options?.headers ?? const <String, Object?>{}).entries)
+          if (entry.key.toLowerCase() != 'content-type') entry.key: entry.value,
+        'Accept': "application/json",
+      },
+      validateStatus: (status) => status != null && (status == 200 || status == 400 || status == 401 || status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/sync/push",
+      options: _options,
+      data: convert.jsonEncode(body),
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => PushMutations200(models.PushResponse.fromJson(response.data as Map<String, Object?>)),
+      400 => PushMutations400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => PushMutations401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => PushMutations429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Changes since a cursor, for Lists the signed-in User is a Member of
+  ///
+  /// Returns the current state of every Item changed since the cursor, plus tombstones for Items removed and for Lists the User can no longer see (deleted, or the User stopped being a Member). Omit cursor for a full snapshot. Keep pulling with the returned cursor while hasMore is true.
+  Future<PullChangesResult> pullChanges({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+
+    /// Opaque cursor from a previous pull.
+    String? cursor,
+    int? limit,
+  }) async {
+    final _options = (options ?? Options()).copyWith(
+      method: "GET",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      headers: {...?options?.headers, 'Accept': "application/json"},
+      validateStatus: (status) => status != null && (status == 200 || status == 400 || status == 401 || status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/sync/pull",
+      options: _options,
+      queryParameters: <String, Object?>{if (cursor != null) "cursor": cursor, if (limit != null) "limit": limit},
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => PullChanges200(models.PullResponse.fromJson(response.data as Map<String, Object?>)),
+      400 => PullChanges400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => PullChanges401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => PullChanges429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       _ => throw StateError('Unexpected response status: ${response.statusCode}'),
     };
   }

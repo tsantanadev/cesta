@@ -58,6 +58,11 @@ func WithRateLimits(perIP, perUser ratelimit.Rule) Option {
 	return func(d *app.Deps) { d.RateLimits = app.RateLimits{PerIP: perIP, PerUser: perUser} }
 }
 
+// WithMaxItemsPerList sets how many Items a List can hold.
+func WithMaxItemsPerList(n int) Option {
+	return func(d *app.Deps) { d.MaxItemsPerList = n }
+}
+
 // WithMaxListsPerUser sets how many live Lists a User can own.
 func WithMaxListsPerUser(n int) Option {
 	return func(d *app.Deps) { d.MaxListsPerUser = n }

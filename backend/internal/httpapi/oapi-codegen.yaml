@@ -6,3 +6,7 @@ generate:
   strict-server: true
   models: true
   embedded-spec: true
+output-options:
+  # Optional nullable fields become nullable.Nullable, so a mutation can tell
+  # "clear this field" (null) from "leave it alone" (absent).
+  nullable-type: true

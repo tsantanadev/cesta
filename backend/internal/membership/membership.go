@@ -15,6 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/tsantanadev/cesta/backend/internal/platform/changeseq"
 )
 
 // Role is a Member's level of access on a List.
@@ -48,11 +50,16 @@ func NewService(db *pgxpool.Pool) *Service {
 }
 
 // Grant makes userID a Member of listID with role, as of at, inside the
-// caller's transaction tx.
+// caller's transaction tx. Joining is a numbered change (package changeseq),
+// so the User's next sync pull brings the whole List.
 func (s *Service) Grant(ctx context.Context, tx pgx.Tx, listID, userID uuid.UUID, role Role, at time.Time) error {
+	seq, err := changeseq.Next(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("membership: grant: %w", err)
+	}
 	if _, err := tx.Exec(ctx,
-		"INSERT INTO list_members (list_id, user_id, role, joined_at) VALUES ($1, $2, $3, $4)",
-		listID, userID, string(role), at); err != nil {
+		"INSERT INTO list_members (list_id, user_id, role, joined_at, seq) VALUES ($1, $2, $3, $4, $5)",
+		listID, userID, string(role), at, seq); err != nil {
 		return fmt.Errorf("membership: grant: %w", err)
 	}
 	return nil
@@ -60,8 +67,21 @@ func (s *Service) Grant(ctx context.Context, tx pgx.Tx, listID, userID uuid.UUID
 
 // RoleOf returns userID's Role on listID, or ErrNotAMember.
 func (s *Service) RoleOf(ctx context.Context, listID, userID uuid.UUID) (Role, error) {
+	return roleOf(ctx, s.db, listID, userID)
+}
+
+// RoleIn is RoleOf inside the caller's transaction tx, so the answer holds for
+// the rest of a change made under a lock the caller took on the List.
+func (s *Service) RoleIn(ctx context.Context, tx pgx.Tx, listID, userID uuid.UUID) (Role, error) {
+	return roleOf(ctx, tx, listID, userID)
+}
+
+func roleOf(ctx context.Context, q interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}, listID, userID uuid.UUID,
+) (Role, error) {
 	var role string
-	err := s.db.QueryRow(ctx,
+	err := q.QueryRow(ctx,
 		"SELECT role FROM list_members WHERE list_id = $1 AND user_id = $2", listID, userID).Scan(&role)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrNotAMember
@@ -70,6 +90,31 @@ func (s *Service) RoleOf(ctx context.Context, listID, userID uuid.UUID) (Role, e
 		return "", fmt.Errorf("membership: role: %w", err)
 	}
 	return Role(role), nil
+}
+
+// Joined is a List a User is a Member of, and the change number (package
+// changeseq) at which they joined it.
+type Joined struct {
+	ListID uuid.UUID
+	Seq    int64
+}
+
+// JoinedIn returns every List userID is a Member of, with when they joined
+// it, read inside the caller's transaction tx.
+func (s *Service) JoinedIn(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]Joined, error) {
+	rows, err := tx.Query(ctx, "SELECT list_id, seq FROM list_members WHERE user_id = $1", userID)
+	if err != nil {
+		return nil, fmt.Errorf("membership: joined: %w", err)
+	}
+	js, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Joined, error) {
+		var j Joined
+		err := row.Scan(&j.ListID, &j.Seq)
+		return j, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("membership: joined: %w", err)
+	}
+	return js, nil
 }
 
 // Memberships returns every List userID is a Member of, with their Role on it.

@@ -227,6 +227,55 @@ void main() {
     expect(find.text('Pharmacy'), findsOneWidget);
   });
 
+  testWidgets('a List deleted on another phone leaves the Lists screen at the next sync', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.addList(ana, name: 'Feira');
+    final pharmacy = h.api.addList(ana, name: 'Pharmacy');
+    await h.pumpApp();
+    expect(find.text('Pharmacy'), findsOneWidget);
+
+    h.goOffline();
+    h.api.deleteListNow(pharmacy);
+    await h.goOnline();
+
+    expect(find.text('Pharmacy'), findsNothing);
+    expect(find.text('Feira'), findsOneWidget);
+  });
+
+  testWidgets('checking an Item updates its List\'s count of Items to buy', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final feira = h.api.addList(ana, name: 'Feira');
+    h.api.addItem(feira, name: 'Coffee', addedBy: ana);
+    h.api.addItem(feira, name: 'Milk', addedBy: ana);
+    h.api.addItem(feira, name: 'Bread', addedBy: ana);
+    await h.pumpApp();
+    expect(find.text('3'), findsOneWidget);
+
+    await h.openList('Feira');
+    await h.tapTag('Coffee');
+    await h.tap(find.byTooltip('Back'));
+
+    expect(find.text('2'), findsOneWidget);
+  });
+
+  testWidgets('offline, checking an Item lowers its List\'s count at once', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final feira = h.api.addList(ana, name: 'Feira');
+    h.api.addItem(feira, name: 'Coffee', addedBy: ana);
+    h.api.addItem(feira, name: 'Milk', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Feira');
+    h.goOffline();
+
+    await h.tapTag('Coffee');
+    await h.tap(find.byTooltip('Back'));
+
+    expect(find.text('1'), findsOneWidget);
+  });
+
   group('rename', () {
     testWidgets('the Owner renames a List', (tester) async {
       final h = Harness(tester);

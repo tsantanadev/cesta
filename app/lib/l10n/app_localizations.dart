@@ -691,6 +691,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This List is no longer available and can\'t be restored.'**
   String get errorListNotRestorable;
+
+  /// Under a List's name on its screen: how many Items are still to buy and how many are checked.
+  ///
+  /// In en, this message translates to:
+  /// **'{toBuy} to buy, {inBasket} in the basket'**
+  String listToBuyInBasket(int toBuy, int inBasket);
+
+  /// Heading of the Checked Items on a List's screen.
+  ///
+  /// In en, this message translates to:
+  /// **'In the basket'**
+  String get listInTheBasket;
+
+  /// The bar at the bottom of a List's screen that opens Add items.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an item'**
+  String get listAddAnItem;
+
+  /// Who checked an Item In the basket, when it was the signed-in User.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get listCheckedByYou;
+
+  /// Screen reader hint on an Item tag: tapping it marks the Item as bought.
+  ///
+  /// In en, this message translates to:
+  /// **'Check'**
+  String get itemCheck;
+
+  /// Screen reader hint on a Checked Item: tapping it puts the Item back to buy.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncheck'**
+  String get itemUncheck;
+
+  /// Label of the search field on Add items.
+  ///
+  /// In en, this message translates to:
+  /// **'Search items'**
+  String get addItemsSearch;
+
+  /// Closes Add items and returns to the List.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get addItemsDone;
+
+  /// Action on Add items that opens the New item sheet with the search text as its name.
+  ///
+  /// In en, this message translates to:
+  /// **'Add “{name}” as a new item'**
+  String addItemsAddAsNew(String name);
+
+  /// Title of the sheet that adds a new Item.
+  ///
+  /// In en, this message translates to:
+  /// **'New item'**
+  String get newItemTitle;
+
+  /// Label of the new Item's name field.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get newItemName;
+
+  /// Label of the new Item's quantity and unit.
+  ///
+  /// In en, this message translates to:
+  /// **'How much'**
+  String get newItemHowMuch;
+
+  /// Screen reader label of the quantity value in the stepper.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get newItemQuantity;
+
+  /// Stepper button that lowers the quantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Less'**
+  String get newItemLess;
+
+  /// Stepper button that raises the quantity.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get newItemMore;
+
+  /// Placeholder of the new Item's note field.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a note, like “ripe ones”'**
+  String get newItemNoteHint;
+
+  /// Button that adds the new Item to the List.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to {list}'**
+  String newItemAddTo(String list);
+
+  /// The unit 'un' (counted pieces) on its chip.
+  ///
+  /// In en, this message translates to:
+  /// **'units'**
+  String get unitUn;
+
+  /// Kilograms.
+  ///
+  /// In en, this message translates to:
+  /// **'kg'**
+  String get unitKg;
+
+  /// Grams.
+  ///
+  /// In en, this message translates to:
+  /// **'g'**
+  String get unitG;
+
+  /// Litres.
+  ///
+  /// In en, this message translates to:
+  /// **'L'**
+  String get unitL;
+
+  /// Millilitres.
+  ///
+  /// In en, this message translates to:
+  /// **'ml'**
+  String get unitMl;
+
+  /// Packs.
+  ///
+  /// In en, this message translates to:
+  /// **'pack'**
+  String get unitPack;
+
+  /// Toast after adding an Item; it has an Undo action.
+  ///
+  /// In en, this message translates to:
+  /// **'{item} added to {list}'**
+  String itemAdded(String item, String list);
+
+  /// Toast action that removes the Item just added.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get itemUndo;
+
+  /// Validation: Item name blank.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get errorItemNameRequired;
+
+  /// Validation: Item name too long.
+  ///
+  /// In en, this message translates to:
+  /// **'Use {max} characters or fewer.'**
+  String errorItemNameTooLong(int max);
+
+  /// Validation: the typed quantity isn't a positive number the app accepts.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a number above zero, like 2 or 1.5.'**
+  String get errorItemQuantityInvalid;
+
+  /// Pill on a List while the phone is offline (Figma 13 List offline), with how many changes wait to reach the server.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Offline} =1{Offline · 1 change waiting to sync} other{Offline · {count} changes waiting to sync}}'**
+  String listOffline(int count);
+
+  /// Subtitle of a List with no Items (Figma 15 Empty list).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to buy yet'**
+  String get listNothingToBuyYet;
+
+  /// Heading of a List with no Items.
+  ///
+  /// In en, this message translates to:
+  /// **'Start your list'**
+  String get listEmptyTitle;
+
+  /// Body of a List with no Items.
+  ///
+  /// In en, this message translates to:
+  /// **'Add what you need. Everyone on this list sees it right away.'**
+  String get listEmptyBody;
+
+  /// Title of the Opened item sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit item'**
+  String get itemEditTitle;
+
+  /// Saves the edits to an Item.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get itemSave;
+
+  /// Who added the Item, on the Opened item sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Added by {name}'**
+  String itemAddedBy(String name);
+
+  /// The signed-in User added the Item.
+  ///
+  /// In en, this message translates to:
+  /// **'Added by you'**
+  String get itemAddedByYou;
+
+  /// Who checked the Item, on the Opened item sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked by {name}'**
+  String itemCheckedBy(String name);
+
+  /// The signed-in User checked the Item.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked by you'**
+  String get itemCheckedByYou;
+
+  /// Removes the Item from the List.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove item'**
+  String get itemRemove;
+
+  /// Toast after removing an Item; it has an Undo action.
+  ///
+  /// In en, this message translates to:
+  /// **'{item} removed'**
+  String itemRemoved(String item);
+
+  /// Toast (Figma 13b): a change to an Item that someone else removed was not saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save “{name}”. It was removed.'**
+  String itemRejectedRemoved(String name);
+
+  /// Toast: a change was not saved because its List was deleted or the User left it.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save “{name}”. The list is no longer available.'**
+  String itemRejectedListGone(String name);
+
+  /// Toast: the server refused a change made on this device, which was undone.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t save “{name}”.'**
+  String itemRejected(String name);
+
+  /// Title of the Item limit sheet (Figma 14).
+  ///
+  /// In en, this message translates to:
+  /// **'This list is full'**
+  String get itemLimitTitle;
+
+  /// Body of the Item limit sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'A list can hold up to {max} items. Remove ones you no longer need to make room.'**
+  String itemLimitBody(int max);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -910,16 +910,1313 @@ class KnownListsCompanion extends UpdateCompanion<KnownList> {
   }
 }
 
+class $SyncedItemsTable extends SyncedItems with TableInfo<$SyncedItemsTable, SyncedItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncedItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _listIdMeta = const VerificationMeta('listId');
+  @override
+  late final GeneratedColumn<String> listId = GeneratedColumn<String>(
+    'list_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta('quantity');
+  @override
+  late final GeneratedColumn<String> quantity = GeneratedColumn<String>(
+    'quantity',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _addedByIdMeta = const VerificationMeta('addedById');
+  @override
+  late final GeneratedColumn<String> addedById = GeneratedColumn<String>(
+    'added_by_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _addedByNameMeta = const VerificationMeta('addedByName');
+  @override
+  late final GeneratedColumn<String> addedByName = GeneratedColumn<String>(
+    'added_by_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _addedAtMicrosMeta = const VerificationMeta('addedAtMicros');
+  @override
+  late final GeneratedColumn<int> addedAtMicros = GeneratedColumn<int>(
+    'added_at_micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _checkedAtMicrosMeta = const VerificationMeta('checkedAtMicros');
+  @override
+  late final GeneratedColumn<int> checkedAtMicros = GeneratedColumn<int>(
+    'checked_at_micros',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _checkedByIdMeta = const VerificationMeta('checkedById');
+  @override
+  late final GeneratedColumn<String> checkedById = GeneratedColumn<String>(
+    'checked_by_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _checkedByNameMeta = const VerificationMeta('checkedByName');
+  @override
+  late final GeneratedColumn<String> checkedByName = GeneratedColumn<String>(
+    'checked_by_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    listId,
+    name,
+    quantity,
+    unit,
+    note,
+    addedById,
+    addedByName,
+    addedAtMicros,
+    checkedAtMicros,
+    checkedById,
+    checkedByName,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'synced_items';
+  @override
+  VerificationContext validateIntegrity(Insertable<SyncedItem> instance, {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('list_id')) {
+      context.handle(_listIdMeta, listId.isAcceptableOrUnknown(data['list_id']!, _listIdMeta));
+    } else if (isInserting) {
+      context.missing(_listIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(_nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(_quantityMeta, quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
+    }
+    if (data.containsKey('unit')) {
+      context.handle(_unitMeta, unit.isAcceptableOrUnknown(data['unit']!, _unitMeta));
+    }
+    if (data.containsKey('note')) {
+      context.handle(_noteMeta, note.isAcceptableOrUnknown(data['note']!, _noteMeta));
+    }
+    if (data.containsKey('added_by_id')) {
+      context.handle(_addedByIdMeta, addedById.isAcceptableOrUnknown(data['added_by_id']!, _addedByIdMeta));
+    } else if (isInserting) {
+      context.missing(_addedByIdMeta);
+    }
+    if (data.containsKey('added_by_name')) {
+      context.handle(_addedByNameMeta, addedByName.isAcceptableOrUnknown(data['added_by_name']!, _addedByNameMeta));
+    } else if (isInserting) {
+      context.missing(_addedByNameMeta);
+    }
+    if (data.containsKey('added_at_micros')) {
+      context.handle(
+        _addedAtMicrosMeta,
+        addedAtMicros.isAcceptableOrUnknown(data['added_at_micros']!, _addedAtMicrosMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_addedAtMicrosMeta);
+    }
+    if (data.containsKey('checked_at_micros')) {
+      context.handle(
+        _checkedAtMicrosMeta,
+        checkedAtMicros.isAcceptableOrUnknown(data['checked_at_micros']!, _checkedAtMicrosMeta),
+      );
+    }
+    if (data.containsKey('checked_by_id')) {
+      context.handle(_checkedByIdMeta, checkedById.isAcceptableOrUnknown(data['checked_by_id']!, _checkedByIdMeta));
+    }
+    if (data.containsKey('checked_by_name')) {
+      context.handle(
+        _checkedByNameMeta,
+        checkedByName.isAcceptableOrUnknown(data['checked_by_name']!, _checkedByNameMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SyncedItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncedItem(
+      id: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      listId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}list_id'])!,
+      name: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      quantity: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}quantity']),
+      unit: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}unit']),
+      note: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}note']),
+      addedById: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}added_by_id'])!,
+      addedByName: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}added_by_name'])!,
+      addedAtMicros: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}added_at_micros'])!,
+      checkedAtMicros: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}checked_at_micros']),
+      checkedById: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}checked_by_id']),
+      checkedByName: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}checked_by_name']),
+    );
+  }
+
+  @override
+  $SyncedItemsTable createAlias(String alias) {
+    return $SyncedItemsTable(attachedDatabase, alias);
+  }
+}
+
+class SyncedItem extends DataClass implements Insertable<SyncedItem> {
+  final String id;
+  final String listId;
+  final String name;
+  final String? quantity;
+
+  /// The [ItemUnit] wire value.
+  final String? unit;
+  final String? note;
+  final String addedById;
+  final String addedByName;
+
+  /// Microseconds since the epoch (UTC): Items show in this order, so it keeps
+  /// more precision than Drift's DateTime columns.
+  final int addedAtMicros;
+  final int? checkedAtMicros;
+  final String? checkedById;
+  final String? checkedByName;
+  const SyncedItem({
+    required this.id,
+    required this.listId,
+    required this.name,
+    this.quantity,
+    this.unit,
+    this.note,
+    required this.addedById,
+    required this.addedByName,
+    required this.addedAtMicros,
+    this.checkedAtMicros,
+    this.checkedById,
+    this.checkedByName,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['list_id'] = Variable<String>(listId);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || quantity != null) {
+      map['quantity'] = Variable<String>(quantity);
+    }
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['added_by_id'] = Variable<String>(addedById);
+    map['added_by_name'] = Variable<String>(addedByName);
+    map['added_at_micros'] = Variable<int>(addedAtMicros);
+    if (!nullToAbsent || checkedAtMicros != null) {
+      map['checked_at_micros'] = Variable<int>(checkedAtMicros);
+    }
+    if (!nullToAbsent || checkedById != null) {
+      map['checked_by_id'] = Variable<String>(checkedById);
+    }
+    if (!nullToAbsent || checkedByName != null) {
+      map['checked_by_name'] = Variable<String>(checkedByName);
+    }
+    return map;
+  }
+
+  SyncedItemsCompanion toCompanion(bool nullToAbsent) {
+    return SyncedItemsCompanion(
+      id: Value(id),
+      listId: Value(listId),
+      name: Value(name),
+      quantity: quantity == null && nullToAbsent ? const Value.absent() : Value(quantity),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      addedById: Value(addedById),
+      addedByName: Value(addedByName),
+      addedAtMicros: Value(addedAtMicros),
+      checkedAtMicros: checkedAtMicros == null && nullToAbsent ? const Value.absent() : Value(checkedAtMicros),
+      checkedById: checkedById == null && nullToAbsent ? const Value.absent() : Value(checkedById),
+      checkedByName: checkedByName == null && nullToAbsent ? const Value.absent() : Value(checkedByName),
+    );
+  }
+
+  factory SyncedItem.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncedItem(
+      id: serializer.fromJson<String>(json['id']),
+      listId: serializer.fromJson<String>(json['listId']),
+      name: serializer.fromJson<String>(json['name']),
+      quantity: serializer.fromJson<String?>(json['quantity']),
+      unit: serializer.fromJson<String?>(json['unit']),
+      note: serializer.fromJson<String?>(json['note']),
+      addedById: serializer.fromJson<String>(json['addedById']),
+      addedByName: serializer.fromJson<String>(json['addedByName']),
+      addedAtMicros: serializer.fromJson<int>(json['addedAtMicros']),
+      checkedAtMicros: serializer.fromJson<int?>(json['checkedAtMicros']),
+      checkedById: serializer.fromJson<String?>(json['checkedById']),
+      checkedByName: serializer.fromJson<String?>(json['checkedByName']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'listId': serializer.toJson<String>(listId),
+      'name': serializer.toJson<String>(name),
+      'quantity': serializer.toJson<String?>(quantity),
+      'unit': serializer.toJson<String?>(unit),
+      'note': serializer.toJson<String?>(note),
+      'addedById': serializer.toJson<String>(addedById),
+      'addedByName': serializer.toJson<String>(addedByName),
+      'addedAtMicros': serializer.toJson<int>(addedAtMicros),
+      'checkedAtMicros': serializer.toJson<int?>(checkedAtMicros),
+      'checkedById': serializer.toJson<String?>(checkedById),
+      'checkedByName': serializer.toJson<String?>(checkedByName),
+    };
+  }
+
+  SyncedItem copyWith({
+    String? id,
+    String? listId,
+    String? name,
+    Value<String?> quantity = const Value.absent(),
+    Value<String?> unit = const Value.absent(),
+    Value<String?> note = const Value.absent(),
+    String? addedById,
+    String? addedByName,
+    int? addedAtMicros,
+    Value<int?> checkedAtMicros = const Value.absent(),
+    Value<String?> checkedById = const Value.absent(),
+    Value<String?> checkedByName = const Value.absent(),
+  }) => SyncedItem(
+    id: id ?? this.id,
+    listId: listId ?? this.listId,
+    name: name ?? this.name,
+    quantity: quantity.present ? quantity.value : this.quantity,
+    unit: unit.present ? unit.value : this.unit,
+    note: note.present ? note.value : this.note,
+    addedById: addedById ?? this.addedById,
+    addedByName: addedByName ?? this.addedByName,
+    addedAtMicros: addedAtMicros ?? this.addedAtMicros,
+    checkedAtMicros: checkedAtMicros.present ? checkedAtMicros.value : this.checkedAtMicros,
+    checkedById: checkedById.present ? checkedById.value : this.checkedById,
+    checkedByName: checkedByName.present ? checkedByName.value : this.checkedByName,
+  );
+  SyncedItem copyWithCompanion(SyncedItemsCompanion data) {
+    return SyncedItem(
+      id: data.id.present ? data.id.value : this.id,
+      listId: data.listId.present ? data.listId.value : this.listId,
+      name: data.name.present ? data.name.value : this.name,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      note: data.note.present ? data.note.value : this.note,
+      addedById: data.addedById.present ? data.addedById.value : this.addedById,
+      addedByName: data.addedByName.present ? data.addedByName.value : this.addedByName,
+      addedAtMicros: data.addedAtMicros.present ? data.addedAtMicros.value : this.addedAtMicros,
+      checkedAtMicros: data.checkedAtMicros.present ? data.checkedAtMicros.value : this.checkedAtMicros,
+      checkedById: data.checkedById.present ? data.checkedById.value : this.checkedById,
+      checkedByName: data.checkedByName.present ? data.checkedByName.value : this.checkedByName,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncedItem(')
+          ..write('id: $id, ')
+          ..write('listId: $listId, ')
+          ..write('name: $name, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('note: $note, ')
+          ..write('addedById: $addedById, ')
+          ..write('addedByName: $addedByName, ')
+          ..write('addedAtMicros: $addedAtMicros, ')
+          ..write('checkedAtMicros: $checkedAtMicros, ')
+          ..write('checkedById: $checkedById, ')
+          ..write('checkedByName: $checkedByName')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    listId,
+    name,
+    quantity,
+    unit,
+    note,
+    addedById,
+    addedByName,
+    addedAtMicros,
+    checkedAtMicros,
+    checkedById,
+    checkedByName,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncedItem &&
+          other.id == this.id &&
+          other.listId == this.listId &&
+          other.name == this.name &&
+          other.quantity == this.quantity &&
+          other.unit == this.unit &&
+          other.note == this.note &&
+          other.addedById == this.addedById &&
+          other.addedByName == this.addedByName &&
+          other.addedAtMicros == this.addedAtMicros &&
+          other.checkedAtMicros == this.checkedAtMicros &&
+          other.checkedById == this.checkedById &&
+          other.checkedByName == this.checkedByName);
+}
+
+class SyncedItemsCompanion extends UpdateCompanion<SyncedItem> {
+  final Value<String> id;
+  final Value<String> listId;
+  final Value<String> name;
+  final Value<String?> quantity;
+  final Value<String?> unit;
+  final Value<String?> note;
+  final Value<String> addedById;
+  final Value<String> addedByName;
+  final Value<int> addedAtMicros;
+  final Value<int?> checkedAtMicros;
+  final Value<String?> checkedById;
+  final Value<String?> checkedByName;
+  final Value<int> rowid;
+  const SyncedItemsCompanion({
+    this.id = const Value.absent(),
+    this.listId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.note = const Value.absent(),
+    this.addedById = const Value.absent(),
+    this.addedByName = const Value.absent(),
+    this.addedAtMicros = const Value.absent(),
+    this.checkedAtMicros = const Value.absent(),
+    this.checkedById = const Value.absent(),
+    this.checkedByName = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncedItemsCompanion.insert({
+    required String id,
+    required String listId,
+    required String name,
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.note = const Value.absent(),
+    required String addedById,
+    required String addedByName,
+    required int addedAtMicros,
+    this.checkedAtMicros = const Value.absent(),
+    this.checkedById = const Value.absent(),
+    this.checkedByName = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       listId = Value(listId),
+       name = Value(name),
+       addedById = Value(addedById),
+       addedByName = Value(addedByName),
+       addedAtMicros = Value(addedAtMicros);
+  static Insertable<SyncedItem> custom({
+    Expression<String>? id,
+    Expression<String>? listId,
+    Expression<String>? name,
+    Expression<String>? quantity,
+    Expression<String>? unit,
+    Expression<String>? note,
+    Expression<String>? addedById,
+    Expression<String>? addedByName,
+    Expression<int>? addedAtMicros,
+    Expression<int>? checkedAtMicros,
+    Expression<String>? checkedById,
+    Expression<String>? checkedByName,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (listId != null) 'list_id': listId,
+      if (name != null) 'name': name,
+      if (quantity != null) 'quantity': quantity,
+      if (unit != null) 'unit': unit,
+      if (note != null) 'note': note,
+      if (addedById != null) 'added_by_id': addedById,
+      if (addedByName != null) 'added_by_name': addedByName,
+      if (addedAtMicros != null) 'added_at_micros': addedAtMicros,
+      if (checkedAtMicros != null) 'checked_at_micros': checkedAtMicros,
+      if (checkedById != null) 'checked_by_id': checkedById,
+      if (checkedByName != null) 'checked_by_name': checkedByName,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncedItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? listId,
+    Value<String>? name,
+    Value<String?>? quantity,
+    Value<String?>? unit,
+    Value<String?>? note,
+    Value<String>? addedById,
+    Value<String>? addedByName,
+    Value<int>? addedAtMicros,
+    Value<int?>? checkedAtMicros,
+    Value<String?>? checkedById,
+    Value<String?>? checkedByName,
+    Value<int>? rowid,
+  }) {
+    return SyncedItemsCompanion(
+      id: id ?? this.id,
+      listId: listId ?? this.listId,
+      name: name ?? this.name,
+      quantity: quantity ?? this.quantity,
+      unit: unit ?? this.unit,
+      note: note ?? this.note,
+      addedById: addedById ?? this.addedById,
+      addedByName: addedByName ?? this.addedByName,
+      addedAtMicros: addedAtMicros ?? this.addedAtMicros,
+      checkedAtMicros: checkedAtMicros ?? this.checkedAtMicros,
+      checkedById: checkedById ?? this.checkedById,
+      checkedByName: checkedByName ?? this.checkedByName,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (listId.present) {
+      map['list_id'] = Variable<String>(listId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<String>(quantity.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (addedById.present) {
+      map['added_by_id'] = Variable<String>(addedById.value);
+    }
+    if (addedByName.present) {
+      map['added_by_name'] = Variable<String>(addedByName.value);
+    }
+    if (addedAtMicros.present) {
+      map['added_at_micros'] = Variable<int>(addedAtMicros.value);
+    }
+    if (checkedAtMicros.present) {
+      map['checked_at_micros'] = Variable<int>(checkedAtMicros.value);
+    }
+    if (checkedById.present) {
+      map['checked_by_id'] = Variable<String>(checkedById.value);
+    }
+    if (checkedByName.present) {
+      map['checked_by_name'] = Variable<String>(checkedByName.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncedItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('listId: $listId, ')
+          ..write('name: $name, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('note: $note, ')
+          ..write('addedById: $addedById, ')
+          ..write('addedByName: $addedByName, ')
+          ..write('addedAtMicros: $addedAtMicros, ')
+          ..write('checkedAtMicros: $checkedAtMicros, ')
+          ..write('checkedById: $checkedById, ')
+          ..write('checkedByName: $checkedByName, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OutboxTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _seqMeta = const VerificationMeta('seq');
+  @override
+  late final GeneratedColumn<int> seq = GeneratedColumn<int>(
+    'seq',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'),
+  );
+  static const VerificationMeta _mutationIdMeta = const VerificationMeta('mutationId');
+  @override
+  late final GeneratedColumn<String> mutationId = GeneratedColumn<String>(
+    'mutation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<MutationType, String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  ).withConverter<MutationType>($OutboxTable.$convertertype);
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
+    'item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _listIdMeta = const VerificationMeta('listId');
+  @override
+  late final GeneratedColumn<String> listId = GeneratedColumn<String>(
+    'list_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<ItemFields, String> fields = GeneratedColumn<String>(
+    'fields',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  ).withConverter<ItemFields>($OutboxTable.$converterfields);
+  static const VerificationMeta _clientTimestampMicrosMeta = const VerificationMeta('clientTimestampMicros');
+  @override
+  late final GeneratedColumn<int> clientTimestampMicros = GeneratedColumn<int>(
+    'client_timestamp_micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _byIdMeta = const VerificationMeta('byId');
+  @override
+  late final GeneratedColumn<String> byId = GeneratedColumn<String>(
+    'by_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _byNameMeta = const VerificationMeta('byName');
+  @override
+  late final GeneratedColumn<String> byName = GeneratedColumn<String>(
+    'by_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _appliedMeta = const VerificationMeta('applied');
+  @override
+  late final GeneratedColumn<bool> applied = GeneratedColumn<bool>(
+    'applied',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('CHECK ("applied" IN (0, 1))'),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    seq,
+    mutationId,
+    type,
+    itemId,
+    listId,
+    fields,
+    clientTimestampMicros,
+    byId,
+    byName,
+    applied,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'outbox';
+  @override
+  VerificationContext validateIntegrity(Insertable<OutboxData> instance, {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('seq')) {
+      context.handle(_seqMeta, seq.isAcceptableOrUnknown(data['seq']!, _seqMeta));
+    }
+    if (data.containsKey('mutation_id')) {
+      context.handle(_mutationIdMeta, mutationId.isAcceptableOrUnknown(data['mutation_id']!, _mutationIdMeta));
+    } else if (isInserting) {
+      context.missing(_mutationIdMeta);
+    }
+    if (data.containsKey('item_id')) {
+      context.handle(_itemIdMeta, itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta));
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('list_id')) {
+      context.handle(_listIdMeta, listId.isAcceptableOrUnknown(data['list_id']!, _listIdMeta));
+    } else if (isInserting) {
+      context.missing(_listIdMeta);
+    }
+    if (data.containsKey('client_timestamp_micros')) {
+      context.handle(
+        _clientTimestampMicrosMeta,
+        clientTimestampMicros.isAcceptableOrUnknown(data['client_timestamp_micros']!, _clientTimestampMicrosMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_clientTimestampMicrosMeta);
+    }
+    if (data.containsKey('by_id')) {
+      context.handle(_byIdMeta, byId.isAcceptableOrUnknown(data['by_id']!, _byIdMeta));
+    } else if (isInserting) {
+      context.missing(_byIdMeta);
+    }
+    if (data.containsKey('by_name')) {
+      context.handle(_byNameMeta, byName.isAcceptableOrUnknown(data['by_name']!, _byNameMeta));
+    } else if (isInserting) {
+      context.missing(_byNameMeta);
+    }
+    if (data.containsKey('applied')) {
+      context.handle(_appliedMeta, applied.isAcceptableOrUnknown(data['applied']!, _appliedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {seq};
+  @override
+  OutboxData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OutboxData(
+      seq: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}seq'])!,
+      mutationId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}mutation_id'])!,
+      type: $OutboxTable.$convertertype.fromSql(
+        attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      ),
+      itemId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}item_id'])!,
+      listId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}list_id'])!,
+      fields: $OutboxTable.$converterfields.fromSql(
+        attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}fields'])!,
+      ),
+      clientTimestampMicros: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}client_timestamp_micros'],
+      )!,
+      byId: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}by_id'])!,
+      byName: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}by_name'])!,
+      applied: attachedDatabase.typeMapping.read(DriftSqlType.bool, data['${effectivePrefix}applied'])!,
+    );
+  }
+
+  @override
+  $OutboxTable createAlias(String alias) {
+    return $OutboxTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<MutationType, String> $convertertype = const _MutationTypeConverter();
+  static TypeConverter<ItemFields, String> $converterfields = const _ItemFieldsConverter();
+}
+
+class OutboxData extends DataClass implements Insertable<OutboxData> {
+  /// Order the changes were made in, which is the order they are pushed in.
+  final int seq;
+
+  /// The client mutation ID, so retrying a push applies it once.
+  final String mutationId;
+
+  /// Stored as the [MutationType] wire value.
+  final MutationType type;
+  final String itemId;
+  final String listId;
+
+  /// The changed fields, stored as [ItemFields] JSON.
+  final ItemFields fields;
+  final int clientTimestampMicros;
+
+  /// The signed-in User when the change was made: shown as who added or checked it.
+  final String byId;
+  final String byName;
+
+  /// True once the server applied it; it is dropped after the next full pull.
+  final bool applied;
+  const OutboxData({
+    required this.seq,
+    required this.mutationId,
+    required this.type,
+    required this.itemId,
+    required this.listId,
+    required this.fields,
+    required this.clientTimestampMicros,
+    required this.byId,
+    required this.byName,
+    required this.applied,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['seq'] = Variable<int>(seq);
+    map['mutation_id'] = Variable<String>(mutationId);
+    {
+      map['type'] = Variable<String>($OutboxTable.$convertertype.toSql(type));
+    }
+    map['item_id'] = Variable<String>(itemId);
+    map['list_id'] = Variable<String>(listId);
+    {
+      map['fields'] = Variable<String>($OutboxTable.$converterfields.toSql(fields));
+    }
+    map['client_timestamp_micros'] = Variable<int>(clientTimestampMicros);
+    map['by_id'] = Variable<String>(byId);
+    map['by_name'] = Variable<String>(byName);
+    map['applied'] = Variable<bool>(applied);
+    return map;
+  }
+
+  OutboxCompanion toCompanion(bool nullToAbsent) {
+    return OutboxCompanion(
+      seq: Value(seq),
+      mutationId: Value(mutationId),
+      type: Value(type),
+      itemId: Value(itemId),
+      listId: Value(listId),
+      fields: Value(fields),
+      clientTimestampMicros: Value(clientTimestampMicros),
+      byId: Value(byId),
+      byName: Value(byName),
+      applied: Value(applied),
+    );
+  }
+
+  factory OutboxData.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OutboxData(
+      seq: serializer.fromJson<int>(json['seq']),
+      mutationId: serializer.fromJson<String>(json['mutationId']),
+      type: serializer.fromJson<MutationType>(json['type']),
+      itemId: serializer.fromJson<String>(json['itemId']),
+      listId: serializer.fromJson<String>(json['listId']),
+      fields: serializer.fromJson<ItemFields>(json['fields']),
+      clientTimestampMicros: serializer.fromJson<int>(json['clientTimestampMicros']),
+      byId: serializer.fromJson<String>(json['byId']),
+      byName: serializer.fromJson<String>(json['byName']),
+      applied: serializer.fromJson<bool>(json['applied']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'seq': serializer.toJson<int>(seq),
+      'mutationId': serializer.toJson<String>(mutationId),
+      'type': serializer.toJson<MutationType>(type),
+      'itemId': serializer.toJson<String>(itemId),
+      'listId': serializer.toJson<String>(listId),
+      'fields': serializer.toJson<ItemFields>(fields),
+      'clientTimestampMicros': serializer.toJson<int>(clientTimestampMicros),
+      'byId': serializer.toJson<String>(byId),
+      'byName': serializer.toJson<String>(byName),
+      'applied': serializer.toJson<bool>(applied),
+    };
+  }
+
+  OutboxData copyWith({
+    int? seq,
+    String? mutationId,
+    MutationType? type,
+    String? itemId,
+    String? listId,
+    ItemFields? fields,
+    int? clientTimestampMicros,
+    String? byId,
+    String? byName,
+    bool? applied,
+  }) => OutboxData(
+    seq: seq ?? this.seq,
+    mutationId: mutationId ?? this.mutationId,
+    type: type ?? this.type,
+    itemId: itemId ?? this.itemId,
+    listId: listId ?? this.listId,
+    fields: fields ?? this.fields,
+    clientTimestampMicros: clientTimestampMicros ?? this.clientTimestampMicros,
+    byId: byId ?? this.byId,
+    byName: byName ?? this.byName,
+    applied: applied ?? this.applied,
+  );
+  OutboxData copyWithCompanion(OutboxCompanion data) {
+    return OutboxData(
+      seq: data.seq.present ? data.seq.value : this.seq,
+      mutationId: data.mutationId.present ? data.mutationId.value : this.mutationId,
+      type: data.type.present ? data.type.value : this.type,
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      listId: data.listId.present ? data.listId.value : this.listId,
+      fields: data.fields.present ? data.fields.value : this.fields,
+      clientTimestampMicros: data.clientTimestampMicros.present
+          ? data.clientTimestampMicros.value
+          : this.clientTimestampMicros,
+      byId: data.byId.present ? data.byId.value : this.byId,
+      byName: data.byName.present ? data.byName.value : this.byName,
+      applied: data.applied.present ? data.applied.value : this.applied,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OutboxData(')
+          ..write('seq: $seq, ')
+          ..write('mutationId: $mutationId, ')
+          ..write('type: $type, ')
+          ..write('itemId: $itemId, ')
+          ..write('listId: $listId, ')
+          ..write('fields: $fields, ')
+          ..write('clientTimestampMicros: $clientTimestampMicros, ')
+          ..write('byId: $byId, ')
+          ..write('byName: $byName, ')
+          ..write('applied: $applied')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(seq, mutationId, type, itemId, listId, fields, clientTimestampMicros, byId, byName, applied);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OutboxData &&
+          other.seq == this.seq &&
+          other.mutationId == this.mutationId &&
+          other.type == this.type &&
+          other.itemId == this.itemId &&
+          other.listId == this.listId &&
+          other.fields == this.fields &&
+          other.clientTimestampMicros == this.clientTimestampMicros &&
+          other.byId == this.byId &&
+          other.byName == this.byName &&
+          other.applied == this.applied);
+}
+
+class OutboxCompanion extends UpdateCompanion<OutboxData> {
+  final Value<int> seq;
+  final Value<String> mutationId;
+  final Value<MutationType> type;
+  final Value<String> itemId;
+  final Value<String> listId;
+  final Value<ItemFields> fields;
+  final Value<int> clientTimestampMicros;
+  final Value<String> byId;
+  final Value<String> byName;
+  final Value<bool> applied;
+  const OutboxCompanion({
+    this.seq = const Value.absent(),
+    this.mutationId = const Value.absent(),
+    this.type = const Value.absent(),
+    this.itemId = const Value.absent(),
+    this.listId = const Value.absent(),
+    this.fields = const Value.absent(),
+    this.clientTimestampMicros = const Value.absent(),
+    this.byId = const Value.absent(),
+    this.byName = const Value.absent(),
+    this.applied = const Value.absent(),
+  });
+  OutboxCompanion.insert({
+    this.seq = const Value.absent(),
+    required String mutationId,
+    required MutationType type,
+    required String itemId,
+    required String listId,
+    required ItemFields fields,
+    required int clientTimestampMicros,
+    required String byId,
+    required String byName,
+    this.applied = const Value.absent(),
+  }) : mutationId = Value(mutationId),
+       type = Value(type),
+       itemId = Value(itemId),
+       listId = Value(listId),
+       fields = Value(fields),
+       clientTimestampMicros = Value(clientTimestampMicros),
+       byId = Value(byId),
+       byName = Value(byName);
+  static Insertable<OutboxData> custom({
+    Expression<int>? seq,
+    Expression<String>? mutationId,
+    Expression<String>? type,
+    Expression<String>? itemId,
+    Expression<String>? listId,
+    Expression<String>? fields,
+    Expression<int>? clientTimestampMicros,
+    Expression<String>? byId,
+    Expression<String>? byName,
+    Expression<bool>? applied,
+  }) {
+    return RawValuesInsertable({
+      if (seq != null) 'seq': seq,
+      if (mutationId != null) 'mutation_id': mutationId,
+      if (type != null) 'type': type,
+      if (itemId != null) 'item_id': itemId,
+      if (listId != null) 'list_id': listId,
+      if (fields != null) 'fields': fields,
+      if (clientTimestampMicros != null) 'client_timestamp_micros': clientTimestampMicros,
+      if (byId != null) 'by_id': byId,
+      if (byName != null) 'by_name': byName,
+      if (applied != null) 'applied': applied,
+    });
+  }
+
+  OutboxCompanion copyWith({
+    Value<int>? seq,
+    Value<String>? mutationId,
+    Value<MutationType>? type,
+    Value<String>? itemId,
+    Value<String>? listId,
+    Value<ItemFields>? fields,
+    Value<int>? clientTimestampMicros,
+    Value<String>? byId,
+    Value<String>? byName,
+    Value<bool>? applied,
+  }) {
+    return OutboxCompanion(
+      seq: seq ?? this.seq,
+      mutationId: mutationId ?? this.mutationId,
+      type: type ?? this.type,
+      itemId: itemId ?? this.itemId,
+      listId: listId ?? this.listId,
+      fields: fields ?? this.fields,
+      clientTimestampMicros: clientTimestampMicros ?? this.clientTimestampMicros,
+      byId: byId ?? this.byId,
+      byName: byName ?? this.byName,
+      applied: applied ?? this.applied,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (seq.present) {
+      map['seq'] = Variable<int>(seq.value);
+    }
+    if (mutationId.present) {
+      map['mutation_id'] = Variable<String>(mutationId.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>($OutboxTable.$convertertype.toSql(type.value));
+    }
+    if (itemId.present) {
+      map['item_id'] = Variable<String>(itemId.value);
+    }
+    if (listId.present) {
+      map['list_id'] = Variable<String>(listId.value);
+    }
+    if (fields.present) {
+      map['fields'] = Variable<String>($OutboxTable.$converterfields.toSql(fields.value));
+    }
+    if (clientTimestampMicros.present) {
+      map['client_timestamp_micros'] = Variable<int>(clientTimestampMicros.value);
+    }
+    if (byId.present) {
+      map['by_id'] = Variable<String>(byId.value);
+    }
+    if (byName.present) {
+      map['by_name'] = Variable<String>(byName.value);
+    }
+    if (applied.present) {
+      map['applied'] = Variable<bool>(applied.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OutboxCompanion(')
+          ..write('seq: $seq, ')
+          ..write('mutationId: $mutationId, ')
+          ..write('type: $type, ')
+          ..write('itemId: $itemId, ')
+          ..write('listId: $listId, ')
+          ..write('fields: $fields, ')
+          ..write('clientTimestampMicros: $clientTimestampMicros, ')
+          ..write('byId: $byId, ')
+          ..write('byName: $byName, ')
+          ..write('applied: $applied')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SyncCursorTable extends SyncCursor with TableInfo<$SyncCursorTable, SyncCursorData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncCursorTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cursorMeta = const VerificationMeta('cursor');
+  @override
+  late final GeneratedColumn<String> cursor = GeneratedColumn<String>(
+    'cursor',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, cursor];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_cursor';
+  @override
+  VerificationContext validateIntegrity(Insertable<SyncCursorData> instance, {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('cursor')) {
+      context.handle(_cursorMeta, cursor.isAcceptableOrUnknown(data['cursor']!, _cursorMeta));
+    } else if (isInserting) {
+      context.missing(_cursorMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SyncCursorData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncCursorData(
+      id: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      cursor: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}cursor'])!,
+    );
+  }
+
+  @override
+  $SyncCursorTable createAlias(String alias) {
+    return $SyncCursorTable(attachedDatabase, alias);
+  }
+}
+
+class SyncCursorData extends DataClass implements Insertable<SyncCursorData> {
+  final int id;
+  final String cursor;
+  const SyncCursorData({required this.id, required this.cursor});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['cursor'] = Variable<String>(cursor);
+    return map;
+  }
+
+  SyncCursorCompanion toCompanion(bool nullToAbsent) {
+    return SyncCursorCompanion(id: Value(id), cursor: Value(cursor));
+  }
+
+  factory SyncCursorData.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncCursorData(
+      id: serializer.fromJson<int>(json['id']),
+      cursor: serializer.fromJson<String>(json['cursor']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{'id': serializer.toJson<int>(id), 'cursor': serializer.toJson<String>(cursor)};
+  }
+
+  SyncCursorData copyWith({int? id, String? cursor}) =>
+      SyncCursorData(id: id ?? this.id, cursor: cursor ?? this.cursor);
+  SyncCursorData copyWithCompanion(SyncCursorCompanion data) {
+    return SyncCursorData(
+      id: data.id.present ? data.id.value : this.id,
+      cursor: data.cursor.present ? data.cursor.value : this.cursor,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncCursorData(')
+          ..write('id: $id, ')
+          ..write('cursor: $cursor')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, cursor);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || (other is SyncCursorData && other.id == this.id && other.cursor == this.cursor);
+}
+
+class SyncCursorCompanion extends UpdateCompanion<SyncCursorData> {
+  final Value<int> id;
+  final Value<String> cursor;
+  const SyncCursorCompanion({this.id = const Value.absent(), this.cursor = const Value.absent()});
+  SyncCursorCompanion.insert({this.id = const Value.absent(), required String cursor}) : cursor = Value(cursor);
+  static Insertable<SyncCursorData> custom({Expression<int>? id, Expression<String>? cursor}) {
+    return RawValuesInsertable({if (id != null) 'id': id, if (cursor != null) 'cursor': cursor});
+  }
+
+  SyncCursorCompanion copyWith({Value<int>? id, Value<String>? cursor}) {
+    return SyncCursorCompanion(id: id ?? this.id, cursor: cursor ?? this.cursor);
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (cursor.present) {
+      map['cursor'] = Variable<String>(cursor.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncCursorCompanion(')
+          ..write('id: $id, ')
+          ..write('cursor: $cursor')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $KnownHealthTable knownHealth = $KnownHealthTable(this);
   late final $SignedInUserTable signedInUser = $SignedInUserTable(this);
   late final $KnownListsTable knownLists = $KnownListsTable(this);
+  late final $SyncedItemsTable syncedItems = $SyncedItemsTable(this);
+  late final $OutboxTable outbox = $OutboxTable(this);
+  late final $SyncCursorTable syncCursor = $SyncCursorTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables => allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [knownHealth, signedInUser, knownLists];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    knownHealth,
+    signedInUser,
+    knownLists,
+    syncedItems,
+    outbox,
+    syncCursor,
+  ];
 }
 
 typedef $$KnownHealthTableCreateCompanionBuilder = KnownHealthCompanion Function({
@@ -1397,6 +2694,600 @@ typedef $$KnownListsTableProcessedTableManager =
       KnownList,
       PrefetchHooks Function()
     >;
+typedef $$SyncedItemsTableCreateCompanionBuilder = SyncedItemsCompanion Function({
+  required String id,
+  required String listId,
+  required String name,
+  Value<String?> quantity,
+  Value<String?> unit,
+  Value<String?> note,
+  required String addedById,
+  required String addedByName,
+  required int addedAtMicros,
+  Value<int?> checkedAtMicros,
+  Value<String?> checkedById,
+  Value<String?> checkedByName,
+  Value<int> rowid,
+});
+typedef $$SyncedItemsTableUpdateCompanionBuilder = SyncedItemsCompanion Function({
+  Value<String> id,
+  Value<String> listId,
+  Value<String> name,
+  Value<String?> quantity,
+  Value<String?> unit,
+  Value<String?> note,
+  Value<String> addedById,
+  Value<String> addedByName,
+  Value<int> addedAtMicros,
+  Value<int?> checkedAtMicros,
+  Value<String?> checkedById,
+  Value<String?> checkedByName,
+  Value<int> rowid,
+});
+
+class $$SyncedItemsTableFilterComposer extends Composer<_$AppDatabase, $SyncedItemsTable> {
+  $$SyncedItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get listId =>
+      $composableBuilder(column: $table.listId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get unit => $composableBuilder(column: $table.unit, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get note => $composableBuilder(column: $table.note, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get addedById =>
+      $composableBuilder(column: $table.addedById, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get addedByName =>
+      $composableBuilder(column: $table.addedByName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get addedAtMicros =>
+      $composableBuilder(column: $table.addedAtMicros, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get checkedAtMicros =>
+      $composableBuilder(column: $table.checkedAtMicros, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get checkedById =>
+      $composableBuilder(column: $table.checkedById, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get checkedByName =>
+      $composableBuilder(column: $table.checkedByName, builder: (column) => ColumnFilters(column));
+}
+
+class $$SyncedItemsTableOrderingComposer extends Composer<_$AppDatabase, $SyncedItemsTable> {
+  $$SyncedItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get listId =>
+      $composableBuilder(column: $table.listId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get addedById =>
+      $composableBuilder(column: $table.addedById, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get addedByName =>
+      $composableBuilder(column: $table.addedByName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get addedAtMicros =>
+      $composableBuilder(column: $table.addedAtMicros, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get checkedAtMicros =>
+      $composableBuilder(column: $table.checkedAtMicros, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get checkedById =>
+      $composableBuilder(column: $table.checkedById, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get checkedByName =>
+      $composableBuilder(column: $table.checkedByName, builder: (column) => ColumnOrderings(column));
+}
+
+class $$SyncedItemsTableAnnotationComposer extends Composer<_$AppDatabase, $SyncedItemsTable> {
+  $$SyncedItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id => $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get listId => $composableBuilder(column: $table.listId, builder: (column) => column);
+
+  GeneratedColumn<String> get name => $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get quantity => $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<String> get unit => $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<String> get note => $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get addedById => $composableBuilder(column: $table.addedById, builder: (column) => column);
+
+  GeneratedColumn<String> get addedByName =>
+      $composableBuilder(column: $table.addedByName, builder: (column) => column);
+
+  GeneratedColumn<int> get addedAtMicros =>
+      $composableBuilder(column: $table.addedAtMicros, builder: (column) => column);
+
+  GeneratedColumn<int> get checkedAtMicros =>
+      $composableBuilder(column: $table.checkedAtMicros, builder: (column) => column);
+
+  GeneratedColumn<String> get checkedById =>
+      $composableBuilder(column: $table.checkedById, builder: (column) => column);
+
+  GeneratedColumn<String> get checkedByName =>
+      $composableBuilder(column: $table.checkedByName, builder: (column) => column);
+}
+
+class $$SyncedItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncedItemsTable,
+          SyncedItem,
+          $$SyncedItemsTableFilterComposer,
+          $$SyncedItemsTableOrderingComposer,
+          $$SyncedItemsTableAnnotationComposer,
+          $$SyncedItemsTableCreateCompanionBuilder,
+          $$SyncedItemsTableUpdateCompanionBuilder,
+          (SyncedItem, BaseReferences<_$AppDatabase, $SyncedItemsTable, SyncedItem>),
+          SyncedItem,
+          PrefetchHooks Function()
+        > {
+  $$SyncedItemsTableTableManager(_$AppDatabase db, $SyncedItemsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () => $$SyncedItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () => $$SyncedItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () => $$SyncedItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> listId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> quantity = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<String> addedById = const Value.absent(),
+                Value<String> addedByName = const Value.absent(),
+                Value<int> addedAtMicros = const Value.absent(),
+                Value<int?> checkedAtMicros = const Value.absent(),
+                Value<String?> checkedById = const Value.absent(),
+                Value<String?> checkedByName = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncedItemsCompanion(
+                id: id,
+                listId: listId,
+                name: name,
+                quantity: quantity,
+                unit: unit,
+                note: note,
+                addedById: addedById,
+                addedByName: addedByName,
+                addedAtMicros: addedAtMicros,
+                checkedAtMicros: checkedAtMicros,
+                checkedById: checkedById,
+                checkedByName: checkedByName,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String listId,
+                required String name,
+                Value<String?> quantity = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                required String addedById,
+                required String addedByName,
+                required int addedAtMicros,
+                Value<int?> checkedAtMicros = const Value.absent(),
+                Value<String?> checkedById = const Value.absent(),
+                Value<String?> checkedByName = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncedItemsCompanion.insert(
+                id: id,
+                listId: listId,
+                name: name,
+                quantity: quantity,
+                unit: unit,
+                note: note,
+                addedById: addedById,
+                addedByName: addedByName,
+                addedAtMicros: addedAtMicros,
+                checkedAtMicros: checkedAtMicros,
+                checkedById: checkedById,
+                checkedByName: checkedByName,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SyncedItemsTable, SyncedItem>(table),
+                  BaseReferences<_$AppDatabase, $SyncedItemsTable, SyncedItem>(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncedItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncedItemsTable,
+      SyncedItem,
+      $$SyncedItemsTableFilterComposer,
+      $$SyncedItemsTableOrderingComposer,
+      $$SyncedItemsTableAnnotationComposer,
+      $$SyncedItemsTableCreateCompanionBuilder,
+      $$SyncedItemsTableUpdateCompanionBuilder,
+      (SyncedItem, BaseReferences<_$AppDatabase, $SyncedItemsTable, SyncedItem>),
+      SyncedItem,
+      PrefetchHooks Function()
+    >;
+typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
+  Value<int> seq,
+  required String mutationId,
+  required MutationType type,
+  required String itemId,
+  required String listId,
+  required ItemFields fields,
+  required int clientTimestampMicros,
+  required String byId,
+  required String byName,
+  Value<bool> applied,
+});
+typedef $$OutboxTableUpdateCompanionBuilder = OutboxCompanion Function({
+  Value<int> seq,
+  Value<String> mutationId,
+  Value<MutationType> type,
+  Value<String> itemId,
+  Value<String> listId,
+  Value<ItemFields> fields,
+  Value<int> clientTimestampMicros,
+  Value<String> byId,
+  Value<String> byName,
+  Value<bool> applied,
+});
+
+class $$OutboxTableFilterComposer extends Composer<_$AppDatabase, $OutboxTable> {
+  $$OutboxTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get seq => $composableBuilder(column: $table.seq, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get mutationId =>
+      $composableBuilder(column: $table.mutationId, builder: (column) => ColumnFilters(column));
+
+  ColumnWithTypeConverterFilters<MutationType, MutationType, String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => ColumnWithTypeConverterFilters(column));
+
+  ColumnFilters<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get listId =>
+      $composableBuilder(column: $table.listId, builder: (column) => ColumnFilters(column));
+
+  ColumnWithTypeConverterFilters<ItemFields, ItemFields, String> get fields =>
+      $composableBuilder(column: $table.fields, builder: (column) => ColumnWithTypeConverterFilters(column));
+
+  ColumnFilters<int> get clientTimestampMicros =>
+      $composableBuilder(column: $table.clientTimestampMicros, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get byId => $composableBuilder(column: $table.byId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get byName =>
+      $composableBuilder(column: $table.byName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get applied =>
+      $composableBuilder(column: $table.applied, builder: (column) => ColumnFilters(column));
+}
+
+class $$OutboxTableOrderingComposer extends Composer<_$AppDatabase, $OutboxTable> {
+  $$OutboxTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get seq => $composableBuilder(column: $table.seq, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get mutationId =>
+      $composableBuilder(column: $table.mutationId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get listId =>
+      $composableBuilder(column: $table.listId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get fields =>
+      $composableBuilder(column: $table.fields, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get clientTimestampMicros =>
+      $composableBuilder(column: $table.clientTimestampMicros, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get byId =>
+      $composableBuilder(column: $table.byId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get byName =>
+      $composableBuilder(column: $table.byName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get applied =>
+      $composableBuilder(column: $table.applied, builder: (column) => ColumnOrderings(column));
+}
+
+class $$OutboxTableAnnotationComposer extends Composer<_$AppDatabase, $OutboxTable> {
+  $$OutboxTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get seq => $composableBuilder(column: $table.seq, builder: (column) => column);
+
+  GeneratedColumn<String> get mutationId => $composableBuilder(column: $table.mutationId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<MutationType, String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get itemId => $composableBuilder(column: $table.itemId, builder: (column) => column);
+
+  GeneratedColumn<String> get listId => $composableBuilder(column: $table.listId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<ItemFields, String> get fields =>
+      $composableBuilder(column: $table.fields, builder: (column) => column);
+
+  GeneratedColumn<int> get clientTimestampMicros =>
+      $composableBuilder(column: $table.clientTimestampMicros, builder: (column) => column);
+
+  GeneratedColumn<String> get byId => $composableBuilder(column: $table.byId, builder: (column) => column);
+
+  GeneratedColumn<String> get byName => $composableBuilder(column: $table.byName, builder: (column) => column);
+
+  GeneratedColumn<bool> get applied => $composableBuilder(column: $table.applied, builder: (column) => column);
+}
+
+class $$OutboxTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $OutboxTable,
+          OutboxData,
+          $$OutboxTableFilterComposer,
+          $$OutboxTableOrderingComposer,
+          $$OutboxTableAnnotationComposer,
+          $$OutboxTableCreateCompanionBuilder,
+          $$OutboxTableUpdateCompanionBuilder,
+          (OutboxData, BaseReferences<_$AppDatabase, $OutboxTable, OutboxData>),
+          OutboxData,
+          PrefetchHooks Function()
+        > {
+  $$OutboxTableTableManager(_$AppDatabase db, $OutboxTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () => $$OutboxTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () => $$OutboxTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () => $$OutboxTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> seq = const Value.absent(),
+                Value<String> mutationId = const Value.absent(),
+                Value<MutationType> type = const Value.absent(),
+                Value<String> itemId = const Value.absent(),
+                Value<String> listId = const Value.absent(),
+                Value<ItemFields> fields = const Value.absent(),
+                Value<int> clientTimestampMicros = const Value.absent(),
+                Value<String> byId = const Value.absent(),
+                Value<String> byName = const Value.absent(),
+                Value<bool> applied = const Value.absent(),
+              }) => OutboxCompanion(
+                seq: seq,
+                mutationId: mutationId,
+                type: type,
+                itemId: itemId,
+                listId: listId,
+                fields: fields,
+                clientTimestampMicros: clientTimestampMicros,
+                byId: byId,
+                byName: byName,
+                applied: applied,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> seq = const Value.absent(),
+                required String mutationId,
+                required MutationType type,
+                required String itemId,
+                required String listId,
+                required ItemFields fields,
+                required int clientTimestampMicros,
+                required String byId,
+                required String byName,
+                Value<bool> applied = const Value.absent(),
+              }) => OutboxCompanion.insert(
+                seq: seq,
+                mutationId: mutationId,
+                type: type,
+                itemId: itemId,
+                listId: listId,
+                fields: fields,
+                clientTimestampMicros: clientTimestampMicros,
+                byId: byId,
+                byName: byName,
+                applied: applied,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$OutboxTable, OutboxData>(table),
+                  BaseReferences<_$AppDatabase, $OutboxTable, OutboxData>(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$OutboxTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $OutboxTable,
+      OutboxData,
+      $$OutboxTableFilterComposer,
+      $$OutboxTableOrderingComposer,
+      $$OutboxTableAnnotationComposer,
+      $$OutboxTableCreateCompanionBuilder,
+      $$OutboxTableUpdateCompanionBuilder,
+      (OutboxData, BaseReferences<_$AppDatabase, $OutboxTable, OutboxData>),
+      OutboxData,
+      PrefetchHooks Function()
+    >;
+typedef $$SyncCursorTableCreateCompanionBuilder = SyncCursorCompanion Function({Value<int> id, required String cursor});
+typedef $$SyncCursorTableUpdateCompanionBuilder = SyncCursorCompanion Function({Value<int> id, Value<String> cursor});
+
+class $$SyncCursorTableFilterComposer extends Composer<_$AppDatabase, $SyncCursorTable> {
+  $$SyncCursorTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cursor =>
+      $composableBuilder(column: $table.cursor, builder: (column) => ColumnFilters(column));
+}
+
+class $$SyncCursorTableOrderingComposer extends Composer<_$AppDatabase, $SyncCursorTable> {
+  $$SyncCursorTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cursor =>
+      $composableBuilder(column: $table.cursor, builder: (column) => ColumnOrderings(column));
+}
+
+class $$SyncCursorTableAnnotationComposer extends Composer<_$AppDatabase, $SyncCursorTable> {
+  $$SyncCursorTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id => $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get cursor => $composableBuilder(column: $table.cursor, builder: (column) => column);
+}
+
+class $$SyncCursorTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncCursorTable,
+          SyncCursorData,
+          $$SyncCursorTableFilterComposer,
+          $$SyncCursorTableOrderingComposer,
+          $$SyncCursorTableAnnotationComposer,
+          $$SyncCursorTableCreateCompanionBuilder,
+          $$SyncCursorTableUpdateCompanionBuilder,
+          (SyncCursorData, BaseReferences<_$AppDatabase, $SyncCursorTable, SyncCursorData>),
+          SyncCursorData,
+          PrefetchHooks Function()
+        > {
+  $$SyncCursorTableTableManager(_$AppDatabase db, $SyncCursorTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () => $$SyncCursorTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () => $$SyncCursorTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () => $$SyncCursorTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> cursor = const Value.absent(),
+          }) => SyncCursorCompanion(id: id, cursor: cursor),
+          createCompanionCallback: ({Value<int> id = const Value.absent(), required String cursor}) =>
+              SyncCursorCompanion.insert(id: id, cursor: cursor),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SyncCursorTable, SyncCursorData>(table),
+                  BaseReferences<_$AppDatabase, $SyncCursorTable, SyncCursorData>(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncCursorTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncCursorTable,
+      SyncCursorData,
+      $$SyncCursorTableFilterComposer,
+      $$SyncCursorTableOrderingComposer,
+      $$SyncCursorTableAnnotationComposer,
+      $$SyncCursorTableCreateCompanionBuilder,
+      $$SyncCursorTableUpdateCompanionBuilder,
+      (SyncCursorData, BaseReferences<_$AppDatabase, $SyncCursorTable, SyncCursorData>),
+      SyncCursorData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -1404,4 +3295,7 @@ class $AppDatabaseManager {
   $$KnownHealthTableTableManager get knownHealth => $$KnownHealthTableTableManager(_db, _db.knownHealth);
   $$SignedInUserTableTableManager get signedInUser => $$SignedInUserTableTableManager(_db, _db.signedInUser);
   $$KnownListsTableTableManager get knownLists => $$KnownListsTableTableManager(_db, _db.knownLists);
+  $$SyncedItemsTableTableManager get syncedItems => $$SyncedItemsTableTableManager(_db, _db.syncedItems);
+  $$OutboxTableTableManager get outbox => $$OutboxTableTableManager(_db, _db.outbox);
+  $$SyncCursorTableTableManager get syncCursor => $$SyncCursorTableTableManager(_db, _db.syncCursor);
 }
