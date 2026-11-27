@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
@@ -6,6 +5,58 @@ import 'package:uuid/uuid.dart';
 
 import '../api/generated/cesta_api.dart';
 import '../db/app_database.dart';
+import '../sync/outbox.dart';
+
+export '../sync/outbox.dart' show Actor;
+
+/// What a person fills in about an Item: its name, how much and a note.
+final class ItemDetails {
+  const ItemDetails({required this.name, this.quantity, this.unit, this.note});
+
+  final String name;
+
+  /// A positive decimal as the API writes it, e.g. "1.5"; null when not given.
+  final String? quantity;
+  final ItemUnit? unit;
+  final String? note;
+
+  /// These details with the name trimmed and a blank note left out.
+  ItemDetails get _clean {
+    final note = this.note?.trim();
+    return ItemDetails(name: name.trim(), quantity: quantity, unit: unit, note: (note?.isEmpty ?? true) ? null : note);
+  }
+
+  /// The fields of an item_create with these details.
+  ItemFields get _created {
+    final d = _clean;
+    return ItemFields(
+      name: d.name,
+      quantity: d.quantity == null ? null : (value: d.quantity),
+      unit: d.unit == null ? null : (value: _fieldsUnit(d.unit)),
+      note: d.note == null ? null : (value: d.note),
+    );
+  }
+
+  /// The fields of an item_update from [before] to these details: only what
+  /// changed, with a present null clearing a field.
+  ItemFields _changedFrom(ItemDetails before) {
+    final d = _clean;
+    return ItemFields(
+      name: d.name == before.name ? null : d.name,
+      quantity: d.quantity == before.quantity ? null : (value: d.quantity),
+      unit: d.unit == before.unit ? null : (value: _fieldsUnit(d.unit)),
+      note: d.note == before.note ? null : (value: d.note),
+    );
+  }
+
+  /// These details with [fields] applied, as an item_update would.
+  ItemDetails _updated(ItemFields fields) => ItemDetails(
+    name: fields.name ?? name,
+    quantity: fields.quantity == null ? quantity : fields.quantity!.value,
+    unit: fields.unit == null ? unit : _unit(fields.unit!.value),
+    note: fields.note == null ? note : fields.note!.value,
+  );
+}
 
 /// An Item as the app shows it: what the server last reported, with the
 /// device's changes not yet confirmed applied on top.
@@ -13,13 +64,10 @@ final class ShownItem {
   const ShownItem({
     required this.id,
     required this.listId,
-    required this.name,
+    required this.details,
     required this.addedAt,
     required this.addedById,
     required this.addedByName,
-    this.quantity,
-    this.unit,
-    this.note,
     this.checkedAt,
     this.checkedById,
     this.checkedByName,
@@ -28,13 +76,13 @@ final class ShownItem {
 
   final String id;
   final String listId;
-  final String name;
-
-  /// A positive decimal as the API writes it, e.g. "1.5"; null when not given.
-  final String? quantity;
-  final ItemUnit? unit;
-  final String? note;
+  final ItemDetails details;
   final DateTime addedAt;
+
+  String get name => details.name;
+  String? get quantity => details.quantity;
+  ItemUnit? get unit => details.unit;
+  String? get note => details.note;
 
   /// Who added it, as the server (or, before it confirms, this device) says.
   final String addedById;
@@ -58,54 +106,41 @@ final class ShownItem {
     required String byId,
     required String byName,
     required bool pending,
-  }) => ShownItem(
-    id: id,
-    listId: listId,
-    name: fields.name ?? name,
-    addedAt: addedAt,
-    addedById: addedById,
-    addedByName: addedByName,
-    quantity: fields.quantity == null ? quantity : fields.quantity!.value,
-    unit: fields.unit == null ? unit : _unit(fields.unit!.value),
-    note: fields.note == null ? note : fields.note!.value,
-    checkedAt: switch (fields.checked) {
-      true => at,
-      false => null,
-      null => checkedAt,
-    },
-    checkedById: switch (fields.checked) {
-      true => byId,
-      false => null,
-      null => checkedById,
-    },
-    checkedByName: switch (fields.checked) {
-      true => byName,
-      false => null,
-      null => checkedByName,
-    },
-    pending: pending,
-  );
+  }) {
+    final (checkedAt, checkedById, checkedByName) = switch (fields.checked) {
+      true => (at, byId, byName),
+      false => (null, null, null),
+      null => (this.checkedAt, this.checkedById, this.checkedByName),
+    };
+    return ShownItem(
+      id: id,
+      listId: listId,
+      details: details._updated(fields),
+      addedAt: addedAt,
+      addedById: addedById,
+      addedByName: addedByName,
+      checkedAt: checkedAt,
+      checkedById: checkedById,
+      checkedByName: checkedByName,
+      pending: pending,
+    );
+  }
 }
 
+/// The two generated unit types the API's schemas give the same values.
 ItemUnit? _unit(ItemFieldsUnit? u) => u == null ? null : ItemUnit.fromJson(u.toJson());
+ItemFieldsUnit? _fieldsUnit(ItemUnit? u) => u == null ? null : ItemFieldsUnit.fromJson(u.toJson());
 
-/// The signed-in User making a change, recorded with it so the change shows
-/// who made it before the server confirms it.
-typedef Actor = ({String id, String displayName});
-
-/// The device's Items (the display's source of truth) and the outbox of
-/// changes to them (ADR-0001).
+/// The device's Items (the display's source of truth) with the outbox of
+/// changes to them on top (ADR-0001).
 ///
-/// Changes are written to the outbox and show at once; [changes] fires after
-/// each so the sync engine can push it.
+/// Changes go into the [ChangeOutbox] and show at once; the sync engine
+/// pushes them from there.
 class ItemsStore {
-  ItemsStore(this._db);
+  ItemsStore(this._db, this._outbox);
 
   final AppDatabase _db;
-  final _changes = StreamController<void>.broadcast();
-
-  /// Fires after every local change.
-  Stream<void> get changes => _changes.stream;
+  final ChangeOutbox _outbox;
 
   static const _uuid = Uuid();
 
@@ -124,66 +159,33 @@ class ItemsStore {
     return showItems(synced, pending);
   });
 
-  /// How many changes are waiting to reach the server; emits on change.
-  Stream<int> watchPendingCount() {
+  /// How many changes to List [listId] are waiting to reach the server;
+  /// emits on change.
+  Stream<int> watchPendingCount(String listId) {
     final count = _db.outbox.seq.count();
     final query = _db.selectOnly(_db.outbox)
       ..addColumns([count])
-      ..where(_db.outbox.applied.equals(false));
+      ..where(_db.outbox.listId.equals(listId) & _db.outbox.applied.equals(false));
     return query.map((row) => row.read(count) ?? 0).watchSingle();
   }
 
-  /// Adds a new Item to List [listId]; returns its ID.
-  Future<String> add({
-    required String listId,
-    required Actor by,
-    required String name,
-    String? quantity,
-    ItemUnit? unit,
-    String? note,
-  }) async {
+  /// Adds a new Item with [details] to List [listId]; returns its ID.
+  Future<String> add({required String listId, required Actor by, required ItemDetails details}) async {
     final id = _uuid.v4();
-    await _enqueue(
-      MutationType.itemCreate,
-      itemId: id,
-      listId: listId,
-      by: by,
-      fields: ItemFields(
-        name: name.trim(),
-        quantity: quantity == null ? null : (value: quantity),
-        unit: unit == null ? null : (value: ItemFieldsUnit.fromJson(unit.toJson())),
-        note: _note(note) == null ? null : (value: _note(note)),
-      ),
-    );
+    await _outbox.enqueue(MutationType.itemCreate, itemId: id, listId: listId, by: by, fields: details._created);
     return id;
   }
 
-  /// Edits [item]: its name, and how much and the note, which are cleared
-  /// when null. Only what changed is sent.
-  Future<void> update(
-    ShownItem item, {
-    required Actor by,
-    required String name,
-    String? quantity,
-    ItemUnit? unit,
-    String? note,
-  }) {
-    final trimmed = name.trim();
-    final cleanNote = _note(note);
-    final fields = ItemFields(
-      name: trimmed == item.name ? null : trimmed,
-      quantity: quantity == item.quantity ? null : (value: quantity),
-      unit: unit == item.unit ? null : (value: unit == null ? null : ItemFieldsUnit.fromJson(unit.toJson())),
-      note: cleanNote == item.note ? null : (value: cleanNote),
-    );
+  /// Edits [item] to have [details]: how much and the note are cleared when
+  /// null. Only what changed is sent.
+  Future<void> update(ShownItem item, {required Actor by, required ItemDetails details}) {
+    final fields = details._changedFrom(item.details);
     if (fields.toJson().isEmpty) return Future.value();
-    return _enqueue(MutationType.itemUpdate, itemId: item.id, listId: item.listId, by: by, fields: fields);
+    return _outbox.enqueue(MutationType.itemUpdate, itemId: item.id, listId: item.listId, by: by, fields: fields);
   }
 
-  static String? _note(String? note) => (note?.trim().isEmpty ?? true) ? null : note!.trim();
-
   /// Checks [item] (puts it In the basket), or unchecks it when [checked] is false.
-  Future<void> setChecked(ShownItem item, {required bool checked, required Actor by}) => _enqueue(
+  Future<void> setChecked(ShownItem item, {required bool checked, required Actor by}) => _outbox.enqueue(
     MutationType.itemUpdate,
     itemId: item.id,
     listId: item.listId,
@@ -193,32 +195,16 @@ class ItemsStore {
 
   /// Removes Item [itemId] from List [listId].
   Future<void> remove({required String itemId, required String listId, required Actor by}) =>
-      _enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
+      _outbox.enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
 
   /// Undoes the removal of [item]: drops the removal while it is still
   /// waiting to sync, or else adds the Item again as it was (the server keeps
   /// removed Items removed, so it comes back as a new Item).
   Future<void> restore(ShownItem item, {required Actor by}) async {
-    final dropped =
-        await (_db.delete(_db.outbox)..where(
-              (t) =>
-                  t.itemId.equals(item.id) & t.type.equals(MutationType.itemDelete.toJson()) & t.applied.equals(false),
-            ))
-            .go();
-    if (dropped > 0) {
-      _changes.add(null);
-      return;
-    }
-    final id = await add(
-      listId: item.listId,
-      by: by,
-      name: item.name,
-      quantity: item.quantity,
-      unit: item.unit,
-      note: item.note,
-    );
+    if (await _outbox.dropPendingRemoval(item.id)) return;
+    final id = await add(listId: item.listId, by: by, details: item.details);
     if (item.checked) {
-      await _enqueue(
+      await _outbox.enqueue(
         MutationType.itemUpdate,
         itemId: id,
         listId: item.listId,
@@ -227,32 +213,6 @@ class ItemsStore {
       );
     }
   }
-
-  Future<void> _enqueue(
-    MutationType type, {
-    required String itemId,
-    required String listId,
-    required Actor by,
-    required ItemFields fields,
-  }) async {
-    await _db
-        .into(_db.outbox)
-        .insert(
-          OutboxCompanion.insert(
-            mutationId: _uuid.v4(),
-            type: type.toJson(),
-            itemId: itemId,
-            listId: listId,
-            fields: jsonEncode(fields.toJson()),
-            clientTimestampMicros: DateTime.now().toUtc().microsecondsSinceEpoch,
-            byId: by.id,
-            byName: by.displayName,
-          ),
-        );
-    _changes.add(null);
-  }
-
-  void dispose() => unawaited(_changes.close());
 }
 
 /// [synced] Items with the [pending] outbox changes (oldest first) applied on top.
@@ -268,13 +228,15 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
           () => ShownItem(
             id: m.itemId,
             listId: m.listId,
-            name: fields.name ?? '',
+            details: ItemDetails(
+              name: fields.name ?? '',
+              quantity: fields.quantity?.value,
+              unit: _unit(fields.unit?.value),
+              note: fields.note?.value,
+            ),
             addedAt: at,
             addedById: m.byId,
             addedByName: m.byName,
-            quantity: fields.quantity?.value,
-            unit: _unit(fields.unit?.value),
-            note: fields.note?.value,
             pending: !m.applied,
           ),
         );
@@ -301,13 +263,15 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
 ShownItem _fromRow(SyncedItem r) => ShownItem(
   id: r.id,
   listId: r.listId,
-  name: r.name,
+  details: ItemDetails(
+    name: r.name,
+    quantity: r.quantity,
+    unit: r.unit == null ? null : ItemUnit.fromJson(r.unit),
+    note: r.note,
+  ),
   addedAt: DateTime.fromMicrosecondsSinceEpoch(r.addedAtMicros, isUtc: true),
   addedById: r.addedById,
   addedByName: r.addedByName,
-  quantity: r.quantity,
-  unit: r.unit == null ? null : ItemUnit.fromJson(r.unit),
-  note: r.note,
   checkedAt: r.checkedAtMicros == null ? null : DateTime.fromMicrosecondsSinceEpoch(r.checkedAtMicros!, isUtc: true),
   checkedById: r.checkedById,
   checkedByName: r.checkedByName,

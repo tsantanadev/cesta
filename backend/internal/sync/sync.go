@@ -4,8 +4,9 @@
 // made since their cursor. The server is authoritative:
 //   - Every mutation is idempotent by its client mutation ID: the first result
 //     is stored and returned again on any retry.
-//   - Each mutation re-checks that the User is a Member of the Item's List
-//     (package membership decides).
+//   - Each mutation re-checks, under a lock on the Item's List, that the User
+//     is a Member of it and it is not deleted (packages lists and membership
+//     decide).
 //   - Conflicts resolve last-write-wins per field, in order of server receipt.
 //     A mutation changes only the fields it carries.
 //   - A delete wins: a removed Item keeps a tombstone row, and later edits to it
@@ -25,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/tsantanadev/cesta/backend/internal/lists"
 	"github.com/tsantanadev/cesta/backend/internal/membership"
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
 )
@@ -109,16 +111,19 @@ var ErrInvalidBatch = errors.New("sync: invalid batch")
 type Service struct {
 	db       *pgxpool.Pool
 	clock    clock.Clock
+	lists    *lists.Service
 	members  *membership.Service
 	maxItems int
 }
 
 // NewService returns a Service backed by db. maxItemsPerList <= 0 means DefaultMaxItemsPerList.
-func NewService(db *pgxpool.Pool, c clock.Clock, members *membership.Service, maxItemsPerList int) *Service {
+func NewService(
+	db *pgxpool.Pool, c clock.Clock, ls *lists.Service, members *membership.Service, maxItemsPerList int,
+) *Service {
 	if maxItemsPerList <= 0 {
 		maxItemsPerList = DefaultMaxItemsPerList
 	}
-	return &Service{db: db, clock: c, members: members, maxItems: maxItemsPerList}
+	return &Service{db: db, clock: c, lists: ls, members: members, maxItems: maxItemsPerList}
 }
 
 // Push applies ms in order, each in its own transaction, on behalf of userID

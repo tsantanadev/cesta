@@ -145,5 +145,5 @@
   "itemRejectedListGone": "Não foi possível salvar “{name}”. A lista não está mais disponível.",
   "itemRejected": "Não foi possível salvar “{name}”.",
   "itemLimitTitle": "Esta lista está cheia",
-  "itemLimitBody": "Uma lista pode ter até {max} itens. Limpe os itens marcados ou remova os que você não precisa mais para abrir espaço."
+  "itemLimitBody": "Uma lista pode ter até {max} itens. Remova os que você não precisa mais para abrir espaço."
 }

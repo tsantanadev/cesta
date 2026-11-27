@@ -352,6 +352,60 @@ func (s *Service) lockOwned(ctx context.Context, tx pgx.Tx, userID, listID uuid.
 	return l, nil
 }
 
+// LockForItems locks listID until tx ends, if userID is a Member of it, so a
+// change to its Items can't race the List being deleted, restored or purged,
+// nor another change's check of how many Items it holds. It returns
+// ErrNotFound if userID is not a Member or the List is gone, and ErrDeleted
+// if the List is deleted.
+func (s *Service) LockForItems(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) error {
+	var deletedAt *time.Time
+	err := tx.QueryRow(ctx, "SELECT deleted_at FROM lists WHERE id = $1 FOR UPDATE", listID).Scan(&deletedAt)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return ErrNotFound
+	case err != nil:
+		return wrap("lock for items", err)
+	}
+	// Under the lock, so the answer holds for the caller's whole change.
+	if _, err := s.members.RoleIn(ctx, tx, listID, userID); errors.Is(err, membership.ErrNotAMember) {
+		return ErrNotFound
+	} else if err != nil {
+		return err
+	}
+	if deletedAt != nil {
+		return ErrDeleted
+	}
+	return nil
+}
+
+// Visibility is what a sync pull needs to know about a List: whether it is
+// deleted, and the change number (package changeseq) at which it was last
+// deleted or restored.
+type Visibility struct {
+	ID      uuid.UUID
+	Deleted bool
+	Seq     int64
+}
+
+// VisibilityIn returns the Visibility of each of listIDs that still exists,
+// read inside the caller's transaction tx.
+func (s *Service) VisibilityIn(ctx context.Context, tx pgx.Tx, listIDs []uuid.UUID) ([]Visibility, error) {
+	rows, err := tx.Query(ctx,
+		"SELECT id, deleted_at IS NOT NULL, visible_seq FROM lists WHERE id = ANY($1)", listIDs)
+	if err != nil {
+		return nil, wrap("visibility", err)
+	}
+	vs, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Visibility, error) {
+		var v Visibility
+		err := row.Scan(&v.ID, &v.Deleted, &v.Seq)
+		return v, err
+	})
+	if err != nil {
+		return nil, wrap("visibility", err)
+	}
+	return vs, nil
+}
+
 // restorable reports whether a List deleted at deletedAt can still be restored.
 func (s *Service) restorable(deletedAt time.Time) bool {
 	return s.clock.Now().Before(deletedAt.Add(RestoreWindow))

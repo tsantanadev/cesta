@@ -7,9 +7,7 @@ import '../names.dart';
 import '../ui/components.dart';
 import '../ui/tokens.dart';
 import 'item_text.dart';
-
-/// An Item as the New item or Opened item sheet filled it in.
-typedef ItemDraft = ({String name, String? quantity, ItemUnit? unit, String? note});
+import 'items_store.dart';
 
 /// The content of the Item sheets: the tag preview, Name, How much (a stepper
 /// that also takes typed decimals, and unit chips), a note, then any
@@ -25,18 +23,18 @@ class ItemForm extends StatefulWidget {
     required this.submitLabel,
     required this.onSubmit,
     this.submitIcon,
-    this.initial = (name: '', quantity: null, unit: null, note: null),
+    this.initial = const ItemDetails(name: ''),
     this.details = const [],
     this.onRemove,
   });
 
   final String submitLabel;
   final IconData? submitIcon;
-  final ItemDraft initial;
+  final ItemDetails initial;
 
   /// Lines under the note, e.g. "Added by Ana".
   final List<String> details;
-  final void Function(ItemDraft draft) onSubmit;
+  final void Function(ItemDetails draft) onSubmit;
 
   /// Shows a Remove item row that closes the sheet, then calls this.
   final VoidCallback? onRemove;
@@ -112,7 +110,12 @@ class _ItemFormState extends State<ItemForm> {
     final nameOk = _formKey.currentState?.validate() ?? false;
     if (!nameOk || _quantityInvalid) return;
     final note = _note.text.trim();
-    final draft = (name: _name.text.trim(), quantity: quantity, unit: _unit, note: note.isEmpty ? null : note);
+    final draft = ItemDetails(
+      name: _name.text.trim(),
+      quantity: quantity,
+      unit: _unit,
+      note: note.isEmpty ? null : note,
+    );
     Navigator.of(context).pop();
     widget.onSubmit(draft);
   }

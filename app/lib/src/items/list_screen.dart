@@ -59,7 +59,9 @@ class _ListScreenState extends State<ListScreen> {
             _loaded = true;
           }),
         );
-    _pendingSub = widget.items.watchPendingCount().listen((n) => setState(() => _pending = n));
+    _pendingSub = widget.items.watchPendingCount(widget.listId).listen((n) => setState(() => _pending = n));
+    // Show what other Members changed since the last sync (story 43).
+    unawaited(widget.sync.sync());
   }
 
   @override
@@ -95,22 +97,13 @@ class _ListScreenState extends State<ListScreen> {
         sectionGap: 18,
         child: ItemForm(
           submitLabel: l10n.itemSave,
-          initial: (name: item.name, quantity: item.quantity, unit: item.unit, note: item.note),
+          initial: item.details,
           details: [
             item.addedById == me.id ? l10n.itemAddedByYou : l10n.itemAddedBy(item.addedByName),
             if (item.checked)
               item.checkedById == me.id ? l10n.itemCheckedByYou : l10n.itemCheckedBy(item.checkedByName ?? ''),
           ],
-          onSubmit: (draft) => unawaited(
-            widget.items.update(
-              item,
-              by: me,
-              name: draft.name,
-              quantity: draft.quantity,
-              unit: draft.unit,
-              note: draft.note,
-            ),
-          ),
+          onSubmit: (draft) => unawaited(widget.items.update(item, by: me, details: draft)),
           onRemove: () => unawaited(_remove(item, me)),
         ),
       ),

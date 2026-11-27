@@ -504,6 +504,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String itemLimitBody(int max) {
-    return 'A list can hold up to $max items. Clear checked items, or remove ones you no longer need, to make room.';
+    return 'A list can hold up to $max items. Remove ones you no longer need to make room.';
   }
 }

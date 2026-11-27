@@ -1,14 +1,16 @@
+import 'dart:ui' show Tristate;
+
 import 'package:cesta/src/app.dart';
 import 'package:cesta/src/db/app_database.dart';
 import 'package:cesta/src/ui/components.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'fake_api_client.dart';
 import 'fake_auth_gateway.dart';
-import 'fake_network_status.dart';
 import 'fields.dart';
 
 export 'package:cesta/src/ui/components.dart'
@@ -25,7 +27,6 @@ export 'package:cesta/src/ui/components.dart'
 
 export 'fake_api_client.dart';
 export 'fake_auth_gateway.dart';
-export 'fake_network_status.dart';
 export 'fields.dart';
 
 const english = Locale('en');
@@ -48,15 +49,13 @@ class Harness {
         DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true),
       ) {
     api = FakeApiClient(auth: auth);
-    addTearDown(network.close);
+    addTearDown(api.close);
     addTearDown(db.close);
   }
 
   final WidgetTester tester;
   final FakeAuthGateway auth;
 
-  /// The phone's connection, as the OS reports it.
-  final network = FakeNetworkStatus();
   late final FakeApiClient api;
   final AppDatabase db;
 
@@ -80,7 +79,7 @@ class Harness {
         api: api,
         auth: auth,
         database: db,
-        network: network,
+        network: api.network,
         locale: locale,
         themeMode: themeMode,
         initialLocation: initialLocation,
@@ -155,7 +154,6 @@ class Harness {
   void goOffline() {
     api.goOffline();
     auth.offline = true;
-    network.connected = false;
   }
 
   /// The network and both servers become reachable again; waits for the app
@@ -163,7 +161,6 @@ class Harness {
   Future<void> goOnline() async {
     api.goOnline();
     auth.offline = false;
-    network.connected = true;
     await tester.pumpAndSettle();
   }
 
@@ -221,16 +218,23 @@ class Harness {
   /// Opens the List named [name] from the Lists screen.
   Future<void> openList(String name) => tap(find.text(name));
 
-  /// The names on the Item tags shown, in order.
-  List<String> tagNames() => [
-    for (final t in tester.widgetList<CesItemTile>(find.byType(CesItemTile)))
-      if (t.onTap != null) t.name,
+  /// The Item tags to buy, in order, as they read on screen: the quantity,
+  /// if any, then the name (e.g. "1 kg Tomatoes").
+  List<String> tags() => [for (final n in find.semantics.byHint(_check).evaluate()) n.label];
+
+  /// The rows In the basket, in order: each Checked Item's name and who
+  /// checked it, as they read on screen.
+  List<(String, String)> basketRows() => [
+    for (final n in find.semantics.byHint(_uncheck).evaluate())
+      switch (n.label.split('\n')) {
+        [final name, final checkedBy] => (name, checkedBy),
+        final other => throw StateError('Unexpected basket row: $other'),
+      },
   ];
 
-  /// The rows In the basket: each Checked Item's name and who checked it.
-  List<(String, String)> basketRows() => [
-    for (final r in tester.widgetList<CesCheckedItem>(find.byType(CesCheckedItem))) (r.name, r.checkedBy),
-  ];
+  /// What tapping a tag or a basket row does, as screen readers say it.
+  static final _check = RegExp(r'^(Check|Marcar como comprado)$');
+  static final _uncheck = RegExp(r'^(Uncheck|Desmarcar)$');
 
   /// From a List's screen, adds a new Item named [name] through Add items and
   /// the New item sheet, pressing + [steps] times and picking [unit] (as its
@@ -269,7 +273,7 @@ class Harness {
 
   /// The label of the selected unit chip, or null.
   String? get selectedUnit =>
-      tester.widgetList<CesChoiceChip>(find.byType(CesChoiceChip)).where((c) => c.selected).firstOrNull?.label;
+      find.semantics.byPredicate((n) => n.flagsCollection.isSelected == Tristate.isTrue).evaluate().firstOrNull?.label;
 
   /// The note field of the open Item sheet.
   Finder get noteField => find.descendant(of: find.byType(CesSoftField), matching: find.byType(EditableText));
@@ -278,9 +282,6 @@ class Harness {
 
   /// Taps the In the basket row of the Item named [name] (unchecks it).
   Future<void> tapBasketRow(String name) => tap(find.widgetWithText(CesCheckedItem, name));
-
-  /// The List screen's offline pill, or null when it isn't shown.
-  String? get offlinePill => tester.widgetList<CesStatusPill>(find.byType(CesStatusPill)).firstOrNull?.label;
 
   /// The text in the field labelled [label].
   String textInField(String label) => fieldController(tester, label).text;
