@@ -150,142 +150,135 @@ class _ListScreenState extends State<ListScreen> {
     return ListenableBuilder(
       listenable: widget.lists,
       builder: (context, _) => Scaffold(
-        body: Stack(
-          children: [
-            SafeArea(
-              bottom: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Top bar (Figma 4:151).
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 16, 0),
-                    child: SizedBox(
-                      height: 44,
-                      child: Row(
-                        children: [
-                          CesBackButton(onPressed: () => context.pop()),
-                          const Spacer(),
-                        ],
-                      ),
-                    ),
+        // The Add bar is the bottom bar, so Toasts float above it (Figma 12b, 13b).
+        extendBody: true,
+        bottomNavigationBar: CesAddBar(label: l10n.listAddAnItem, onTap: _addItems),
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Top bar (Figma 4:151).
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 16, 0),
+                child: SizedBox(
+                  height: 44,
+                  child: Row(
+                    children: [
+                      CesBackButton(onPressed: () => context.pop()),
+                      const Spacer(),
+                    ],
                   ),
-                  Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: widget.sync.sync,
-                      child: CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
-                        slivers: [
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-                            sliver: SliverToBoxAdapter(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Semantics(
-                                    header: true,
-                                    child: Text(
-                                      _list?.name ?? '',
-                                      style: CestaDisplayType.screenTitle.copyWith(color: scheme.onSurface),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _shown.isEmpty
-                                        ? l10n.listNothingToBuyYet
-                                        : l10n.listToBuyInBasket(toBuy.length, inBasket.length),
-                                    style: TextStyle(
-                                      fontFamily: CestaFonts.family,
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 15,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  // Figma "13 List offline" 38:3843: only while offline.
-                                  ValueListenableBuilder(
-                                    valueListenable: widget.sync.offline,
-                                    builder: (context, offline, _) => offline
-                                        ? Padding(
-                                            padding: const EdgeInsets.only(top: 10),
-                                            child: CesStatusPill(label: l10n.listOffline(_pending)),
-                                          )
-                                        : const SizedBox.shrink(),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // Figma "15 Empty list" 39:3859.
-                          if (_loaded && _shown.isEmpty)
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(40, 96, 40, 0),
-                                child: CesEmptyListState(title: l10n.listEmptyTitle, body: l10n.listEmptyBody),
-                              ),
-                            ),
-                          // To buy (Figma 4:169): tags in insertion order.
-                          SliverPadding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            sliver: SliverToBoxAdapter(
-                              child: Wrap(
-                                spacing: 11,
-                                runSpacing: 11,
-                                children: [
-                                  for (final item in toBuy)
-                                    CesItemTile(
-                                      key: ValueKey(item.id),
-                                      name: item.name,
-                                      quantity: tagQuantity(l10n, item.quantity, item.unit),
-                                      semanticHint: l10n.itemCheck,
-                                      onTap: () => _setChecked(item, true),
-                                      onLongPress: () => _openItem(item),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // In the basket (Figma 4:242).
-                          if (inBasket.isNotEmpty)
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
-                              sliver: SliverList.list(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: CesSectionHeading(l10n.listInTheBasket),
-                                  ),
-                                  for (final item in inBasket)
-                                    Padding(
-                                      key: ValueKey(item.id),
-                                      padding: const EdgeInsets.only(bottom: 4),
-                                      child: CesCheckedItem(
-                                        name: item.name,
-                                        checkedBy: item.checkedById == myId
-                                            ? l10n.listCheckedByYou
-                                            : item.checkedByName ?? '',
-                                        semanticHint: l10n.itemUncheck,
-                                        onTap: () => _setChecked(item, false),
-                                        onLongPress: () => _openItem(item),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          SliverToBoxAdapter(child: SizedBox(height: CesAddBar.height + 16 + bottomInset)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: CesAddBar(label: l10n.listAddAnItem, onTap: _addItems),
-            ),
-          ],
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: widget.sync.sync,
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  _list?.name ?? '',
+                                  style: CestaDisplayType.screenTitle.copyWith(color: scheme.onSurface),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _shown.isEmpty
+                                    ? l10n.listNothingToBuyYet
+                                    : l10n.listToBuyInBasket(toBuy.length, inBasket.length),
+                                style: TextStyle(
+                                  fontFamily: CestaFonts.family,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 15,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                              // Figma "13 List offline" 38:3843: only while offline.
+                              ValueListenableBuilder(
+                                valueListenable: widget.sync.offline,
+                                builder: (context, offline, _) => offline
+                                    ? Padding(
+                                        padding: const EdgeInsets.only(top: 10),
+                                        child: CesStatusPill(label: l10n.listOffline(_pending)),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Figma "15 Empty list" 39:3859.
+                      if (_loaded && _shown.isEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(40, 96, 40, 0),
+                            child: CesEmptyListState(title: l10n.listEmptyTitle, body: l10n.listEmptyBody),
+                          ),
+                        ),
+                      // To buy (Figma 4:169): tags in insertion order.
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverToBoxAdapter(
+                          child: Wrap(
+                            spacing: 11,
+                            runSpacing: 11,
+                            children: [
+                              for (final item in toBuy)
+                                CesItemTile(
+                                  key: ValueKey(item.id),
+                                  name: item.name,
+                                  quantity: tagQuantity(l10n, item.quantity, item.unit),
+                                  semanticHint: l10n.itemCheck,
+                                  onTap: () => _setChecked(item, true),
+                                  onLongPress: () => _openItem(item),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // In the basket (Figma 4:242).
+                      if (inBasket.isNotEmpty)
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
+                          sliver: SliverList.list(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: CesSectionHeading(l10n.listInTheBasket),
+                              ),
+                              for (final item in inBasket)
+                                Padding(
+                                  key: ValueKey(item.id),
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: CesCheckedItem(
+                                    name: item.name,
+                                    checkedBy: item.checkedById == myId
+                                        ? l10n.listCheckedByYou
+                                        : item.checkedByName ?? '',
+                                    semanticHint: l10n.itemUncheck,
+                                    onTap: () => _setChecked(item, false),
+                                    onLongPress: () => _openItem(item),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      SliverToBoxAdapter(child: SizedBox(height: CesAddBar.height + 16 + bottomInset)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
