@@ -71,6 +71,7 @@ class _HealthScreenState extends State<HealthScreen> {
       final health = switch (await widget.api.getHealth()) {
         GetHealth200(:final value) => value,
         GetHealth503(:final value) => value,
+        GetHealth429() => throw StateError('rate limited'),
       };
       await widget.database.saveKnownHealth(health);
       return _Reached(health);

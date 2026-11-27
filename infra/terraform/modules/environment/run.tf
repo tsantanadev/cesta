@@ -80,8 +80,30 @@ resource "google_cloud_run_v2_service" "backend" {
         value = var.domain
       }
       env {
+        name  = "FIREBASE_PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        # Firebase Hosting appends the client's address to X-Forwarded-For, then
+        # Cloud Run's front end appends Hosting's, so the client is 2nd from the right.
+        name  = "TRUSTED_PROXY_HOPS"
+        value = "2"
+      }
+      env {
         name  = "LOG_LEVEL"
         value = var.log_level
+      }
+      env {
+        name  = "RATE_LIMIT_PER_IP"
+        value = var.rate_limit_per_ip
+      }
+      env {
+        name  = "RATE_LIMIT_PER_USER"
+        value = var.rate_limit_per_user
+      }
+      env {
+        name  = "MAX_LISTS_PER_USER"
+        value = tostring(var.max_lists_per_user)
       }
       env {
         name  = "OTEL_EXPORTER_OTLP_ENDPOINT"

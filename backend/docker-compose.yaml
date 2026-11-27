@@ -32,6 +32,8 @@ services:
       DATABASE_URL: postgres://cesta:cesta@postgres:5432/cesta?sslmode=disable
       PORT: "8080"
       LOG_LEVEL: debug
+      # Tokens from the app's dev build verify against the dev Firebase project.
+      FIREBASE_PROJECT_ID: cesta-dev
       # Uncomment to export traces and metrics to a local OTLP collector:
       # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:

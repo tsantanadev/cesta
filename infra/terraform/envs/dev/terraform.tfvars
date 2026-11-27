@@ -9,3 +9,5 @@ budget_amount     = 50
 kill_switch_limit = 200
 
 otel_exporter_otlp_endpoint = "https://otlp-gateway-prod-sa-east-1.grafana.net/otlp"
+android_sha1_hashes         = ["c8d2c832f5295e8b09960fa75557af96c24a50b8"]
+android_sha256_hashes       = ["639ce9be9687fcb43ed5dfce080071fe41308c4f38cb08d8cc1636a588168ee3"]

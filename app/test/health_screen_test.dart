@@ -4,20 +4,33 @@ import 'package:material_ui/material_ui.dart';
 
 import 'harness/harness.dart';
 
-void main() {
-  testWidgets('shows the server is up, in English', (tester) async {
-    final h = Harness(tester);
+const serverStatus = '/server-status';
 
+void main() {
+  testWidgets('is opened from the User menu', (tester) async {
+    final h = Harness(tester)..signedIn();
     await h.pumpApp();
+
+    await h.openUserMenu();
+    await tester.tap(find.text('Server status'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Server is up'), findsOneWidget);
+  });
+
+  testWidgets('shows the server is up, in English', (tester) async {
+    final h = Harness(tester)..signedIn();
+
+    await h.pumpApp(initialLocation: serverStatus);
 
     expect(find.text('Server is up'), findsOneWidget);
     expect(find.text('Database: connected'), findsOneWidget);
   });
 
   testWidgets('shows the server is up, in Brazilian Portuguese', (tester) async {
-    final h = Harness(tester);
+    final h = Harness(tester)..signedIn();
 
-    await h.pumpApp(locale: brazilianPortuguese);
+    await h.pumpApp(locale: brazilianPortuguese, initialLocation: serverStatus);
 
     expect(find.text('Status do servidor'), findsOneWidget);
     expect(find.text('Servidor no ar'), findsOneWidget);
@@ -26,20 +39,21 @@ void main() {
   });
 
   testWidgets('shows a degraded server when the backend reports its database down', (tester) async {
-    final h = Harness(tester);
+    final h = Harness(tester)..signedIn();
     h.api.health = const Health(status: HealthStatus.degraded, database: HealthDatabase.down);
 
-    await h.pumpApp();
+    await h.pumpApp(initialLocation: serverStatus);
 
     expect(find.text('Server is degraded'), findsOneWidget);
     expect(find.text('Database: unreachable'), findsOneWidget);
   });
 
   testWidgets('offline with nothing stored, says the server could not be reached', (tester) async {
-    final h = Harness(tester);
+    final h = Harness(tester)..signedIn();
+    await h.pumpApp(); // the User is now stored on the device, but no server status
     h.api.goOffline();
 
-    await h.pumpApp();
+    await h.pumpApp(initialLocation: serverStatus);
 
     expect(find.text("You're offline"), findsOneWidget);
     expect(find.text("Couldn't reach the server."), findsOneWidget);
@@ -47,11 +61,11 @@ void main() {
   });
 
   testWidgets('offline after a restart, shows the last known status from the device', (tester) async {
-    final h = Harness(tester);
-    await h.pumpApp();
+    final h = Harness(tester)..signedIn();
+    await h.pumpApp(initialLocation: serverStatus);
     h.api.goOffline();
 
-    await h.pumpApp(); // app restarts with the same local database
+    await h.pumpApp(initialLocation: serverStatus); // app restarts with the same local database
 
     expect(find.text("You're offline"), findsOneWidget);
     expect(find.text('Last known status'), findsOneWidget);
@@ -59,12 +73,12 @@ void main() {
   });
 
   testWidgets('offline after a restart, remembers a degraded server and its database being down', (tester) async {
-    final h = Harness(tester);
+    final h = Harness(tester)..signedIn();
     h.api.health = const Health(status: HealthStatus.degraded, database: HealthDatabase.down);
-    await h.pumpApp();
+    await h.pumpApp(initialLocation: serverStatus);
     h.api.goOffline();
 
-    await h.pumpApp();
+    await h.pumpApp(initialLocation: serverStatus);
 
     expect(find.text('Last known status'), findsOneWidget);
     expect(find.text('Server is degraded'), findsOneWidget);
@@ -72,9 +86,10 @@ void main() {
   });
 
   testWidgets('checking again after reconnecting shows the live status', (tester) async {
-    final h = Harness(tester);
+    final h = Harness(tester)..signedIn();
+    await h.pumpApp(); // the User is now stored on the device, but no server status
     h.api.goOffline();
-    await h.pumpApp();
+    await h.pumpApp(initialLocation: serverStatus);
     h.api.goOnline();
 
     await tester.tap(find.text('Check again'));
@@ -85,10 +100,10 @@ void main() {
   }, variant: TargetPlatformVariant.mobile());
 
   testWidgets('an unexpected failure says the check failed and lets the user check again', (tester) async {
-    final h = Harness(tester);
+    final h = Harness(tester)..signedIn();
     h.api.failure = const FormatException('malformed health response');
 
-    await h.pumpApp();
+    await h.pumpApp(initialLocation: serverStatus);
 
     expect(find.text("Couldn't check the server status."), findsOneWidget);
     expect(find.text('Checking the server…'), findsNothing);
@@ -101,11 +116,15 @@ void main() {
   });
 
   testWidgets('stays readable in dark mode at the largest text size', (tester) async {
-    final h = Harness(tester);
-    tester.view.physicalSize = const Size(360, 640) * tester.view.devicePixelRatio;
-    addTearDown(tester.view.reset);
+    final h = Harness(tester)..signedIn();
 
-    await h.pumpApp(themeMode: ThemeMode.dark, textScale: 3.0, locale: brazilianPortuguese);
+    await h.pumpApp(
+      themeMode: ThemeMode.dark,
+      textScale: 3.0,
+      screen: const Size(360, 640),
+      locale: brazilianPortuguese,
+      initialLocation: serverStatus,
+    );
 
     expect(tester.takeException(), isNull);
     expect(find.text('Servidor no ar'), findsOneWidget);

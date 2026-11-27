@@ -55,6 +55,17 @@ variable "otel_exporter_otlp_endpoint" {
   type = string
 }
 
+variable "android_sha1_hashes" {
+  description = "SHA-1 fingerprints of the Android signing keys (infra/auth-setup.sh prints them)."
+  type        = list(string)
+  default     = []
+}
+
+variable "android_sha256_hashes" {
+  type    = list(string)
+  default = []
+}
+
 variable "prod_project_id" {
   description = "The prod project, whose deployer may pull images from dev. Leave empty until prod is applied."
   type        = string
@@ -104,6 +115,8 @@ module "environment" {
   kill_switch_limit           = var.kill_switch_limit
   alert_email                 = var.alert_email
   otel_exporter_otlp_endpoint = var.otel_exporter_otlp_endpoint
+  android_sha1_hashes         = var.android_sha1_hashes
+  android_sha256_hashes       = var.android_sha256_hashes
   kill_switch_enabled         = true
   log_level                   = "debug"
 
@@ -133,4 +146,14 @@ output "service_url" {
 
 output "kill_switch_topic" {
   value = module.environment.kill_switch_topic
+}
+
+output "android_config_file" {
+  description = "base64 google-services.json; infra/auth-setup.sh writes it into the app."
+  value       = module.environment.android_config_file
+}
+
+output "apple_config_file" {
+  description = "base64 GoogleService-Info.plist; infra/auth-setup.sh writes it into the app."
+  value       = module.environment.apple_config_file
 }

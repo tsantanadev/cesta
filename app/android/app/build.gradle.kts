@@ -4,6 +4,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase config comes from google-services.json, which infra/auth-setup.sh writes
+// from Terraform's output. Without it the app still builds, but Firebase (sign-in)
+// fails at startup.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "dev.tsantana.cesta"
     compileSdk = flutter.compileSdkVersion

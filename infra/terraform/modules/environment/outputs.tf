@@ -31,3 +31,13 @@ output "kill_switch_topic" {
   description = "Publish a fake budget notification here to test the kill switch."
   value       = var.kill_switch_enabled ? google_pubsub_topic.kill_switch[0].id : null
 }
+
+output "android_config_file" {
+  description = "google-services.json for the Android app (base64). Not secret: Firebase client config is public."
+  value       = data.google_firebase_android_app_config.cesta.config_file_contents
+}
+
+output "apple_config_file" {
+  description = "GoogleService-Info.plist for the iOS app (base64). Not secret: Firebase client config is public."
+  value       = data.google_firebase_apple_app_config.cesta.config_file_contents
+}

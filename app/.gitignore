@@ -46,3 +46,11 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Per-developer iOS signing team (app/tool/run-iphone.sh)
+/ios/Flutter/Signing.xcconfig
+
+# Firebase client config: written by infra/auth-setup.sh from Terraform output. Kept out of
+# git because the repo is public and they hold the project's Firebase API key.
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist

@@ -2,6 +2,18 @@
 
 export 'default_client/api_client.dart';
 export 'default_client/api_client_results.dart';
+export 'default_client/models/api_error.dart';
+export 'default_client/models/api_error_code.dart';
+export 'default_client/models/deleted_list.dart';
+export 'default_client/models/deleted_lists.dart';
 export 'default_client/models/health.dart';
 export 'default_client/models/health_database.dart';
 export 'default_client/models/health_status.dart';
+export 'default_client/models/list_create.dart';
+export 'default_client/models/list_name.dart';
+export 'default_client/models/list_rename.dart';
+export 'default_client/models/list_summaries.dart';
+export 'default_client/models/list_summary.dart';
+export 'default_client/models/role.dart';
+export 'default_client/models/user.dart';
+export 'default_client/models/user_update.dart';

@@ -15,6 +15,9 @@ type Identity struct {
 	// Subject is the provider's stable user identifier (the Firebase UID).
 	Subject string
 	Email   string
+	// Name is the name the provider knows the person by (e.g. from their Google
+	// account). It is empty for email + password sign-ups.
+	Name string
 }
 
 // TokenVerifier turns a bearer token (a Firebase ID token) into a verified Identity.

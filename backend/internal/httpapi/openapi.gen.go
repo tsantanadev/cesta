@@ -15,10 +15,57 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for ApiErrorCode.
+const (
+	ApiErrorCodeInternal           ApiErrorCode = "internal"
+	ApiErrorCodeInvalidDisplayName ApiErrorCode = "invalid_display_name"
+	ApiErrorCodeInvalidListName    ApiErrorCode = "invalid_list_name"
+	ApiErrorCodeInvalidRequest     ApiErrorCode = "invalid_request"
+	ApiErrorCodeLimitExceeded      ApiErrorCode = "limit_exceeded"
+	ApiErrorCodeListDeleted        ApiErrorCode = "list_deleted"
+	ApiErrorCodeListIdTaken        ApiErrorCode = "list_id_taken"
+	ApiErrorCodeListNotFound       ApiErrorCode = "list_not_found"
+	ApiErrorCodeNotListOwner       ApiErrorCode = "not_list_owner"
+	ApiErrorCodeRateLimited        ApiErrorCode = "rate_limited"
+	ApiErrorCodeUnauthenticated    ApiErrorCode = "unauthenticated"
+)
+
+// Valid indicates whether the value is a known member of the ApiErrorCode enum.
+func (e ApiErrorCode) Valid() bool {
+	switch e {
+	case ApiErrorCodeInternal:
+		return true
+	case ApiErrorCodeInvalidDisplayName:
+		return true
+	case ApiErrorCodeInvalidListName:
+		return true
+	case ApiErrorCodeInvalidRequest:
+		return true
+	case ApiErrorCodeLimitExceeded:
+		return true
+	case ApiErrorCodeListDeleted:
+		return true
+	case ApiErrorCodeListIdTaken:
+		return true
+	case ApiErrorCodeListNotFound:
+		return true
+	case ApiErrorCodeNotListOwner:
+		return true
+	case ApiErrorCodeRateLimited:
+		return true
+	case ApiErrorCodeUnauthenticated:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for HealthDatabase.
 const (
@@ -56,6 +103,54 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// Defines values for Role.
+const (
+	Editor Role = "editor"
+	Owner  Role = "owner"
+)
+
+// Valid indicates whether the value is a known member of the Role enum.
+func (e Role) Valid() bool {
+	switch e {
+	case Editor:
+		return true
+	case Owner:
+		return true
+	default:
+		return false
+	}
+}
+
+// ApiError defines model for ApiError.
+type ApiError struct {
+	// Code Stable machine-readable reason.
+	Code ApiErrorCode `json:"code"`
+
+	// Limit Present when code is limit_exceeded: the configured maximum the User has reached.
+	Limit *int `json:"limit,omitempty"`
+
+	// Message Human-readable explanation, in English, for logs and debugging.
+	Message string `json:"message"`
+}
+
+// ApiErrorCode Stable machine-readable reason.
+type ApiErrorCode string
+
+// DeletedList defines model for DeletedList.
+type DeletedList struct {
+	DeletedAt time.Time          `json:"deletedAt"`
+	Id        openapi_types.UUID `json:"id"`
+	Name      string             `json:"name"`
+
+	// PurgeAt When the List stops being restorable and is removed for good (30 days after deletedAt).
+	PurgeAt time.Time `json:"purgeAt"`
+}
+
+// DeletedLists defines model for DeletedLists.
+type DeletedLists struct {
+	Lists []DeletedList `json:"lists"`
+}
+
 // Health defines model for Health.
 type Health struct {
 	Database HealthDatabase `json:"database"`
@@ -68,8 +163,123 @@ type HealthDatabase string
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// ListCreate defines model for ListCreate.
+type ListCreate struct {
+	// Id Chosen by the client, so the List can be created offline and retried safely.
+	Id openapi_types.UUID `json:"id"`
+
+	// Name Trimmed; must contain at least one visible character and no control characters.
+	Name ListName `json:"name"`
+}
+
+// ListName Trimmed; must contain at least one visible character and no control characters.
+type ListName = string
+
+// ListRename defines model for ListRename.
+type ListRename struct {
+	// Name Trimmed; must contain at least one visible character and no control characters.
+	Name ListName `json:"name"`
+}
+
+// ListSummaries defines model for ListSummaries.
+type ListSummaries struct {
+	Lists []ListSummary `json:"lists"`
+}
+
+// ListSummary defines model for ListSummary.
+type ListSummary struct {
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// MemberCount Members of the List, including the Owner.
+	MemberCount int    `json:"memberCount"`
+	Name        string `json:"name"`
+
+	// Role The signed-in User's Role on the List.
+	Role Role `json:"role"`
+
+	// UncheckedItemCount Items on the List that are not checked.
+	UncheckedItemCount int `json:"uncheckedItemCount"`
+}
+
+// Role The signed-in User's Role on the List.
+type Role string
+
+// User defines model for User.
+type User struct {
+	// DisplayName The name other Members see.
+	DisplayName string `json:"displayName"`
+
+	// DisplayNameConfirmed False until the User has set or confirmed their display name.
+	DisplayNameConfirmed bool   `json:"displayNameConfirmed"`
+	Email                string `json:"email"`
+
+	// Id Internal User ID.
+	Id openapi_types.UUID `json:"id"`
+}
+
+// UserUpdate defines model for UserUpdate.
+type UserUpdate struct {
+	// DisplayName Trimmed; must contain at least one visible character.
+	DisplayName string `json:"displayName"`
+}
+
+// ListId defines model for ListId.
+type ListId = openapi_types.UUID
+
+// BadRequest defines model for BadRequest.
+type BadRequest = ApiError
+
+// Conflict defines model for Conflict.
+type Conflict = ApiError
+
+// Forbidden defines model for Forbidden.
+type Forbidden = ApiError
+
+// NotFound defines model for NotFound.
+type NotFound = ApiError
+
+// RateLimited defines model for RateLimited.
+type RateLimited = ApiError
+
+// Unauthenticated defines model for Unauthenticated.
+type Unauthenticated = ApiError
+
+// CreateListJSONRequestBody defines body for CreateList for application/json ContentType.
+type CreateListJSONRequestBody = ListCreate
+
+// RenameListJSONRequestBody defines body for RenameList for application/json ContentType.
+type RenameListJSONRequestBody = ListRename
+
+// UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
+type UpdateMeJSONRequestBody = UserUpdate
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListDeletedLists Lists the signed-in User deleted and can still restore
+	// (GET /api/deleted-lists)
+	ListDeletedLists(w http.ResponseWriter, r *http.Request)
+	// ListLists The Lists the signed-in User is a Member of
+	// (GET /api/lists)
+	ListLists(w http.ResponseWriter, r *http.Request)
+	// CreateList Create a List owned by the signed-in User
+	// (POST /api/lists)
+	CreateList(w http.ResponseWriter, r *http.Request)
+	// DeleteList Delete a List (Owner only)
+	// (DELETE /api/lists/{listId})
+	DeleteList(w http.ResponseWriter, r *http.Request, listId ListId)
+	// RenameList Rename a List (Owner only)
+	// (PATCH /api/lists/{listId})
+	RenameList(w http.ResponseWriter, r *http.Request, listId ListId)
+	// RestoreList Restore a deleted List (Owner only, within 30 days)
+	// (POST /api/lists/{listId}/restore)
+	RestoreList(w http.ResponseWriter, r *http.Request, listId ListId)
+	// GetMe The signed-in User
+	// (GET /api/me)
+	GetMe(w http.ResponseWriter, r *http.Request)
+	// UpdateMe Set the signed-in User's display name
+	// (PATCH /api/me)
+	UpdateMe(w http.ResponseWriter, r *http.Request)
 	// GetHealth Liveness and database readiness
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -83,6 +293,154 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListDeletedLists operation middleware
+func (siw *ServerInterfaceWrapper) ListDeletedLists(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDeletedLists(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListLists operation middleware
+func (siw *ServerInterfaceWrapper) ListLists(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListLists(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateList operation middleware
+func (siw *ServerInterfaceWrapper) CreateList(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateList(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteList operation middleware
+func (siw *ServerInterfaceWrapper) DeleteList(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "listId" -------------
+	var listId ListId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "listId", r.PathValue("listId"), &listId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "listId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteList(w, r, listId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RenameList operation middleware
+func (siw *ServerInterfaceWrapper) RenameList(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "listId" -------------
+	var listId ListId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "listId", r.PathValue("listId"), &listId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "listId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RenameList(w, r, listId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreList operation middleware
+func (siw *ServerInterfaceWrapper) RestoreList(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "listId" -------------
+	var listId ListId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "listId", r.PathValue("listId"), &listId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "listId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreList(w, r, listId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMe operation middleware
+func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMe operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
@@ -219,8 +577,715 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/me", wrapper.UpdateMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/lists", wrapper.ListLists)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/lists", wrapper.CreateList)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/lists/{listId}", wrapper.DeleteList)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/lists/{listId}", wrapper.RenameList)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/lists/{listId}/restore", wrapper.RestoreList)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/deleted-lists", wrapper.ListDeletedLists)
 
 	return m
+}
+
+type BadRequestJSONResponse ApiError
+
+type ConflictJSONResponse ApiError
+
+type ForbiddenJSONResponse ApiError
+
+type NotFoundJSONResponse ApiError
+
+type RateLimitedResponseHeaders struct {
+	RetryAfter *int
+}
+type RateLimitedJSONResponse struct {
+	Body ApiError
+
+	Headers RateLimitedResponseHeaders
+}
+
+type UnauthenticatedJSONResponse ApiError
+
+type ListDeletedListsRequestObject struct {
+}
+
+type ListDeletedListsResponseObject interface {
+	VisitListDeletedListsResponse(w http.ResponseWriter) error
+}
+
+type ListDeletedLists200JSONResponse DeletedLists
+
+func (response ListDeletedLists200JSONResponse) VisitListDeletedListsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeletedLists401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response ListDeletedLists401JSONResponse) VisitListDeletedListsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDeletedLists429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response ListDeletedLists429JSONResponse) VisitListDeletedListsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListListsRequestObject struct {
+}
+
+type ListListsResponseObject interface {
+	VisitListListsResponse(w http.ResponseWriter) error
+}
+
+type ListLists200JSONResponse ListSummaries
+
+func (response ListLists200JSONResponse) VisitListListsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLists401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response ListLists401JSONResponse) VisitListListsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLists429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response ListLists429JSONResponse) VisitListListsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateListRequestObject struct {
+	Body *CreateListJSONRequestBody
+}
+
+type CreateListResponseObject interface {
+	VisitCreateListResponse(w http.ResponseWriter) error
+}
+
+type CreateList200JSONResponse ListSummary
+
+func (response CreateList200JSONResponse) VisitCreateListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateList201JSONResponse ListSummary
+
+func (response CreateList201JSONResponse) VisitCreateListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateList400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateList400JSONResponse) VisitCreateListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateList401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response CreateList401JSONResponse) VisitCreateListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateList409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateList409JSONResponse) VisitCreateListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateList429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response CreateList429JSONResponse) VisitCreateListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteListRequestObject struct {
+	ListId ListId `json:"listId"`
+}
+
+type DeleteListResponseObject interface {
+	VisitDeleteListResponse(w http.ResponseWriter) error
+}
+
+type DeleteList200JSONResponse DeletedList
+
+func (response DeleteList200JSONResponse) VisitDeleteListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteList400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DeleteList400JSONResponse) VisitDeleteListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteList401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response DeleteList401JSONResponse) VisitDeleteListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteList403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DeleteList403JSONResponse) VisitDeleteListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ForbiddenJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteList404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteList404JSONResponse) VisitDeleteListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteList429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response DeleteList429JSONResponse) VisitDeleteListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenameListRequestObject struct {
+	ListId ListId `json:"listId"`
+	Body   *RenameListJSONRequestBody
+}
+
+type RenameListResponseObject interface {
+	VisitRenameListResponse(w http.ResponseWriter) error
+}
+
+type RenameList200JSONResponse ListSummary
+
+func (response RenameList200JSONResponse) VisitRenameListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenameList400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response RenameList400JSONResponse) VisitRenameListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenameList401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response RenameList401JSONResponse) VisitRenameListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenameList403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RenameList403JSONResponse) VisitRenameListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ForbiddenJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenameList404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RenameList404JSONResponse) VisitRenameListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenameList409JSONResponse struct{ ConflictJSONResponse }
+
+func (response RenameList409JSONResponse) VisitRenameListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RenameList429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response RenameList429JSONResponse) VisitRenameListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreListRequestObject struct {
+	ListId ListId `json:"listId"`
+}
+
+type RestoreListResponseObject interface {
+	VisitRestoreListResponse(w http.ResponseWriter) error
+}
+
+type RestoreList200JSONResponse ListSummary
+
+func (response RestoreList200JSONResponse) VisitRestoreListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreList400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response RestoreList400JSONResponse) VisitRestoreListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreList401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response RestoreList401JSONResponse) VisitRestoreListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreList403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response RestoreList403JSONResponse) VisitRestoreListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ForbiddenJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreList404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response RestoreList404JSONResponse) VisitRestoreListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.NotFoundJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreList409JSONResponse struct{ ConflictJSONResponse }
+
+func (response RestoreList409JSONResponse) VisitRestoreListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.ConflictJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreList429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response RestoreList429JSONResponse) VisitRestoreListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMeRequestObject struct {
+}
+
+type GetMeResponseObject interface {
+	VisitGetMeResponse(w http.ResponseWriter) error
+}
+
+type GetMe200JSONResponse User
+
+func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response GetMe401JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response GetMe429JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMeRequestObject struct {
+	Body *UpdateMeJSONRequestBody
+}
+
+type UpdateMeResponseObject interface {
+	VisitUpdateMeResponse(w http.ResponseWriter) error
+}
+
+type UpdateMe200JSONResponse User
+
+func (response UpdateMe200JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateMe400JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.BadRequestJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response UpdateMe401JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.UnauthenticatedJSONResponse); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response UpdateMe429JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetHealthRequestObject struct {
@@ -244,6 +1309,29 @@ func (response GetHealth200JSONResponse) VisitGetHealthResponse(w http.ResponseW
 	return err
 }
 
+type GetHealth429JSONResponse struct{ RateLimitedJSONResponse }
+
+func (response GetHealth429JSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := runtime.JSONMarshalWrite(&buf, response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		{
+			v, err := runtime.StyleParamWithOptions("simple", false, "Retry-After", *response.Headers.RetryAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "integer", Format: ""})
+			if err != nil {
+				return fmt.Errorf("error styling response header Retry-After: %w", err)
+			}
+			w.Header().Set("Retry-After", v)
+		}
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealth503JSONResponse Health
 
 func (response GetHealth503JSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
@@ -260,6 +1348,30 @@ func (response GetHealth503JSONResponse) VisitGetHealthResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListDeletedLists Lists the signed-in User deleted and can still restore
+	// (GET /api/deleted-lists)
+	ListDeletedLists(ctx context.Context, request ListDeletedListsRequestObject) (ListDeletedListsResponseObject, error)
+	// ListLists The Lists the signed-in User is a Member of
+	// (GET /api/lists)
+	ListLists(ctx context.Context, request ListListsRequestObject) (ListListsResponseObject, error)
+	// CreateList Create a List owned by the signed-in User
+	// (POST /api/lists)
+	CreateList(ctx context.Context, request CreateListRequestObject) (CreateListResponseObject, error)
+	// DeleteList Delete a List (Owner only)
+	// (DELETE /api/lists/{listId})
+	DeleteList(ctx context.Context, request DeleteListRequestObject) (DeleteListResponseObject, error)
+	// RenameList Rename a List (Owner only)
+	// (PATCH /api/lists/{listId})
+	RenameList(ctx context.Context, request RenameListRequestObject) (RenameListResponseObject, error)
+	// RestoreList Restore a deleted List (Owner only, within 30 days)
+	// (POST /api/lists/{listId}/restore)
+	RestoreList(ctx context.Context, request RestoreListRequestObject) (RestoreListResponseObject, error)
+	// GetMe The signed-in User
+	// (GET /api/me)
+	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// UpdateMe Set the signed-in User's display name
+	// (PATCH /api/me)
+	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
 	// GetHealth Liveness and database readiness
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -307,6 +1419,225 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
+// ListDeletedLists operation middleware
+func (sh *strictHandler) ListDeletedLists(w http.ResponseWriter, r *http.Request) {
+	var request ListDeletedListsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListDeletedLists(ctx, request.(ListDeletedListsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDeletedLists")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDeletedListsResponseObject); ok {
+		if err := validResponse.VisitListDeletedListsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListLists operation middleware
+func (sh *strictHandler) ListLists(w http.ResponseWriter, r *http.Request) {
+	var request ListListsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.ListLists(ctx, request.(ListListsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListLists")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListListsResponseObject); ok {
+		if err := validResponse.VisitListListsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateList operation middleware
+func (sh *strictHandler) CreateList(w http.ResponseWriter, r *http.Request) {
+	var request CreateListRequestObject
+
+	var body CreateListJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.CreateList(ctx, request.(CreateListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateListResponseObject); ok {
+		if err := validResponse.VisitCreateListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteList operation middleware
+func (sh *strictHandler) DeleteList(w http.ResponseWriter, r *http.Request, listId ListId) {
+	var request DeleteListRequestObject
+
+	request.ListId = listId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.DeleteList(ctx, request.(DeleteListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteListResponseObject); ok {
+		if err := validResponse.VisitDeleteListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RenameList operation middleware
+func (sh *strictHandler) RenameList(w http.ResponseWriter, r *http.Request, listId ListId) {
+	var request RenameListRequestObject
+
+	request.ListId = listId
+
+	var body RenameListJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RenameList(ctx, request.(RenameListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RenameList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RenameListResponseObject); ok {
+		if err := validResponse.VisitRenameListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RestoreList operation middleware
+func (sh *strictHandler) RestoreList(w http.ResponseWriter, r *http.Request, listId ListId) {
+	var request RestoreListRequestObject
+
+	request.ListId = listId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.RestoreList(ctx, request.(RestoreListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RestoreListResponseObject); ok {
+		if err := validResponse.VisitRestoreListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMe operation middleware
+func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	var request GetMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.GetMe(ctx, request.(GetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeResponseObject); ok {
+		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMe operation middleware
+func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	var request UpdateMeRequestObject
+
+	var body UpdateMeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error) {
+		return sh.ssi.UpdateMe(ctx, request.(UpdateMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
+		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -336,13 +1667,48 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"80xbN/1l8suEbS43/x0A",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
