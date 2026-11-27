@@ -158,6 +158,15 @@ class SyncEngine {
     await _current;
   }
 
+  /// Before signing out: pushes what this device still holds, held removals
+  /// included, if the phone is online, waiting at most [timeout]. Best effort:
+  /// whatever doesn't reach the server is lost with the session's data.
+  Future<void> flush({Duration timeout = const Duration(seconds: 3)}) async {
+    _outbox.releaseHolds();
+    if (!_started || !await _network.isConnected()) return;
+    await sync().timeout(timeout, onTimeout: () {});
+  }
+
   /// Syncs now. When a sync is already running, another one follows it, and
   /// the returned future completes after that one.
   Future<void> sync() {

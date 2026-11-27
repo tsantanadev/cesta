@@ -288,6 +288,23 @@ void main() {
     expect(find.text('Undo'), findsNothing);
   });
 
+  testWidgets('online, an Item removed just before signing out stays removed', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Tomatoes', addedBy: ana);
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await h.openItem('Tomatoes');
+    await h.tap(find.text('Remove item'));
+    await h.tap(find.byTooltip('Back'));
+    await h.signOut(); // while Undo is still offered
+
+    expect(h.api.itemsToBuy(list), ['Coffee']);
+  });
+
   testWidgets('offline, Undo of a removal just drops the waiting change', (tester) async {
     final h = Harness(tester);
     final ana = h.signedIn();

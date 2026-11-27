@@ -67,7 +67,9 @@ class _CestaAppState extends State<CestaApp> {
     _outbox = ChangeOutbox(widget.database);
     _items = ItemsStore(widget.database, _outbox);
     _sync = SyncEngine(api: widget.api, db: widget.database, items: _items, outbox: _outbox, network: widget.network);
-    _session.addListener(_followSession);
+    _session
+      ..beforeSignOut = _beforeSignOut
+      ..addListener(_followSession);
     _rejections = _sync.rejections.listen(_tellRejected);
     _listsChanged = _sync.listsChanged.listen((c) => _lists.changed(gone: c.gone, toBuy: c.toBuy));
     _router = buildRouter(
@@ -91,6 +93,13 @@ class _CestaAppState extends State<CestaApp> {
       // An Undo belongs to the session that made the change.
       _messenger.currentState?.removeCurrentSnackBar();
     }
+  }
+
+  /// Takes away the Undo and pushes what's left to sync, so a removal held
+  /// for Undo isn't lost with the session's data.
+  Future<void> _beforeSignOut() async {
+    _messenger.currentState?.removeCurrentSnackBar();
+    await _sync.flush();
   }
 
   /// Clears the Checked Items of List [listId] as the signed-in User.

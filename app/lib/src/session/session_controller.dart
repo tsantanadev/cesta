@@ -153,7 +153,18 @@ class SessionController extends ChangeNotifier {
     }
   }
 
-  Future<void> signOut() => _auth.signOut();
+  /// Runs while the User is still signed in, just before [signOut] ends the
+  /// session (e.g. to push changes not yet synced).
+  Future<void> Function()? beforeSignOut;
+
+  Future<void> signOut() async {
+    try {
+      await beforeSignOut?.call();
+    } catch (_) {
+      // Best effort: signing out goes on.
+    }
+    await _auth.signOut();
+  }
 
   Future<void> _keep(AuthSession session, User user) async {
     if (_session?.uid != session.uid) return;

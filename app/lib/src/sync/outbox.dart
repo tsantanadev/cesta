@@ -74,13 +74,20 @@ class ChangeOutbox {
     _heldRemovals.update(itemId, (n) => n + 1, ifAbsent: () => 1);
     unawaited(
       until.catchError((Object _) {}).whenComplete(() {
-        if (_heldRemovals.update(itemId, (n) => n - 1) == 0) _heldRemovals.remove(itemId);
+        // Gone already when [releaseHolds] let it go first.
+        if (_heldRemovals.containsKey(itemId) && _heldRemovals.update(itemId, (n) => n - 1) == 0) {
+          _heldRemovals.remove(itemId);
+        }
         // Pushes it now, unless it was undone meanwhile (nothing then to push).
         if (!_changes.isClosed) _changes.add(listId);
       }),
     );
     await enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
   }
+
+  /// Lets every held removal be pushed now, Undo or not (sign out: the Undo
+  /// goes with the session, the removal mustn't).
+  void releaseHolds() => _heldRemovals.clear();
 
   /// Drops every change to Item [itemId] while its creation is still waiting
   /// to be pushed, so the Item never reaches the server; false when it can't
