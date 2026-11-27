@@ -32,5 +32,3 @@ export 'default_client/models/tombstone_type.dart';
 export 'default_client/models/user.dart';
 export 'default_client/models/user_ref.dart';
 export 'default_client/models/user_update.dart';
-export 'models/quantity.dart';
-export 'models/unit.dart';

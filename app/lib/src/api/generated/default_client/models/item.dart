@@ -10,10 +10,10 @@ class Item {
     required this.listId,
     required this.name,
 
-    /// See Quantity.
+    /// A positive decimal as a string, to keep it exact (e.g. "1.5"). Zero is not allowed.
     this.quantity,
 
-    /// See Unit.
+    /// Fixed set, not extendable. The app shows "un" as "units" in English.
     this.unit,
     this.note,
     required this.addedBy,
@@ -52,10 +52,10 @@ class Item {
 
   final String name;
 
-  /// See Quantity.
+  /// A positive decimal as a string, to keep it exact (e.g. "1.5"). Zero is not allowed.
   final ({String? value})? quantity;
 
-  /// See Unit.
+  /// Fixed set, not extendable. The app shows "un" as "units" in English.
   final ({ItemUnit? value})? unit;
 
   final ({String? value})? note;

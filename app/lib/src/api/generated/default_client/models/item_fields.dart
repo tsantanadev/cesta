@@ -8,10 +8,10 @@ class ItemFields {
     /// Trimmed; required on item_create and can't be cleared.
     this.name,
 
-    /// See Quantity.
+    /// A positive decimal as a string, to keep it exact (e.g. "1.5"). Zero is not allowed.
     this.quantity,
 
-    /// See Unit.
+    /// Fixed set, not extendable. The app shows "un" as "units" in English.
     this.unit,
     this.note,
     this.checked,
@@ -35,10 +35,10 @@ class ItemFields {
   /// Trimmed; required on item_create and can't be cleared.
   final String? name;
 
-  /// See Quantity.
+  /// A positive decimal as a string, to keep it exact (e.g. "1.5"). Zero is not allowed.
   final ({String? value})? quantity;
 
-  /// See Unit.
+  /// Fixed set, not extendable. The app shows "un" as "units" in English.
   final ({ItemFieldsUnit? value})? unit;
 
   final ({String? value})? note;
