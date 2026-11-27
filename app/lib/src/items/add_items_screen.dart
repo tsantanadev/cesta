@@ -150,7 +150,8 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
               ),
             ),
             // Matches (Figma 4:280): the List's Items to buy, as on the List,
-            // then Items from the Item history; Bought before while nothing is typed.
+            // then Items from the Item history; Bought before (Figma 4:311,
+            // heading 4:312) while nothing is typed.
             if (matches.isNotEmpty || fromHistory.isNotEmpty)
               _section(query.isEmpty ? l10n.addItemsBoughtBefore : l10n.addItemsMatches, [
                 for (final item in matches)

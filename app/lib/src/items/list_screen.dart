@@ -181,7 +181,7 @@ class _ListScreenState extends State<ListScreen> {
                           padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
                           sliver: SliverList.list(
                             children: [
-                              // The heading, with Clear checked on its right.
+                              // The heading, with Clear checked (Figma 4:245) on its right.
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 4),
                                 child: Row(
