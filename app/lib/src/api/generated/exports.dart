@@ -9,6 +9,8 @@ export 'default_client/models/deleted_lists.dart';
 export 'default_client/models/health.dart';
 export 'default_client/models/health_database.dart';
 export 'default_client/models/health_status.dart';
+export 'default_client/models/history_entry.dart';
+export 'default_client/models/history_entry_unit.dart';
 export 'default_client/models/item.dart';
 export 'default_client/models/item_checked_by.dart';
 export 'default_client/models/item_fields.dart';

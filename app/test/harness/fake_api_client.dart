@@ -539,6 +539,9 @@ class FakeApiClient implements ApiClient {
         }
         item.seq = ++_changeSeq;
         return applied;
+      case MutationType.itemClear:
+        // Not faked yet: Clear checked in the app comes with its own ticket.
+        return rejected(ApiErrorCode.invalidRequest);
     }
   }
 
@@ -593,7 +596,9 @@ class FakeApiClient implements ApiClient {
     required String cursor,
     required bool hasMore,
   }) => PullResponse.fromJson(
-    _wire(PullResponse(items: items, tombstones: tombstones, cursor: cursor, hasMore: hasMore).toJson()),
+    _wire(
+      PullResponse(items: items, history: const [], tombstones: tombstones, cursor: cursor, hasMore: hasMore).toJson(),
+    ),
   );
 
   void _failIfOffline(String path) {

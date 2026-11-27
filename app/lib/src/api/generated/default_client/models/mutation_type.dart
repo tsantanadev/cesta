@@ -3,7 +3,8 @@
 enum MutationType {
   itemCreate("item_create"),
   itemUpdate("item_update"),
-  itemDelete("item_delete");
+  itemDelete("item_delete"),
+  itemClear("item_clear");
 
   const MutationType(this.value);
 

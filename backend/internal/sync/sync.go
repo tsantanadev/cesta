@@ -13,6 +13,8 @@
 //     A mutation changes only the fields it carries.
 //   - A delete wins: a removed Item keeps a tombstone, and later edits to it
 //     are rejected with ReasonItemDeleted.
+//   - Clear checked is one ItemClear per Checked Item, so it clears exactly
+//     what the device saw: the Item is removed and recorded in Item history.
 //
 // Every change a pull must see is numbered by package changeseq, so a pull
 // cursor is a position in one ordered stream of changes.
@@ -45,6 +47,8 @@ const (
 	ItemCreate MutationType = "item_create"
 	ItemUpdate MutationType = "item_update"
 	ItemDelete MutationType = "item_delete"
+	// ItemClear clears a Checked Item from its List into Item history.
+	ItemClear MutationType = "item_clear"
 )
 
 // Mutation is one change from a device's outbox.
@@ -71,6 +75,7 @@ const (
 	ReasonInvalidItem    Reason = "invalid_item"
 	ReasonItemNotFound   Reason = "item_not_found"
 	ReasonItemDeleted    Reason = "item_deleted"
+	ReasonItemNotChecked Reason = "item_not_checked"
 	ReasonListNotFound   Reason = "list_not_found"
 	ReasonListDeleted    Reason = "list_deleted"
 	ReasonLimitExceeded  Reason = "limit_exceeded"
@@ -211,6 +216,8 @@ func (s *Service) apply(ctx context.Context, tx pgx.Tx, userID uuid.UUID, m Muta
 		err = s.lists.UpdateItem(ctx, tx, userID, m.EntityID, m.Fields, now)
 	case ItemDelete:
 		err = s.lists.RemoveItem(ctx, tx, userID, m.EntityID, now)
+	case ItemClear:
+		err = s.lists.ClearItem(ctx, tx, userID, m.EntityID, now)
 	default:
 		return rejected(ReasonInvalidRequest, fmt.Sprintf("unknown mutation type %q", m.Type)), nil
 	}
@@ -239,6 +246,8 @@ func result(err error) (Result, error) {
 		return rejected(ReasonItemNotFound, "no such Item"), nil
 	case errors.Is(err, lists.ErrItemDeleted):
 		return rejected(ReasonItemDeleted, "the Item was removed"), nil
+	case errors.Is(err, lists.ErrItemNotChecked):
+		return rejected(ReasonItemNotChecked, "only a checked Item can be cleared"), nil
 	case errors.Is(err, lists.ErrItemIDTaken):
 		return rejected(ReasonInvalidItem, "another Item has this id"), nil
 	default:

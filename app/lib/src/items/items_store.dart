@@ -230,7 +230,7 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
         );
       case MutationType.itemUpdate:
         if (items[m.itemId] case final item?) items[m.itemId] = item._updated(fields, at: at, by: by);
-      case MutationType.itemDelete:
+      case MutationType.itemDelete || MutationType.itemClear:
         items.remove(m.itemId);
     }
   }

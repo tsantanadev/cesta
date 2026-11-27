@@ -462,7 +462,7 @@ class ApiClient {
 
   /// Apply a batch of the device's outbox mutations
   ///
-  /// Mutations are applied in order. Each one is idempotent by its client mutation ID: pushing a mutation the server already received returns its original result and changes nothing. Authorization is re-checked per mutation (the User must be a Member of the Item's List). Conflicts resolve last-write-wins per field, in order of server receipt (clientTimestamp is recorded, never used for ordering). A delete wins over concurrent edits: editing a removed Item is rejected with item_deleted and does not bring it back. A List holds at most the configured limit of Items (default 500); the create past it is rejected with limit_exceeded. One mutation's rejection never fails the batch.
+  /// Mutations are applied in order. Each one is idempotent by its client mutation ID: pushing a mutation the server already received returns its original result and changes nothing. Authorization is re-checked per mutation (the User must be a Member of the Item's List). Conflicts resolve last-write-wins per field, in order of server receipt (clientTimestamp is recorded, never used for ordering). A delete wins over concurrent edits: editing a removed Item is rejected with item_deleted and does not bring it back. A List holds at most the configured limit of Items (default 500); the create past it is rejected with limit_exceeded. item_clear (Clear checked, one per Checked Item) removes the Item from its List and records it in the List's Item history; an Item that is not checked is rejected with item_not_checked, and clearing an Item already cleared is applied and records nothing more. One mutation's rejection never fails the batch.
   Future<PushMutationsResult> pushMutations({
     Map<String, Object?> extra = const {
       "openapi.servers": [
@@ -513,7 +513,7 @@ class ApiClient {
 
   /// Changes since a cursor, for Lists the signed-in User is a Member of
   ///
-  /// Returns the current state of every Item changed since the cursor, plus tombstones for Items removed and for Lists the User can no longer see (deleted, or the User stopped being a Member). Omit cursor for a full snapshot. Keep pulling with the returned cursor while hasMore is true.
+  /// Returns the current state of every Item changed since the cursor, the Item history entries recorded since it (a List that becomes visible brings its whole Item history), plus tombstones for Items removed and for Lists the User can no longer see (deleted, or the User stopped being a Member). Omit cursor for a full snapshot. Keep pulling with the returned cursor while hasMore is true.
   Future<PullChangesResult> pullChanges({
     Map<String, Object?> extra = const {
       "openapi.servers": [

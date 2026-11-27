@@ -73,12 +73,16 @@ func (s *Server) PullChanges(ctx context.Context, req PullChangesRequestObject) 
 	}
 	out := PullChanges200JSONResponse{
 		Items:      make([]Item, 0, len(ch.Items)),
+		History:    make([]HistoryEntry, 0, len(ch.History)),
 		Tombstones: make([]Tombstone, 0, len(ch.Tombstones)),
 		Cursor:     ch.Cursor,
 		HasMore:    ch.HasMore,
 	}
 	for _, it := range ch.Items {
 		out.Items = append(out.Items, apiItem(it))
+	}
+	for _, h := range ch.History {
+		out.History = append(out.History, apiHistoryEntry(h))
 	}
 	for _, t := range ch.Tombstones {
 		ts := Tombstone{Type: TombstoneType(t.Type), Id: t.ID}
@@ -160,6 +164,23 @@ func apiItem(it cestasync.Item) Item {
 	}
 	if it.CheckedBy != nil {
 		out.CheckedBy = nullable.NewNullableWithValue(checkedByRef{Id: it.CheckedBy.ID, DisplayName: it.CheckedBy.DisplayName})
+	}
+	return out
+}
+
+func apiHistoryEntry(h cestasync.HistoryEntry) HistoryEntry {
+	out := HistoryEntry{
+		ItemId:    h.ItemID,
+		ListId:    h.ListID,
+		Name:      h.Name,
+		Quantity:  orNull(h.Quantity),
+		Note:      orNull(h.Note),
+		Unit:      nullable.NewNullNullable[HistoryEntryUnit](),
+		ClearedAt: h.ClearedAt,
+		ClearedBy: UserRef{Id: h.ClearedBy.ID, DisplayName: h.ClearedBy.DisplayName},
+	}
+	if h.Unit != nil {
+		out.Unit = nullable.NewNullableWithValue(HistoryEntryUnit(*h.Unit))
 	}
 	return out
 }
