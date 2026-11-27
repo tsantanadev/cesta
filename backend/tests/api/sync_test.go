@@ -382,3 +382,124 @@ func TestTheFiveHundredAndFirstItemIsRejected(t *testing.T) {
 		t.Fatalf("the List has %d Items, want 500", len(p.Items))
 	}
 }
+
+func TestAUserWhoJoinsAListPullsAllItsItemsSinceTheirCursor(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+	brunosList := uuid.NewString()
+	createList(t, bruno, brunosList, "Hardware")
+	pushOK(t, bruno, createItem(brunosList, uuid.NewString(), `{"name": "Nails"}`))
+	before := pullAll(t, bruno, "")
+
+	srv.AddEditor(t, groceriesID, testkit.Bruno)
+
+	p := pullAll(t, bruno, before.Cursor)
+	if len(p.Items) != 1 || p.Items[0].ID != milkID {
+		t.Fatalf("Bruno's pull after joining = %+v, want Groceries' Milk", p.Items)
+	}
+}
+
+func TestADeletedListIsPulledAsATombstoneAndComesBackWhole(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.AddEditor(t, groceriesID, testkit.Bruno)
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+	before := pullAll(t, bruno, "")
+
+	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
+
+	deleted := pullAll(t, bruno, before.Cursor)
+	if len(deleted.Items) != 0 || len(deleted.Tombstones) != 1 ||
+		deleted.Tombstones[0] != (tombstone{Type: "list", ID: groceriesID}) {
+		t.Fatalf("pull after delete = %+v, want the List's tombstone", deleted)
+	}
+	edit := push(t, bruno, updateItem(milkID, `{"checked": true}`), createItem(groceriesID, breadID, `{"name": "Bread"}`))
+	requireRejected(t, edit[0], "list_deleted")
+	requireRejected(t, edit[1], "list_deleted")
+
+	ana.Post(t, "/api/lists/"+groceriesID+"/restore", "").RequireStatus(t, http.StatusOK)
+
+	restored := pullAll(t, bruno, deleted.Cursor)
+	if len(restored.Items) != 1 || restored.Items[0].ID != milkID || restored.Items[0].CheckedAt != nil {
+		t.Fatalf("pull after restore = %+v, want Milk back, unchanged", restored)
+	}
+}
+
+func TestAPullIsPagedInOrderWithoutGapsOrRepeats(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	batch := make([]mutation, 7)
+	want := map[string]bool{}
+	for i := range batch {
+		id := uuid.NewString()
+		want[id] = true
+		batch[i] = createItem(groceriesID, id, `{"name": "Thing"}`)
+	}
+	pushOK(t, ana, batch...)
+	srv.AddEditor(t, groceriesID, testkit.Bruno) // all 7 become visible to Bruno at once
+	bruno := srv.As(testkit.Bruno)
+
+	seen := map[string]bool{}
+	cursor, pages := "", 0
+	for {
+		p := pullPage(t, bruno, cursor, 3)
+		pages++
+		for _, it := range p.Items {
+			if seen[it.ID] {
+				t.Fatalf("Item %s pulled twice", it.ID)
+			}
+			seen[it.ID] = true
+		}
+		cursor = p.Cursor
+		if !p.HasMore {
+			break
+		}
+	}
+	if len(seen) != len(want) || pages != 3 {
+		t.Fatalf("pulled %d Items in %d pages, want 7 in 3", len(seen), pages)
+	}
+}
+
+func TestAPullWithABadCursorOrLimitIsRejected(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+
+	for _, q := range []string{"cursor=nonsense", "limit=0", "limit=1001"} {
+		res := ana.Get(t, "/api/sync/pull?"+q)
+		res.RequireStatus(t, http.StatusBadRequest)
+		res.RequireErrorCode(t, "invalid_request")
+	}
+}
+
+func TestSyncRequiresSigningIn(t *testing.T) {
+	srv := testkit.NewServer(t)
+	anon := srv.Anonymous()
+
+	anon.Get(t, "/api/sync/pull").RequireStatus(t, http.StatusUnauthorized)
+	anon.Post(t, "/api/sync/push", `{"mutations": [`+deleteItem(milkID).json()+`]}`).
+		RequireStatus(t, http.StatusUnauthorized)
+}
+
+func TestAPushMustCarryOneToAHundredMutations(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	many := make([]string, 101)
+	for i := range many {
+		many[i] = deleteItem(milkID).json()
+	}
+
+	for label, body := range map[string]string{
+		"none":     `{"mutations": []}`,
+		"too many": `{"mutations": [` + strings.Join(many, ",") + `]}`,
+	} {
+		t.Run(label, func(t *testing.T) {
+			res := ana.Post(t, "/api/sync/push", body)
+			res.RequireStatus(t, http.StatusBadRequest)
+			res.RequireErrorCode(t, "invalid_request")
+		})
+	}
+}

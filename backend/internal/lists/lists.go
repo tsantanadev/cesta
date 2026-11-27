@@ -1,5 +1,7 @@
 // Package lists owns Lists: creating, naming, deleting and restoring them, and
-// purging deleted ones after RestoreWindow. Items arrive with #7.
+// purging deleted ones after RestoreWindow. Items are owned by package sync.
+// Deleting and restoring are numbered changes (package changeseq), so sync
+// pulls tell Members the List went away or came back.
 //
 // Who may see or change a List is decided by package membership; this package
 // asks it and never reads list_members itself. Users are known only by ID.
@@ -16,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tsantanadev/cesta/backend/internal/membership"
+	"github.com/tsantanadev/cesta/backend/internal/platform/changeseq"
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
 	"github.com/tsantanadev/cesta/backend/internal/platform/names"
 )
@@ -209,7 +212,12 @@ func (s *Service) Delete(ctx context.Context, userID, listID uuid.UUID) (Deleted
 			return nil
 		}
 		d.DeletedAt = s.clock.Now()
-		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = $2, updated_at = $2 WHERE id = $1", listID, d.DeletedAt)
+		seq, err := changeseq.Next(ctx, tx)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = $2, updated_at = $2, visible_seq = $3 WHERE id = $1",
+			listID, d.DeletedAt, seq)
 		return err
 	})
 	if err != nil {
@@ -234,7 +242,12 @@ func (s *Service) Restore(ctx context.Context, userID, listID uuid.UUID) (Summar
 		if err := s.requireRoomFor(ctx, tx, userID); err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = NULL, updated_at = $2 WHERE id = $1", listID, s.clock.Now())
+		seq, err := changeseq.Next(ctx, tx)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, "UPDATE lists SET deleted_at = NULL, updated_at = $2, visible_seq = $3 WHERE id = $1",
+			listID, s.clock.Now(), seq)
 		return err
 	})
 	if err != nil {
