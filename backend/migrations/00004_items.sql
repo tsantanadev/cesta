@@ -37,7 +37,9 @@ CREATE TABLE items (
 CREATE INDEX items_list_seq_idx ON items (list_id, seq);
 CREATE INDEX items_list_live_idx ON items (list_id) WHERE deleted_at IS NULL;
 
--- The result of every pushed mutation, so a retry returns it unchanged.
+-- The result of every pushed mutation, so a retry returns it unchanged, and
+-- the time the device said it made the change, kept only for diagnosis:
+-- receipt order decides conflicts (ADR-0001).
 CREATE TABLE sync_mutations (
     user_id     uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     id          uuid NOT NULL,
@@ -46,6 +48,7 @@ CREATE TABLE sync_mutations (
     reason      text,
     reason_limit integer,
     received_at timestamptz NOT NULL,
+    client_timestamp timestamptz,
     PRIMARY KEY (user_id, id)
 );
 

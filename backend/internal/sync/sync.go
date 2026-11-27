@@ -174,9 +174,9 @@ func (s *Service) pushOne(ctx context.Context, userID uuid.UUID, m Mutation) (Re
 			limit = &res.Limit
 		}
 		_, err = tx.Exec(ctx, `
-			INSERT INTO sync_mutations (user_id, id, applied, reason_code, reason, reason_limit, received_at)
-			VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''), $6, $7)`,
-			userID, m.ID, res.Applied, string(res.Reason), res.Message, limit, now)
+			INSERT INTO sync_mutations (user_id, id, applied, reason_code, reason, reason_limit, received_at, client_timestamp)
+			VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''), $6, $7, $8)`,
+			userID, m.ID, res.Applied, string(res.Reason), res.Message, limit, now, clientTimestamp(m.ClientTimestamp))
 		return err
 	})
 	if err != nil {
@@ -208,6 +208,14 @@ func storedResult(ctx context.Context, tx pgx.Tx, userID, mutationID uuid.UUID) 
 		r.Limit = *limit
 	}
 	return r, true, nil
+}
+
+// clientTimestamp is t to record, or nil when the client sent none.
+func clientTimestamp(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }
 
 func applied() Result { return Result{Applied: true} }
