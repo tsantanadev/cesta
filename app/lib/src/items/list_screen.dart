@@ -59,7 +59,7 @@ class _ListScreenState extends State<ListScreen> {
             _loaded = true;
           }),
         );
-    _pendingSub = widget.items.watchPendingCount().listen((n) => setState(() => _pending = n));
+    _pendingSub = widget.items.watchPendingCount(widget.listId).listen((n) => setState(() => _pending = n));
   }
 
   @override

@@ -124,12 +124,13 @@ class ItemsStore {
     return showItems(synced, pending);
   });
 
-  /// How many changes are waiting to reach the server; emits on change.
-  Stream<int> watchPendingCount() {
+  /// How many changes to List [listId] are waiting to reach the server;
+  /// emits on change.
+  Stream<int> watchPendingCount(String listId) {
     final count = _db.outbox.seq.count();
     final query = _db.selectOnly(_db.outbox)
       ..addColumns([count])
-      ..where(_db.outbox.applied.equals(false));
+      ..where(_db.outbox.listId.equals(listId) & _db.outbox.applied.equals(false));
     return query.map((row) => row.read(count) ?? 0).watchSingle();
   }
 

@@ -397,4 +397,22 @@ void main() {
     expect(h.tags(), ['Coffee']);
     expect(h.basketRows(), isEmpty);
   });
+
+  testWidgets('the offline pill counts only the changes waiting on the List shown', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final feira = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(feira, name: 'Coffee', addedBy: ana);
+    h.api.addList(ana, name: 'Pharmacy');
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    h.goOffline();
+    await h.tapTag('Coffee');
+    expect(find.text('Offline · 1 change waiting to sync'), findsOneWidget);
+
+    await h.tap(find.byTooltip('Back'));
+    await h.openList('Pharmacy');
+
+    expect(find.text('Offline'), findsOneWidget);
+  });
 }
