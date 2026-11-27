@@ -360,6 +360,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get itemUncheck => 'Uncheck';
 
   @override
+  String get itemOpen => 'Open';
+
+  @override
+  String get addItemsMatches => 'Matches';
+
+  @override
   String get addItemsSearch => 'Search items';
 
   @override

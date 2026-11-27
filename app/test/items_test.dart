@@ -520,4 +520,65 @@ void main() {
 
     expect(h.api.itemsInBasket(list), ['Coffee']);
   });
+  testWidgets('typing in Add items highlights the List’s Item under Matches; tapping it opens that Item', (
+    tester,
+  ) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'leite', addedBy: ana, quantity: '2', unit: ItemUnit.l);
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    await h.tap(find.text('Add an item'));
+
+    await h.search('Leite');
+
+    expect(find.text('Matches'), findsOneWidget);
+    expect(h.matches(), ['2 L leite']);
+
+    await h.tap(find.widgetWithText(CesItemTile, 'leite'));
+
+    expect(find.text('Edit item'), findsOneWidget);
+    expect(h.textInField('Name'), 'leite');
+    expect(find.text('Added by you'), findsOneWidget);
+    expect(h.api.itemsToBuy(list), ['leite', 'Coffee']);
+  });
+
+  testWidgets('"Add “…” as a new item" still adds a second Item when one matches', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'leite', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await h.addNewItem('Leite', listName: 'Weekend feira');
+    await h.tap(find.text('Done'));
+
+    expect(h.tags(), ['leite', 'Leite']);
+    expect(h.api.itemsToBuy(list), ['leite', 'Leite']);
+  });
+
+  testWidgets('Matches ignore case and accents, and leave out what is In the basket', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Feira');
+    h.api.addItem(list, name: 'Pão de forma', addedBy: ana);
+    h.api.addItem(list, name: 'Pãozinho', addedBy: ana, checkedBy: ana);
+    h.api.addItem(list, name: 'Arroz', addedBy: ana);
+    await h.pumpApp(locale: brazilianPortuguese);
+    await h.openList('Feira');
+    await h.tap(find.text('Adicionar um item'));
+
+    await h.search('PAO');
+
+    expect(find.text('Resultados'), findsOneWidget);
+    expect(h.matches(), ['Pão de forma']);
+
+    await h.search('feijão');
+
+    expect(find.text('Resultados'), findsNothing);
+    expect(h.matches(), isEmpty);
+  });
 }
