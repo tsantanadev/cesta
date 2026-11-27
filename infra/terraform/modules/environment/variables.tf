@@ -72,6 +72,28 @@ variable "log_level" {
   default     = "info"
 }
 
+variable "rate_limit_per_ip" {
+  description = "Backend RATE_LIMIT_PER_IP, as <burst>/<every>."
+  type        = string
+  default     = "120/250ms"
+}
+
+variable "rate_limit_per_user" {
+  description = "Backend RATE_LIMIT_PER_USER, as <burst>/<every>."
+  type        = string
+  default     = "60/500ms"
+}
+
+variable "max_lists_per_user" {
+  description = "Backend MAX_LISTS_PER_USER: live Lists a User can own."
+  type        = number
+  default     = 100
+  validation {
+    condition     = var.max_lists_per_user > 0 && floor(var.max_lists_per_user) == var.max_lists_per_user
+    error_message = "max_lists_per_user must be a positive integer."
+  }
+}
+
 variable "image_reader_members" {
   description = "Extra principals allowed to pull from this environment's image repository (prod's deployer, on dev)."
   type        = list(string)

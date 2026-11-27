@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:cesta/src/api/api_transport.dart';
 import 'package:cesta/src/api/generated/cesta_api.dart';
-import 'package:cesta/src/auth/auth_gateway.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -43,12 +42,11 @@ class _FakeBackend implements HttpClientAdapter {
 }
 
 /// Hands out token-1, then token-2 after each forced refresh.
-class _Tokens implements AuthGateway {
+class _Tokens {
   bool signedIn = true;
   int issued = 1;
   int forcedRefreshes = 0;
 
-  @override
   Future<String?> idToken({bool forceRefresh = false}) async {
     if (!signedIn) return null;
     if (forceRefresh) {
@@ -57,9 +55,6 @@ class _Tokens implements AuthGateway {
     }
     return 'token-$issued';
   }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
 void main() {
@@ -70,7 +65,7 @@ void main() {
   setUp(() {
     backend = _FakeBackend();
     tokens = _Tokens();
-    final dio = createApiTransport(baseUrl: 'http://api.test', auth: tokens)..httpClientAdapter = backend;
+    final dio = createApiTransport(baseUrl: 'http://api.test', idToken: tokens.idToken)..httpClientAdapter = backend;
     api = CestaApi(dio).api;
   });
 

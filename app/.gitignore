@@ -47,7 +47,7 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# Per-developer iOS signing team (app/tool/iphone-setup.sh)
+# Per-developer iOS signing team (app/tool/run-iphone.sh)
 /ios/Flutter/Signing.xcconfig
 
 # Firebase client config: written by infra/auth-setup.sh from Terraform output. Kept out of

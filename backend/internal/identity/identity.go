@@ -1,10 +1,10 @@
 // Package identity owns Users: it maps a verified identity from the identity
 // provider to the internal User, and holds the User's email and display name.
 //
-// Other modules know a User only by its internal ID (User.ID), never by the
-// provider's subject or by email address. The one exception is the per-User
-// rate limit in httpapi, which keys on the subject so it can reject a flood
-// before any database work (see httpapi.authenticate).
+// It is the only module that sees the identity provider (ADR-0003): it
+// verifies the provider's ID token, applies the per-User rate limit keyed by
+// the provider's subject, and hands back the internal User. Other modules know
+// a User only by its internal ID (User.ID), never by the provider's subject.
 package identity
 
 import (
@@ -12,8 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -21,6 +21,8 @@ import (
 
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
+	"github.com/tsantanadev/cesta/backend/internal/platform/names"
+	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 )
 
 // MaxDisplayNameLength is the longest display name, in characters.
@@ -40,15 +42,50 @@ type User struct {
 	DisplayNameConfirmed bool
 }
 
-// Service resolves and updates Users.
-type Service struct {
-	db    *pgxpool.Pool
-	clock clock.Clock
+// ErrUnauthenticated is returned by Authenticate for a token the identity
+// provider did not issue, or that has expired.
+var ErrUnauthenticated = errors.New("identity: invalid token")
+
+// RateLimitedError is returned by Authenticate when the User is over the
+// per-User rate limit. Wait is how long until they may try again.
+type RateLimitedError struct {
+	Wait time.Duration
 }
 
-// NewService returns a Service backed by db.
-func NewService(db *pgxpool.Pool, c clock.Clock) *Service {
-	return &Service{db: db, clock: c}
+func (e *RateLimitedError) Error() string {
+	return fmt.Sprintf("identity: rate limited; retry in %s", e.Wait)
+}
+
+// Service authenticates, resolves and updates Users.
+type Service struct {
+	db       *pgxpool.Pool
+	clock    clock.Clock
+	verifier auth.TokenVerifier
+	perUser  *ratelimit.Limiter
+}
+
+// NewService returns a Service backed by db that verifies tokens with verifier
+// and limits each User's requests with perUser.
+func NewService(db *pgxpool.Pool, c clock.Clock, verifier auth.TokenVerifier, perUser *ratelimit.Limiter) *Service {
+	return &Service{db: db, clock: c, verifier: verifier, perUser: perUser}
+}
+
+// Authenticate returns the User a provider ID token belongs to, creating the
+// User on first sight. It returns ErrUnauthenticated for a token that is not
+// valid and a *RateLimitedError for a User over the limit; the limit is checked
+// before any database work, so a flood never reaches the database.
+func (s *Service) Authenticate(ctx context.Context, token string) (User, error) {
+	id, err := s.verifier.Verify(ctx, token)
+	if errors.Is(err, auth.ErrInvalidToken) {
+		return User{}, ErrUnauthenticated
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("identity: verify token: %w", err)
+	}
+	if ok, wait := s.perUser.Allow(id.Subject); !ok {
+		return User{}, &RateLimitedError{Wait: wait}
+	}
+	return s.resolve(ctx, id)
 }
 
 const userColumns = "id, email, display_name, display_name_confirmed"
@@ -59,9 +96,9 @@ func scanUser(row pgx.Row) (User, error) {
 	return u, err
 }
 
-// Resolve returns the User for a verified identity, creating it on first sight.
+// resolve returns the User for a verified identity, creating it on first sight.
 // A changed email at the provider is copied onto the User.
-func (s *Service) Resolve(ctx context.Context, id auth.Identity) (User, error) {
+func (s *Service) resolve(ctx context.Context, id auth.Identity) (User, error) {
 	u, err := scanUser(s.db.QueryRow(ctx,
 		"SELECT "+userColumns+" FROM users WHERE auth_subject = $1", id.Subject))
 	switch {
@@ -113,16 +150,7 @@ func scanUserOrWrap(row pgx.Row, what string) (User, error) {
 
 // normalizeDisplayName trims name and reports whether it is acceptable.
 func normalizeDisplayName(name string) (string, bool) {
-	name = strings.TrimSpace(name)
-	if name == "" || utf8.RuneCountInString(name) > MaxDisplayNameLength || !utf8.ValidString(name) {
-		return "", false
-	}
-	for _, r := range name {
-		if unicode.IsControl(r) {
-			return "", false
-		}
-	}
-	return name, true
+	return names.Normalize(name, MaxDisplayNameLength)
 }
 
 // suggestDisplayName picks a starting display name: the provider's name if it

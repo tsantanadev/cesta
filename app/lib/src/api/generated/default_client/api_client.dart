@@ -6,7 +6,13 @@ import 'package:dio/dio.dart' show Dio, Options, ResponseType, CancelToken;
 
 import 'api_client_results.dart';
 import 'models/api_error.dart' as models show ApiError;
+import 'models/deleted_list.dart' as models show DeletedList;
+import 'models/deleted_lists.dart' as models show DeletedLists;
 import 'models/health.dart' as models show Health;
+import 'models/list_create.dart' as models show ListCreate;
+import 'models/list_rename.dart' as models show ListRename;
+import 'models/list_summaries.dart' as models show ListSummaries;
+import 'models/list_summary.dart' as models show ListSummary;
 import 'models/user.dart' as models show User;
 import 'models/user_update.dart' as models show UserUpdate;
 
@@ -129,6 +135,324 @@ class ApiClient {
       400 => UpdateMe400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       401 => UpdateMe401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       429 => UpdateMe429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// The Lists the signed-in User is a Member of
+  ///
+  /// Every List the User owns or was shared with, except deleted ones, with the User's Role and how many unchecked Items each has. Newest first.
+  Future<ListListsResult> listLists({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+  }) async {
+    final _options = (options ?? Options()).copyWith(
+      method: "GET",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      headers: {...?options?.headers, 'Accept': "application/json"},
+      validateStatus: (status) => status != null && (status == 200 || status == 401 || status == 429),
+    );
+    final response = await _transport.request<dynamic>("/api/lists", options: _options, cancelToken: cancelToken);
+    return switch (response.statusCode) {
+      200 => ListLists200(models.ListSummaries.fromJson(response.data as Map<String, Object?>)),
+      401 => ListLists401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => ListLists429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Create a List owned by the signed-in User
+  ///
+  /// The client picks the List's ID, so a retried request is safe: sending an ID the User already owns returns that List with 200 and changes nothing. The User who created the List becomes its Owner. A User can own at most the configured limit of Lists that are not deleted (default 100).
+  Future<CreateListResult> createList({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+    required models.ListCreate body,
+  }) async {
+    final _options = (options ?? Options()).copyWith(
+      method: "POST",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      contentType: "application/json",
+      headers: {
+        for (final entry in (options?.headers ?? const <String, Object?>{}).entries)
+          if (entry.key.toLowerCase() != 'content-type') entry.key: entry.value,
+        'Accept': "application/json",
+      },
+      validateStatus: (status) =>
+          status != null &&
+          (status == 200 || status == 201 || status == 400 || status == 401 || status == 409 || status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/lists",
+      options: _options,
+      data: convert.jsonEncode(body),
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => CreateList200(models.ListSummary.fromJson(response.data as Map<String, Object?>)),
+      201 => CreateList201(models.ListSummary.fromJson(response.data as Map<String, Object?>)),
+      400 => CreateList400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => CreateList401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      409 => CreateList409(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => CreateList429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Delete a List (Owner only)
+  ///
+  /// The List disappears for every Member at once. The Owner can restore it for 30 days; after that it is purged. Deleting a List that is already deleted returns it unchanged.
+  Future<DeleteListResult> deleteList({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+
+    /// The List's ID (a UUID chosen by the client that created it).
+    required String listId,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(listId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _options = (options ?? Options()).copyWith(
+      method: "DELETE",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      headers: {...?options?.headers, 'Accept': "application/json"},
+      validateStatus: (status) =>
+          status != null &&
+          (status == 200 || status == 400 || status == 401 || status == 403 || status == 404 || status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/lists/" + Uri.encodeComponent(listId),
+      options: _options,
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => DeleteList200(models.DeletedList.fromJson(response.data as Map<String, Object?>)),
+      400 => DeleteList400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => DeleteList401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      403 => DeleteList403(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      404 => DeleteList404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => DeleteList429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Rename a List (Owner only)
+  Future<RenameListResult> renameList({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+
+    /// The List's ID (a UUID chosen by the client that created it).
+    required String listId,
+    required models.ListRename body,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(listId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _options = (options ?? Options()).copyWith(
+      method: "PATCH",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      contentType: "application/json",
+      headers: {
+        for (final entry in (options?.headers ?? const <String, Object?>{}).entries)
+          if (entry.key.toLowerCase() != 'content-type') entry.key: entry.value,
+        'Accept': "application/json",
+      },
+      validateStatus: (status) =>
+          status != null &&
+          (status == 200 ||
+              status == 400 ||
+              status == 401 ||
+              status == 403 ||
+              status == 404 ||
+              status == 409 ||
+              status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/lists/" + Uri.encodeComponent(listId),
+      options: _options,
+      data: convert.jsonEncode(body),
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => RenameList200(models.ListSummary.fromJson(response.data as Map<String, Object?>)),
+      400 => RenameList400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => RenameList401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      403 => RenameList403(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      404 => RenameList404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      409 => RenameList409(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => RenameList429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Restore a deleted List (Owner only, within 30 days)
+  ///
+  /// Brings the List back for every Member. Restoring a List that isn't deleted changes nothing. Restoring counts towards the Owner's List limit.
+  Future<RestoreListResult> restoreList({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+
+    /// The List's ID (a UUID chosen by the client that created it).
+    required String listId,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(listId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _options = (options ?? Options()).copyWith(
+      method: "POST",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      headers: {...?options?.headers, 'Accept': "application/json"},
+      validateStatus: (status) =>
+          status != null &&
+          (status == 200 ||
+              status == 400 ||
+              status == 401 ||
+              status == 403 ||
+              status == 404 ||
+              status == 409 ||
+              status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/lists/" + Uri.encodeComponent(listId) + "/restore",
+      options: _options,
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => RestoreList200(models.ListSummary.fromJson(response.data as Map<String, Object?>)),
+      400 => RestoreList400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => RestoreList401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      403 => RestoreList403(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      404 => RestoreList404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      409 => RestoreList409(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => RestoreList429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Lists the signed-in User deleted and can still restore
+  ///
+  /// Only Lists the User owns, deleted less than 30 days ago. Most recently deleted first.
+  Future<ListDeletedListsResult> listDeletedLists({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+  }) async {
+    final _options = (options ?? Options()).copyWith(
+      method: "GET",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      headers: {...?options?.headers, 'Accept': "application/json"},
+      validateStatus: (status) => status != null && (status == 200 || status == 401 || status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/deleted-lists",
+      options: _options,
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => ListDeletedLists200(models.DeletedLists.fromJson(response.data as Map<String, Object?>)),
+      401 => ListDeletedLists401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => ListDeletedLists429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       _ => throw StateError('Unexpected response status: ${response.statusCode}'),
     };
   }

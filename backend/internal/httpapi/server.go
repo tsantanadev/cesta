@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/tsantanadev/cesta/backend/internal/identity"
-	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
+	"github.com/tsantanadev/cesta/backend/internal/lists"
 	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 )
 
@@ -24,10 +24,9 @@ const healthPingTimeout = 2 * time.Second
 type Server struct {
 	DB       Pinger
 	Logger   *slog.Logger
-	Verifier auth.TokenVerifier
 	Identity *identity.Service
+	Lists    *lists.Service
 	PerIP    *ratelimit.Limiter
-	PerUser  *ratelimit.Limiter
 	// TrustedProxyHops is how many proxies in front of the backend append to
 	// X-Forwarded-For (see clientIP).
 	TrustedProxyHops int
@@ -57,7 +56,7 @@ func (s *Server) Handler() http.Handler {
 		Middlewares:      []MiddlewareFunc{s.authenticate(publicOperations())},
 		ErrorHandlerFunc: s.badRequest,
 	})
-	return s.limitIP(routes)
+	return s.limitIP(capBody(routes))
 }
 
 func (s *Server) badRequest(w http.ResponseWriter, _ *http.Request, err error) {

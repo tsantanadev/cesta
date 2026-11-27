@@ -2,12 +2,16 @@
 //
 //	cesta serve    run the HTTP API (default)
 //	cesta migrate  apply pending database migrations, then exit
+//	cesta purge    remove Lists deleted more than 30 days ago, then exit (run daily)
 //
 // Configuration comes from the environment:
 //
 //	DATABASE_URL                 Postgres URL (required)
 //	FIREBASE_PROJECT_ID          Firebase project whose ID tokens are accepted (required by serve)
 //	TRUSTED_PROXY_HOPS           proxies in front of the backend that append to X-Forwarded-For (default 0)
+//	RATE_LIMIT_PER_IP            requests allowed per client IP, as <burst>/<every> (default 120/250ms)
+//	RATE_LIMIT_PER_USER          requests allowed per User, as <burst>/<every> (default 60/500ms)
+//	MAX_LISTS_PER_USER           live Lists a User can own (default 100)
 //	PORT                         HTTP port (default 8080)
 //	LOG_LEVEL                    debug, info, warn or error (default info)
 //	PUBLIC_HOST                  custom domain served by Firebase Hosting; other requests get 404 (off when unset)
@@ -30,6 +34,7 @@ import (
 	"github.com/tsantanadev/cesta/backend/internal/app"
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth/firebase"
 	"github.com/tsantanadev/cesta/backend/internal/platform/db"
+	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
 	"github.com/tsantanadev/cesta/backend/migrations"
 )
@@ -60,8 +65,10 @@ func run(cmd string, logger *slog.Logger) error {
 		return serve(ctx, logger)
 	case "migrate":
 		return migrate(ctx, logger)
+	case "purge":
+		return purge(ctx, logger)
 	default:
-		return fmt.Errorf("unknown command %q (want serve or migrate)", cmd)
+		return fmt.Errorf("unknown command %q (want serve, migrate or purge)", cmd)
 	}
 }
 
@@ -72,6 +79,25 @@ func newLogger(level string) *slog.Logger {
 	}
 	return slog.New(telemetry.LogHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: l}))).
 		With(slog.String("service", "cesta"), slog.String("version", version))
+}
+
+// rateLimits reads RATE_LIMIT_PER_IP and RATE_LIMIT_PER_USER; an unset one
+// keeps its default.
+func rateLimits() (app.RateLimits, error) {
+	limits := app.DefaultRateLimits
+	for name, rule := range map[string]*ratelimit.Rule{
+		"RATE_LIMIT_PER_IP":   &limits.PerIP,
+		"RATE_LIMIT_PER_USER": &limits.PerUser,
+	} {
+		if v := os.Getenv(name); v != "" {
+			r, err := ratelimit.ParseRule(v)
+			if err != nil {
+				return app.RateLimits{}, fmt.Errorf("%s: %w", name, err)
+			}
+			*rule = r
+		}
+	}
+	return limits, nil
 }
 
 func databaseURL() (string, error) {
@@ -99,6 +125,24 @@ func migrate(ctx context.Context, logger *slog.Logger) error {
 	return nil
 }
 
+func purge(ctx context.Context, logger *slog.Logger) error {
+	url, err := databaseURL()
+	if err != nil {
+		return err
+	}
+	pool, err := db.Open(ctx, url)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	n, err := app.Purge(ctx, app.Deps{DB: pool, Logger: logger})
+	if err != nil {
+		return err
+	}
+	logger.InfoContext(ctx, "purged deleted lists", slog.Int("lists", n))
+	return nil
+}
+
 func serve(ctx context.Context, logger *slog.Logger) error {
 	url, err := databaseURL()
 	if err != nil {
@@ -112,6 +156,16 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	if v := os.Getenv("TRUSTED_PROXY_HOPS"); v != "" {
 		if hops, err = strconv.Atoi(v); err != nil || hops < 0 {
 			return fmt.Errorf("TRUSTED_PROXY_HOPS = %q, want a non-negative integer", v)
+		}
+	}
+	limits, err := rateLimits()
+	if err != nil {
+		return err
+	}
+	maxLists := 0
+	if v := os.Getenv("MAX_LISTS_PER_USER"); v != "" {
+		if maxLists, err = strconv.Atoi(v); err != nil || maxLists <= 0 {
+			return fmt.Errorf("MAX_LISTS_PER_USER = %q, want a positive integer", v)
 		}
 	}
 	publicHost := os.Getenv("PUBLIC_HOST")
@@ -145,7 +199,9 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 			Logger:           logger,
 			TokenVerifier:    firebase.NewVerifier(projectID),
 			TrustedProxyHops: hops,
+			RateLimits:       limits,
 			PublicHost:       publicHost,
+			MaxListsPerUser:  maxLists,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

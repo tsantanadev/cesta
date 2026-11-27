@@ -46,16 +46,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get healthRetry => 'Check again';
 
   @override
-  String get welcomeTagline => 'Shared shopping lists that work in the store, with or without signal.';
+  String get welcomeHeadline => 'One shopping list for the whole house.';
+
+  @override
+  String get welcomeSubtitle => 'Add what\'s missing, see what others added, and check things off at the market.';
+
+  @override
+  String get welcomeSampleOranges => 'Oranges';
+
+  @override
+  String get welcomeSampleBread => 'Bread';
+
+  @override
+  String get welcomeSampleCoffee => 'Coffee';
+
+  @override
+  String get welcomeSampleEggs => 'Eggs';
+
+  @override
+  String get welcomeSampleCheese => 'Cheese';
 
   @override
   String get welcomeContinueWithGoogle => 'Continue with Google';
 
   @override
   String get welcomeContinueWithEmail => 'Continue with email';
-
-  @override
-  String get welcomeHaveAccount => 'Already have an account? Sign in';
 
   @override
   String get signInTitle => 'Sign in';
@@ -176,16 +191,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorDisplayNameInvalid => 'That name can\'t be used. Try another.';
 
   @override
-  String get homeTitle => 'Your Lists';
+  String get listsTitle => 'Your Lists';
 
   @override
-  String get homeEmptyTitle => 'No Lists yet';
+  String get listsEmptyTitle => 'No Lists yet';
 
   @override
-  String get homeEmptyBody => 'Lists you create or are invited to will show up here.';
+  String get listsEmptyBody => 'Lists you create or are invited to will show up here.';
 
   @override
-  String get userMenu => 'Account';
+  String get userMenu => 'User menu';
 
   @override
   String get userMenuChangeDisplayName => 'Change display name';
@@ -198,4 +213,129 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get loading => 'Loading…';
+
+  @override
+  String get userLoadFailed => 'We couldn\'t load your details.';
+
+  @override
+  String get userLoadRetry => 'Try again';
+
+  @override
+  String get sheetClose => 'Close';
+
+  @override
+  String get listsNew => 'New list';
+
+  @override
+  String get listsToBuy => 'to buy';
+
+  @override
+  String get listsNothingToBuy => 'Nothing to buy';
+
+  @override
+  String get listsOnlyYou => 'Only you';
+
+  @override
+  String listsSharedWithPeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count people', one: '1 person');
+    return 'Shared with $_temp0';
+  }
+
+  @override
+  String get listsSharedWithYou => 'Shared with you';
+
+  @override
+  String get listsNewSheetTitle => 'New list';
+
+  @override
+  String get fieldListName => 'Name';
+
+  @override
+  String get listsCreate => 'Create list';
+
+  @override
+  String listsOptions(String name) {
+    return 'Options for $name';
+  }
+
+  @override
+  String get listsRename => 'Rename';
+
+  @override
+  String get listsRenameSheetTitle => 'Rename list';
+
+  @override
+  String get listsSave => 'Save';
+
+  @override
+  String get listsDelete => 'Delete list';
+
+  @override
+  String listsDeleted(String name) {
+    return '“$name” deleted';
+  }
+
+  @override
+  String get listsUndo => 'Undo';
+
+  @override
+  String get listsRestore => 'Restore';
+
+  @override
+  String listsRestored(String name) {
+    return '“$name” restored';
+  }
+
+  @override
+  String get listsRecentlyDeleted => 'Recently deleted';
+
+  @override
+  String listsRecentlyDeletedExplanation(int days) {
+    return 'Deleted Lists can be restored for $days days. After that they\'re gone for good.';
+  }
+
+  @override
+  String listsRecentlyDeletedEmpty(int days) {
+    return 'Nothing deleted in the last $days days.';
+  }
+
+  @override
+  String listsDaysLeft(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days days left',
+      one: '1 day left',
+      zero: 'Gone today',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get errorListNameRequired => 'Enter a name.';
+
+  @override
+  String errorListNameTooLong(int max) {
+    return 'Use $max characters or fewer.';
+  }
+
+  @override
+  String get errorListNameInvalid => 'That name can\'t be used. Try another.';
+
+  @override
+  String errorListLimit(int limit) {
+    return 'You\'ve reached the limit of $limit Lists. Delete one to create another.';
+  }
+
+  @override
+  String get errorListLimitGeneric => 'You\'ve reached the limit of Lists. Delete one to create another.';
+
+  @override
+  String get errorListNotFound => 'This List is no longer available.';
+
+  @override
+  String get errorListDeleted => 'This List was deleted. You can restore it from Recently deleted.';
+
+  @override
+  String get errorListNotRestorable => 'This List is no longer available and can\'t be restored.';
 }

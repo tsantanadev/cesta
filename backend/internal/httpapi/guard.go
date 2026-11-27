@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/tsantanadev/cesta/backend/internal/identity"
-	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
 )
 
 // maxBodyBytes caps request bodies, so oversized payloads are rejected before decoding.
@@ -27,14 +26,22 @@ func (s *Server) limitIP(next http.Handler) http.Handler {
 			writeRateLimited(w, wait)
 			return
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// capBody limits request bodies to maxBodyBytes; reading past it fails, which
+// badRequest reports as 413.
+func capBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 		next.ServeHTTP(w, r)
 	})
 }
 
-// authenticate verifies the bearer token on every operation the contract does
-// not mark public, applies the per-User rate limit and puts the User in the
-// request context. Operations it doesn't know are treated as protected.
+// authenticate checks the bearer token with identity on every operation
+// the contract does not mark public, and puts the User in the request context.
+// Operations it doesn't know are treated as protected.
 func (s *Server) authenticate(public map[string]bool) MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,28 +55,18 @@ func (s *Server) authenticate(public map[string]bool) MiddlewareFunc {
 				writeError(w, http.StatusUnauthorized, ApiErrorCodeUnauthenticated, "a bearer token is required")
 				return
 			}
-			id, err := s.Verifier.Verify(ctx, token)
-			if errors.Is(err, auth.ErrInvalidToken) {
+			u, err := s.Identity.Authenticate(ctx, token)
+			var limited *identity.RateLimitedError
+			switch {
+			case errors.Is(err, identity.ErrUnauthenticated):
 				writeError(w, http.StatusUnauthorized, ApiErrorCodeUnauthenticated, "the bearer token is not valid")
 				return
-			}
-			if err != nil {
-				s.Logger.ErrorContext(ctx, "authenticate: verify token", slog.String("error", err.Error()))
-				writeError(w, http.StatusInternalServerError, ApiErrorCodeInternal, "could not verify the token")
+			case errors.As(err, &limited):
+				writeRateLimited(w, limited.Wait)
 				return
-			}
-			// Keyed by the provider's subject, which maps 1:1 to a User, so a
-			// User over the limit is rejected before any database work. This is
-			// the one place outside identity that sees the subject (ADR-0003); it
-			// never leaves this middleware.
-			if ok, wait := s.PerUser.Allow(id.Subject); !ok {
-				writeRateLimited(w, wait)
-				return
-			}
-			u, err := s.Identity.Resolve(ctx, id)
-			if err != nil {
-				s.Logger.ErrorContext(ctx, "authenticate: resolve user", slog.String("error", err.Error()))
-				writeError(w, http.StatusInternalServerError, ApiErrorCodeInternal, "could not load the User")
+			case err != nil:
+				s.Logger.ErrorContext(ctx, "authenticate", slog.String("error", err.Error()))
+				writeError(w, http.StatusInternalServerError, ApiErrorCodeInternal, "could not authenticate the User")
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(identity.WithUser(ctx, u)))

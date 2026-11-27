@@ -94,6 +94,18 @@ resource "google_cloud_run_v2_service" "backend" {
         value = var.log_level
       }
       env {
+        name  = "RATE_LIMIT_PER_IP"
+        value = var.rate_limit_per_ip
+      }
+      env {
+        name  = "RATE_LIMIT_PER_USER"
+        value = var.rate_limit_per_user
+      }
+      env {
+        name  = "MAX_LISTS_PER_USER"
+        value = tostring(var.max_lists_per_user)
+      }
+      env {
         name  = "OTEL_EXPORTER_OTLP_ENDPOINT"
         value = var.otel_exporter_otlp_endpoint
       }

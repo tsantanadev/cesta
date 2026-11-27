@@ -46,16 +46,31 @@ class AppLocalizationsPt extends AppLocalizations {
   String get healthRetry => 'Verificar novamente';
 
   @override
-  String get welcomeTagline => 'Listas de compras compartilhadas que funcionam no mercado, com ou sem sinal.';
+  String get welcomeHeadline => 'Uma lista de compras para a casa toda.';
+
+  @override
+  String get welcomeSubtitle => 'Adicione o que falta, veja o que os outros adicionaram e marque tudo no mercado.';
+
+  @override
+  String get welcomeSampleOranges => 'Laranjas';
+
+  @override
+  String get welcomeSampleBread => 'Pão';
+
+  @override
+  String get welcomeSampleCoffee => 'Café';
+
+  @override
+  String get welcomeSampleEggs => 'Ovos';
+
+  @override
+  String get welcomeSampleCheese => 'Queijo';
 
   @override
   String get welcomeContinueWithGoogle => 'Continuar com Google';
 
   @override
   String get welcomeContinueWithEmail => 'Continuar com e-mail';
-
-  @override
-  String get welcomeHaveAccount => 'Já tem uma conta? Entrar';
 
   @override
   String get signInTitle => 'Entrar';
@@ -174,16 +189,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get errorDisplayNameInvalid => 'Esse nome não pode ser usado. Tente outro.';
 
   @override
-  String get homeTitle => 'Suas listas';
+  String get listsTitle => 'Suas listas';
 
   @override
-  String get homeEmptyTitle => 'Nenhuma lista ainda';
+  String get listsEmptyTitle => 'Nenhuma lista ainda';
 
   @override
-  String get homeEmptyBody => 'As listas que você criar ou para as quais for convidado aparecerão aqui.';
+  String get listsEmptyBody => 'As listas que você criar ou para as quais for convidado aparecerão aqui.';
 
   @override
-  String get userMenu => 'Conta';
+  String get userMenu => 'Menu do usuário';
 
   @override
   String get userMenuChangeDisplayName => 'Alterar nome de exibição';
@@ -196,4 +211,129 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get loading => 'Carregando…';
+
+  @override
+  String get userLoadFailed => 'Não foi possível carregar seus dados.';
+
+  @override
+  String get userLoadRetry => 'Tentar de novo';
+
+  @override
+  String get sheetClose => 'Fechar';
+
+  @override
+  String get listsNew => 'Nova lista';
+
+  @override
+  String get listsToBuy => 'a comprar';
+
+  @override
+  String get listsNothingToBuy => 'Nada a comprar';
+
+  @override
+  String get listsOnlyYou => 'Só você';
+
+  @override
+  String listsSharedWithPeople(int count) {
+    String _temp0 = intl.Intl.pluralLogic(count, locale: localeName, other: '$count pessoas', one: '1 pessoa');
+    return 'Compartilhada com $_temp0';
+  }
+
+  @override
+  String get listsSharedWithYou => 'Compartilhada com você';
+
+  @override
+  String get listsNewSheetTitle => 'Nova lista';
+
+  @override
+  String get fieldListName => 'Nome';
+
+  @override
+  String get listsCreate => 'Criar lista';
+
+  @override
+  String listsOptions(String name) {
+    return 'Opções de $name';
+  }
+
+  @override
+  String get listsRename => 'Renomear';
+
+  @override
+  String get listsRenameSheetTitle => 'Renomear lista';
+
+  @override
+  String get listsSave => 'Salvar';
+
+  @override
+  String get listsDelete => 'Excluir lista';
+
+  @override
+  String listsDeleted(String name) {
+    return '“$name” excluída';
+  }
+
+  @override
+  String get listsUndo => 'Desfazer';
+
+  @override
+  String get listsRestore => 'Restaurar';
+
+  @override
+  String listsRestored(String name) {
+    return '“$name” restaurada';
+  }
+
+  @override
+  String get listsRecentlyDeleted => 'Excluídas recentemente';
+
+  @override
+  String listsRecentlyDeletedExplanation(int days) {
+    return 'Listas excluídas podem ser restauradas por $days dias. Depois disso, somem de vez.';
+  }
+
+  @override
+  String listsRecentlyDeletedEmpty(int days) {
+    return 'Nada excluído nos últimos $days dias.';
+  }
+
+  @override
+  String listsDaysLeft(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'Faltam $days dias',
+      one: 'Falta 1 dia',
+      zero: 'Some hoje',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get errorListNameRequired => 'Digite um nome.';
+
+  @override
+  String errorListNameTooLong(int max) {
+    return 'Use até $max caracteres.';
+  }
+
+  @override
+  String get errorListNameInvalid => 'Esse nome não pode ser usado. Tente outro.';
+
+  @override
+  String errorListLimit(int limit) {
+    return 'Você atingiu o limite de $limit listas. Exclua uma para criar outra.';
+  }
+
+  @override
+  String get errorListLimitGeneric => 'Você atingiu o limite de listas. Exclua uma para criar outra.';
+
+  @override
+  String get errorListNotFound => 'Esta lista não está mais disponível.';
+
+  @override
+  String get errorListDeleted => 'Esta lista foi excluída. Você pode restaurá-la em Excluídas recentemente.';
+
+  @override
+  String get errorListNotRestorable => 'Esta lista não está mais disponível e não pode ser restaurada.';
 }
