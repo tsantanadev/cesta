@@ -17,7 +17,7 @@ import 'opened_item.dart';
 /// types, Matches (4:280) shows the List's Items to buy whose names match,
 /// highlighted; tapping one opens that Item instead of adding a duplicate.
 /// "Add “…” as a new item" opens the New item sheet, even when something
-/// matches. Past Items from the List's Item history show white: as Bought
+/// matches. Items from the List's Item history show white: as Bought
 /// before while nothing is typed, and under Matches after the List's own as
 /// the Member types. Tapping one adds it straight away as last bought, with
 /// an Undo Toast.
@@ -110,11 +110,11 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     );
   }
 
-  /// Adds [past] again, as it was last bought.
-  void _addAgain(HistoryItem past) {
+  /// Adds [entry] of the Item history again, as it was last bought.
+  void _addAgain(HistoryItem entry) {
     final me = _me;
     if (me == null) return;
-    unawaited(_add(past.details, me));
+    unawaited(_add(entry.details, me));
   }
 
   Widget _section(String heading, List<Widget> tiles) => Padding(
@@ -134,7 +134,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     final l10n = AppLocalizations.of(context);
     final query = _search.text.trim();
     final matches = listMatches(_onList, query);
-    final past = pastItems(_history, _onList, query);
+    final fromHistory = historyToOffer(_history, _onList, query);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -162,8 +162,8 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
               ),
             ),
             // Matches (Figma 4:280): the List's Items to buy, as on the List,
-            // then past Items; Bought before while nothing is typed.
-            if (matches.isNotEmpty || past.isNotEmpty)
+            // then Items from the Item history; Bought before while nothing is typed.
+            if (matches.isNotEmpty || fromHistory.isNotEmpty)
               _section(query.isEmpty ? l10n.addItemsBoughtBefore : l10n.addItemsMatches, [
                 for (final item in matches)
                   CesItemTile(
@@ -173,9 +173,9 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                     semanticHint: l10n.itemOpen,
                     onTap: () => _openItem(item),
                   ),
-                for (final item in past)
+                for (final item in fromHistory)
                   CesItemTile(
-                    key: ValueKey('past ${item.itemId}'),
+                    key: ValueKey('history ${item.itemId}'),
                     name: item.name,
                     quantity: tagQuantity(l10n, item.quantity, item.unit),
                     semanticHint: l10n.itemAddAgain,
