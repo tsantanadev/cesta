@@ -137,7 +137,7 @@ func apiMutationResult(r cestasync.Result) MutationResult {
 // checkedByRef is the type the generated Item uses for checkedBy.
 type checkedByRef = struct {
 	DisplayName string    `json:"displayName"`
-	Id          uuid.UUID `json:"id"`
+	Id          uuid.UUID `json:"id"` //nolint:revive // must match the generated field name
 }
 
 func apiItem(it cestasync.Item) Item {
