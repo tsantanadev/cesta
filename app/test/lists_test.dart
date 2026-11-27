@@ -260,6 +260,22 @@ void main() {
     expect(find.text('2'), findsOneWidget);
   });
 
+  testWidgets('offline, checking an Item lowers its List\'s count at once', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final feira = h.api.addList(ana, name: 'Feira');
+    h.api.addItem(feira, name: 'Coffee', addedBy: ana);
+    h.api.addItem(feira, name: 'Milk', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Feira');
+    h.goOffline();
+
+    await h.tapTag('Coffee');
+    await h.tap(find.byTooltip('Back'));
+
+    expect(find.text('1'), findsOneWidget);
+  });
+
   group('rename', () {
     testWidgets('the Owner renames a List', (tester) async {
       final h = Harness(tester);

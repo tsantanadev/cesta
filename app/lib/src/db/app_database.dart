@@ -216,25 +216,14 @@ class AppDatabase extends _$AppDatabase {
   /// Adds or updates one cached List.
   Future<void> saveKnownList(ListSummary list) => into(knownLists).insertOnConflictUpdate(_listRow(list));
 
-  /// Sets the to-buy count of each cached List in [listIds] from its synced
-  /// Items, which a pull just brought up to date; returns the counts by List ID.
-  Future<Map<String, int>> recountKnownLists(Iterable<String> listIds) async {
-    final counts = <String, int>{};
-    for (final id in listIds) {
-      final count = syncedItems.id.count();
-      final toBuy =
-          await (selectOnly(syncedItems)
-                ..addColumns([count])
-                ..where(syncedItems.listId.equals(id) & syncedItems.checkedAtMicros.isNull()))
-              .map((row) => row.read(count) ?? 0)
-              .getSingle();
+  /// Sets the to-buy count of the cached Lists in [toBuy], by List ID.
+  Future<void> saveToBuyCounts(Map<String, int> toBuy) => transaction(() async {
+    for (final MapEntry(key: id, value: n) in toBuy.entries) {
       await (update(
         knownLists,
-      )..where((t) => t.id.equals(id))).write(KnownListsCompanion(uncheckedItemCount: Value(toBuy)));
-      counts[id] = toBuy;
+      )..where((t) => t.id.equals(id))).write(KnownListsCompanion(uncheckedItemCount: Value(n)));
     }
-    return counts;
-  }
+  });
 
   Future<void> forgetKnownList(String id) => (delete(knownLists)..where((t) => t.id.equals(id))).go();
 

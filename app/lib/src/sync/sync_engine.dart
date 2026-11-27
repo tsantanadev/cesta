@@ -28,14 +28,16 @@ final class RejectedChange {
   final int? limit;
 }
 
-/// What a pull changed about the User's Lists, already saved on the device.
-final class PulledLists {
-  const PulledLists({required this.gone, required this.toBuy});
+/// What changed about the User's Lists on this device, already saved: by a
+/// pull, a change made here, or a change rolled back.
+final class ListsChanged {
+  const ListsChanged({this.gone = const {}, this.toBuy = const {}});
 
   /// Lists the User can no longer see (deleted).
   final Set<String> gone;
 
-  /// The new count of Items to buy of each List whose Items changed, by List ID.
+  /// The new count of Items to buy of each List whose Items changed, by List
+  /// ID: what the device shows, changes waiting to sync included.
   final Map<String, int> toBuy;
 }
 
@@ -78,10 +80,14 @@ class SyncEngine {
   /// Changes the server refused, after they were rolled back.
   Stream<RejectedChange> get rejections => _rejections.stream;
 
-  final _pulledLists = StreamController<PulledLists>.broadcast();
+  final _listsChanged = StreamController<ListsChanged>.broadcast();
 
-  /// What each pull changed about the User's Lists, once saved.
-  Stream<PulledLists> get pulledLists => _pulledLists.stream;
+  /// What changed about the User's Lists, once saved on the device.
+  Stream<ListsChanged> get listsChanged => _listsChanged.stream;
+
+  /// Recounts run one after another, so each reads what the ones before it
+  /// saw and their results arrive in order.
+  Future<void> _recounting = Future.value();
 
   final _offline = ValueNotifier(false);
 
@@ -103,7 +109,7 @@ class SyncEngine {
   int _failures = 0;
   Future<void>? _current;
   Timer? _retry;
-  StreamSubscription<void>? _localChanges;
+  StreamSubscription<String>? _localChanges;
   StreamSubscription<bool>? _networkChanges;
   AppLifecycleListener? _lifecycle;
 
@@ -111,7 +117,10 @@ class SyncEngine {
   void start() {
     if (_started) return;
     _started = true;
-    _localChanges = _outbox.changes.listen((_) => unawaited(sync()));
+    _localChanges = _outbox.changes.listen((listId) {
+      unawaited(_recount({listId}));
+      unawaited(sync());
+    });
     _lifecycle = AppLifecycleListener(onResume: () => unawaited(sync()));
     _networkChanges = _network.changes.listen(_networkChanged);
     unawaited(_network.isConnected().then((connected) => connected ? null : _offline.value = true));
@@ -283,6 +292,7 @@ class SyncEngine {
     final name = shown.where((i) => i.id == row.itemId).firstOrNull?.name ?? row.fields.name ?? '';
     if (generation != _generation) return;
     await _outbox.rollBack(row);
+    unawaited(_recount({row.listId}));
     if (limit != null) _itemLimit.value = limit;
     _rejections.add(RejectedChange(itemName: name, reason: reason, limit: limit));
   }
@@ -297,12 +307,10 @@ class SyncEngine {
         _ => throw _Refused(result),
       };
       final gone = <String>{};
-      var toBuy = const <String, int>{};
+      final touched = <String>{};
       await _db.transaction(() async {
         // Checked inside the transaction: data cleared at sign-out waits for it.
         if (stopped()) return;
-        // Lists whose Items changed, to recount their Items to buy.
-        final touched = <String>{};
         for (final item in page.items) {
           await _db.into(_db.syncedItems).insertOnConflictUpdate(_row(item));
           touched.add(item.listId);
@@ -319,7 +327,6 @@ class SyncEngine {
               gone.add(t.id);
           }
         }
-        toBuy = await _db.recountKnownLists(touched.difference(gone));
         await _db
             .into(_db.syncCursor)
             .insertOnConflictUpdate(SyncCursorCompanion.insert(id: const Value(1), cursor: page.cursor));
@@ -328,10 +335,28 @@ class SyncEngine {
         if (!page.hasMore) await _outbox.dropApplied();
       });
       if (stopped()) return;
-      if (gone.isNotEmpty || toBuy.isNotEmpty) _pulledLists.add(PulledLists(gone: gone, toBuy: toBuy));
+      if (gone.isNotEmpty) _listsChanged.add(ListsChanged(gone: gone));
+      // Lists whose Items changed: recount their Items to buy.
+      unawaited(_recount(touched.difference(gone)));
       cursor = page.cursor;
       if (!page.hasMore) return;
     }
+  }
+
+  /// Counts the Items to buy of [listIds] as the device shows them, saves
+  /// the counts and reports them.
+  Future<void> _recount(Set<String> listIds) {
+    if (listIds.isEmpty) return _recounting;
+    final generation = _generation;
+    return _recounting = _recounting
+        .then((_) async {
+          if (generation != _generation) return;
+          final toBuy = {for (final id in listIds) id: await _items.toBuyCount(id)};
+          if (generation != _generation) return;
+          await _db.saveToBuyCounts(toBuy);
+          if (!_listsChanged.isClosed) _listsChanged.add(ListsChanged(toBuy: toBuy));
+        })
+        .catchError((Object _) {}); // a count is redone at the next change or pull
   }
 
   static SyncedItemsCompanion _row(Item i) => SyncedItemsCompanion.insert(
@@ -352,7 +377,8 @@ class SyncEngine {
   Future<void> dispose() async {
     await stop();
     await _rejections.close();
-    await _pulledLists.close();
+    await _recounting;
+    await _listsChanged.close();
     _offline.dispose();
     _itemLimit.dispose();
   }

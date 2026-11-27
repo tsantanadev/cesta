@@ -77,9 +77,10 @@ final class ListFailed extends ListFailure {
 /// the User makes to them.
 ///
 /// Lists come from the API and are cached on the device, so the Lists screen
-/// still shows them offline. What a sync pull learns about them (a List
-/// deleted elsewhere, a new count of Items to buy) shows at once, through
-/// [synced]. Changes to Lists still need the network (ADR-0001).
+/// still shows them offline. What changes about them on the device (a List
+/// deleted elsewhere, a new count of Items to buy, even offline) shows at once,
+/// through [changed]. Changes to Lists themselves still need the network
+/// (ADR-0001).
 class ListsController extends ChangeNotifier {
   ListsController({required this._api, required this._db, required this._session}) {
     _session.addListener(_onSessionChanged);
@@ -216,10 +217,10 @@ class ListsController extends ChangeNotifier {
     _ => ListFailure.failed,
   };
 
-  /// A sync pull found the Lists [gone] (deleted, or the User is no longer a
-  /// Member) and recounted the Items to buy of others ([toBuy], by List ID).
-  /// The device's cache already says so.
-  void synced({required Set<String> gone, required Map<String, int> toBuy}) {
+  /// The Lists [gone] are deleted (or the User is no longer a Member), and
+  /// others have a new count of Items to buy ([toBuy], by List ID). The
+  /// device's cache already says so.
+  void changed({required Set<String> gone, required Map<String, int> toBuy}) {
     if (!_loaded || (gone.isEmpty && toBuy.isEmpty)) return;
     _show([
       for (final l in _lists)

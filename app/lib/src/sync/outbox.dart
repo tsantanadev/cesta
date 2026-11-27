@@ -19,7 +19,7 @@ class ChangeOutbox {
   ChangeOutbox(this._db);
 
   final AppDatabase _db;
-  final _changes = StreamController<void>.broadcast();
+  final _changes = StreamController<String>.broadcast();
 
   /// The changes being pushed right now ([unpushed] until [settle]), by
   /// [OutboxData.seq]: they may reach the server whatever this device does,
@@ -28,8 +28,9 @@ class ChangeOutbox {
 
   static const _uuid = Uuid();
 
-  /// Fires after every change enqueued or dropped on this device.
-  Stream<void> get changes => _changes.stream;
+  /// Fires with the List's ID after every change to its Items enqueued or
+  /// dropped on this device.
+  Stream<String> get changes => _changes.stream;
 
   /// Adds a change to Item [itemId] of List [listId].
   Future<void> enqueue(
@@ -53,7 +54,7 @@ class ChangeOutbox {
             byName: by.displayName,
           ),
         );
-    _changes.add(null);
+    _changes.add(listId);
   }
 
   /// Drops every change to Item [itemId] while its creation is still waiting
@@ -73,15 +74,15 @@ class ChangeOutbox {
   /// When a [type] change to [itemId] is waiting and none of its changes are
   /// in flight, drops the rows [drop] picks.
   Future<bool> _dropWaiting(String itemId, MutationType type, Expression<bool> Function($OutboxTable t) drop) async {
-    final dropped = await _db.transaction(() async {
+    final listId = await _db.transaction(() async {
       final waiting = await (_db.select(
         _db.outbox,
       )..where((t) => t.itemId.equals(itemId) & t.applied.equals(false))).get();
-      if (!waiting.any((r) => r.type == type) || waiting.any((r) => _inFlight.contains(r.seq))) return 0;
-      return (_db.delete(_db.outbox)..where(drop)).go();
+      if (!waiting.any((r) => r.type == type) || waiting.any((r) => _inFlight.contains(r.seq))) return null;
+      return await (_db.delete(_db.outbox)..where(drop)).go() > 0 ? waiting.first.listId : null;
     });
-    if (dropped > 0) _changes.add(null);
-    return dropped > 0;
+    if (listId != null) _changes.add(listId);
+    return listId != null;
   }
 
   /// The oldest [limit] changes not yet pushed, now in flight until [settle].

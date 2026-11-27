@@ -56,7 +56,7 @@ class _CestaAppState extends State<CestaApp> {
   late final SyncEngine _sync;
   late final GoRouter _router;
   late final StreamSubscription<RejectedChange> _rejections;
-  late final StreamSubscription<PulledLists> _pulledLists;
+  late final StreamSubscription<ListsChanged> _listsChanged;
   final _messenger = GlobalKey<ScaffoldMessengerState>();
 
   @override
@@ -69,7 +69,7 @@ class _CestaAppState extends State<CestaApp> {
     _sync = SyncEngine(api: widget.api, db: widget.database, items: _items, outbox: _outbox, network: widget.network);
     _session.addListener(_followSession);
     _rejections = _sync.rejections.listen(_tellRejected);
-    _pulledLists = _sync.pulledLists.listen((p) => _lists.synced(gone: p.gone, toBuy: p.toBuy));
+    _listsChanged = _sync.listsChanged.listen((c) => _lists.changed(gone: c.gone, toBuy: c.toBuy));
     _router = buildRouter(
       session: _session,
       lists: _lists,
@@ -118,7 +118,7 @@ class _CestaAppState extends State<CestaApp> {
   @override
   void dispose() {
     unawaited(_rejections.cancel());
-    unawaited(_pulledLists.cancel());
+    unawaited(_listsChanged.cancel());
     _session.removeListener(_followSession);
     unawaited(_sync.dispose());
     _outbox.dispose();

@@ -136,6 +136,9 @@ class ItemsStore {
     return showItems(synced, await _outbox.forList(listId));
   });
 
+  /// How many Items of List [listId] are to buy, as shown.
+  Future<int> toBuyCount(String listId) async => (await readList(listId)).where((i) => !i.checked).length;
+
   /// How many changes to List [listId] are waiting to reach the server;
   /// emits on change.
   Stream<int> watchPendingCount(String listId) => _outbox.watchWaiting(listId);
