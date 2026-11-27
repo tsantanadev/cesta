@@ -374,4 +374,27 @@ void main() {
 
     expect(h.tags(), ['Milk']);
   });
+
+  testWidgets('a refused new Item is reported once, not again for each later change to it', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    h.goOffline();
+    await h.addNewItem('Tomatoes', listName: 'Weekend feira');
+    await h.tap(find.text('Done'));
+    await h.tapTag('Tomatoes');
+    await h.tapBasketRow('Tomatoes');
+    h.api.itemLimit = 1; // filled up from another phone meanwhile
+
+    await h.goOnline();
+
+    expect(find.text('This list is full'), findsOneWidget);
+    expect(find.textContaining('Couldn’t save'), findsNothing);
+    await h.tap(find.byTooltip('Close'));
+    expect(h.tags(), ['Coffee']);
+    expect(h.basketRows(), isEmpty);
+  });
 }

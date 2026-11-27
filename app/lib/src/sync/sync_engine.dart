@@ -191,17 +191,22 @@ class SyncEngine {
       if (stopped()) return;
       final byId = {for (final r in results) r.mutationId: r};
       var progressed = false;
+      // Items whose refused create took their later changes with it: those
+      // changes' own results are moot and already reported.
+      final droppedItems = <String>{};
       for (final row in batch) {
         if (stopped()) return;
         final r = byId[row.mutationId];
         if (r == null) continue;
         progressed = true;
+        if (droppedItems.contains(row.itemId)) continue;
         if (r.status == MutationResultStatus.applied) {
           await (_db.update(
             _db.outbox,
           )..where((t) => t.seq.equals(row.seq))).write(const OutboxCompanion(applied: Value(true)));
         } else {
           await _rollBack(row, r.reason?.code);
+          if (row.type == MutationType.itemCreate.toJson()) droppedItems.add(row.itemId);
         }
       }
       if (!progressed) throw _Refused(result);
