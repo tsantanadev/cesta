@@ -21,6 +21,7 @@ import (
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
 	"github.com/tsantanadev/cesta/backend/internal/platform/hosting"
 	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
+	cestasync "github.com/tsantanadev/cesta/backend/internal/sync"
 )
 
 // Deps are the external dependencies of the backend.
@@ -41,6 +42,9 @@ type Deps struct {
 	// MaxListsPerUser is how many Lists a User can own that are not deleted.
 	// 0 means lists.DefaultMaxPerUser.
 	MaxListsPerUser int
+	// MaxItemsPerList is how many Items a List can hold. 0 means
+	// sync.DefaultMaxItemsPerList.
+	MaxItemsPerList int
 }
 
 // RateLimits are the per-client-IP and per-User request limits.
@@ -88,6 +92,7 @@ func New(d Deps) http.Handler {
 		Logger:           d.Logger,
 		Identity:         identity.NewService(d.DB, c, d.TokenVerifier, ratelimit.New(limits.PerUser, c)),
 		Lists:            newLists(d, c),
+		Sync:             cestasync.NewService(d.DB, c, membership.NewService(d.DB), d.MaxItemsPerList),
 		PerIP:            ratelimit.New(limits.PerIP, c),
 		TrustedProxyHops: d.TrustedProxyHops,
 	}
