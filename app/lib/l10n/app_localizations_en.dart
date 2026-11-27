@@ -369,6 +369,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addItemsMatches => 'Matches';
 
   @override
+  String get addItemsBoughtBefore => 'Bought before';
+
+  @override
+  String get itemAddAgain => 'Add';
+
+  @override
   String get addItemsSearch => 'Search items';
 
   @override

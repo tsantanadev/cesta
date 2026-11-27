@@ -17,7 +17,10 @@ import 'opened_item.dart';
 /// types, Matches (4:280) shows the List's Items to buy whose names match,
 /// highlighted; tapping one opens that Item instead of adding a duplicate.
 /// "Add “…” as a new item" opens the New item sheet, even when something
-/// matches. Bought before comes with #8.
+/// matches. Past Items from the List's Item history show white: as Bought
+/// before while nothing is typed, and under Matches after the List's own as
+/// the Member types. Tapping one adds it straight away as last bought, with
+/// an Undo Toast.
 class AddItemsScreen extends StatefulWidget {
   const AddItemsScreen({
     super.key,
@@ -39,17 +42,21 @@ class AddItemsScreen extends StatefulWidget {
 class _AddItemsScreenState extends State<AddItemsScreen> {
   final _search = TextEditingController();
   List<ShownItem> _onList = const [];
+  List<HistoryItem> _history = const [];
   StreamSubscription<List<ShownItem>>? _itemsSub;
+  StreamSubscription<List<HistoryItem>>? _historySub;
 
   @override
   void initState() {
     super.initState();
     _itemsSub = widget.items.watchList(widget.listId).listen((items) => setState(() => _onList = items));
+    _historySub = widget.items.watchHistory(widget.listId).listen((h) => setState(() => _history = h));
   }
 
   @override
   void dispose() {
     unawaited(_itemsSub?.cancel());
+    unawaited(_historySub?.cancel());
     _search.dispose();
     super.dispose();
   }
@@ -81,28 +88,53 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
           submitLabel: l10n.newItemAddTo(_listName),
           submitIcon: CesIcons.plus,
           initial: ItemDetails(name: _search.text.trim()),
-          onSubmit: (draft) async {
-            final id = await widget.items.add(listId: widget.listId, by: me, details: draft);
-            if (!mounted) return;
-            _search.clear();
-            setState(() {});
-            showCesToast(
-              context,
-              message: l10n.itemAdded(draft.name, _listName),
-              actionLabel: l10n.itemUndo,
-              onAction: () => unawaited(widget.items.remove(itemId: id, listId: widget.listId, by: me)),
-            );
-          },
+          onSubmit: (draft) => unawaited(_add(draft, me)),
         ),
       ),
     );
   }
+
+  /// Adds an Item with [details], clears the search for the next one, and
+  /// offers Undo.
+  Future<void> _add(ItemDetails details, Actor me) async {
+    final id = await widget.items.add(listId: widget.listId, by: me, details: details);
+    if (!mounted) return;
+    _search.clear();
+    setState(() {});
+    final l10n = AppLocalizations.of(context);
+    showCesToast(
+      context,
+      message: l10n.itemAdded(details.name, _listName),
+      actionLabel: l10n.itemUndo,
+      onAction: () => unawaited(widget.items.remove(itemId: id, listId: widget.listId, by: me)),
+    );
+  }
+
+  /// Adds [past] again, as it was last bought.
+  void _addAgain(HistoryItem past) {
+    final me = _me;
+    if (me == null) return;
+    unawaited(_add(past.details, me));
+  }
+
+  Widget _section(String heading, List<Widget> tiles) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CesSectionHeading(heading),
+        const SizedBox(height: 12),
+        Wrap(spacing: 11, runSpacing: 11, children: tiles),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final query = _search.text.trim();
     final matches = listMatches(_onList, query);
+    final past = pastItems(_history, _onList, query);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -129,32 +161,28 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                 ],
               ),
             ),
-            // Matches (Figma 4:280): the List's Items to buy, as on the List.
-            if (matches.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    CesSectionHeading(l10n.addItemsMatches),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 11,
-                      runSpacing: 11,
-                      children: [
-                        for (final item in matches)
-                          CesItemTile(
-                            key: ValueKey(item.id),
-                            name: item.name,
-                            quantity: tagQuantity(l10n, item.quantity, item.unit),
-                            semanticHint: l10n.itemOpen,
-                            onTap: () => _openItem(item),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            // Matches (Figma 4:280): the List's Items to buy, as on the List,
+            // then past Items; Bought before while nothing is typed.
+            if (matches.isNotEmpty || past.isNotEmpty)
+              _section(query.isEmpty ? l10n.addItemsBoughtBefore : l10n.addItemsMatches, [
+                for (final item in matches)
+                  CesItemTile(
+                    key: ValueKey(item.id),
+                    name: item.name,
+                    quantity: tagQuantity(l10n, item.quantity, item.unit),
+                    semanticHint: l10n.itemOpen,
+                    onTap: () => _openItem(item),
+                  ),
+                for (final item in past)
+                  CesItemTile(
+                    key: ValueKey('past ${item.itemId}'),
+                    name: item.name,
+                    quantity: tagQuantity(l10n, item.quantity, item.unit),
+                    semanticHint: l10n.itemAddAgain,
+                    suggestion: true,
+                    onTap: () => _addAgain(item),
+                  ),
+              ]),
             if (query.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),

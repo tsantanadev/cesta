@@ -746,6 +746,18 @@ abstract class AppLocalizations {
   /// **'Matches'**
   String get addItemsMatches;
 
+  /// Heading on Add items, before anything is typed, over the most recent past Items from the List's Item history.
+  ///
+  /// In en, this message translates to:
+  /// **'Bought before'**
+  String get addItemsBoughtBefore;
+
+  /// Screen reader hint on a past Item's tag on Add items: tapping it adds it to the List again, as last bought.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get itemAddAgain;
+
   /// Label of the search field on Add items.
   ///
   /// In en, this message translates to:
