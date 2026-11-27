@@ -32,14 +32,21 @@ void showOpenedItem(BuildContext context, {required ItemsStore items, required S
   );
 }
 
+/// Removes [item], with Undo. The removal syncs once the Toast closes, so
+/// Undo never has to re-add it.
 Future<void> _remove(BuildContext context, ItemsStore items, ShownItem item, Actor me) async {
-  await items.remove(itemId: item.id, listId: item.listId, by: me);
-  if (!context.mounted) return;
+  final undoWindow = Completer<void>();
+  await items.remove(itemId: item.id, listId: item.listId, by: me, undoableUntil: undoWindow.future);
+  if (!context.mounted) {
+    undoWindow.complete();
+    return;
+  }
   final l10n = AppLocalizations.of(context);
-  showCesToast(
+  final toast = showCesToast(
     context,
     message: l10n.itemRemoved(item.name),
     actionLabel: l10n.itemUndo,
     onAction: () => unawaited(items.restore(item, by: me)),
   );
+  unawaited(toast.closed.then((_) => undoWindow.complete()));
 }

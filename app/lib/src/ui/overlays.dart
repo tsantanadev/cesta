@@ -169,29 +169,33 @@ class CesSheetItem extends StatelessWidget {
 }
 
 /// Shows a short message at the bottom of the screen (the design's Toast),
-/// with an optional action such as "Undo".
-void showCesToast(BuildContext context, {required String message, String? actionLabel, VoidCallback? onAction}) =>
-    showCesToastOn(ScaffoldMessenger.of(context), message: message, actionLabel: actionLabel, onAction: onAction);
+/// with an optional action such as "Undo". Its `closed` completes once it
+/// is gone.
+ScaffoldFeatureController<SnackBar, SnackBarClosedReason> showCesToast(
+  BuildContext context, {
+  required String message,
+  String? actionLabel,
+  VoidCallback? onAction,
+}) => showCesToastOn(ScaffoldMessenger.of(context), message: message, actionLabel: actionLabel, onAction: onAction);
 
 /// [showCesToast] through a given [messenger], e.g. the app's, for messages
 /// that don't belong to one screen.
-void showCesToastOn(
+ScaffoldFeatureController<SnackBar, SnackBarClosedReason> showCesToastOn(
   ScaffoldMessengerState messenger, {
   required String message,
   String? actionLabel,
   VoidCallback? onAction,
 }) {
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(message),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-        persist: false,
-        duration: const Duration(seconds: 6),
-        action: actionLabel == null ? null : SnackBarAction(label: actionLabel, onPressed: onAction ?? () {}),
-      ),
-    );
+  messenger.hideCurrentSnackBar();
+  return messenger.showSnackBar(
+    SnackBar(
+      content: Text(message),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      persist: false,
+      duration: const Duration(seconds: 6),
+      action: actionLabel == null ? null : SnackBarAction(label: actionLabel, onPressed: onAction ?? () {}),
+    ),
+  );
 }
 
 /// Shows a sheet with a [title], a close button and [child] (usually a

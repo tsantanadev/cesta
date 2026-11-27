@@ -82,12 +82,14 @@ class _CestaAppState extends State<CestaApp> {
     );
   }
 
-  /// Syncs while a User is signed in.
+  /// Syncs while a User is signed in; signing out takes away any Toast.
   void _followSession() {
     if (_session.status == SessionStatus.signedIn && _session.user != null) {
       _sync.start();
     } else {
       unawaited(_sync.stop());
+      // An Undo belongs to the session that made the change.
+      _messenger.currentState?.removeCurrentSnackBar();
     }
   }
 
