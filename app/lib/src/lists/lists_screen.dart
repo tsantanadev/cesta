@@ -48,6 +48,7 @@ class _ListsScreenState extends State<ListsScreen> {
         context,
         title: user?.displayName,
         subtitle: user?.email,
+        closeTooltip: l10n.sheetClose,
         items: [
           CesSheetItem(
             icon: CesIcons.recentlyDeleted,
@@ -98,6 +99,7 @@ class _ListsScreenState extends State<ListsScreen> {
       showCesSheet(
         context,
         title: list.name,
+        closeTooltip: l10n.sheetClose,
         items: [
           CesSheetItem(icon: CesIcons.edit, label: l10n.listsRename, onTap: () => _rename(list)),
           CesSheetItem(
@@ -184,18 +186,20 @@ class _ListsScreenState extends State<ListsScreen> {
               key: ValueKey(list.id),
               name: list.name,
               subtitle: _subtitle(l10n, list),
+              action: list.role == Role.owner
+                  ? CesIconButton(
+                      icon: CesIcons.more,
+                      tooltip: l10n.listsOptions(list.name),
+                      compact: true,
+                      onPressed: () => _openOptions(list),
+                    )
+                  : null,
               trailing: [
                 CesCountSign(
                   count: list.uncheckedItemCount,
                   caption: l10n.listsToBuy,
                   nothingLabel: l10n.listsNothingToBuy,
                 ),
-                if (list.role == Role.owner)
-                  CesIconButton(
-                    icon: CesIcons.more,
-                    tooltip: l10n.listsOptions(list.name),
-                    onPressed: () => _openOptions(list),
-                  ),
               ],
             ),
         ],

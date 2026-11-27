@@ -90,12 +90,25 @@ class CestaSpacing extends ThemeExtension<CestaSpacing> {
 /// Corner radii.
 abstract final class CestaRadii {
   static const card = 16.0;
+  static const listCard = 20.0;
+  static const sign = 4.0;
 
   /// Buttons are pills (Figma Button 3:61: 56 dp tall, radius 28). Large
   /// enough to stay a pill when a button grows with the text size.
   static const button = 999.0;
   static const field = 12.0;
   static const sheet = 28.0;
+}
+
+/// Shared pill-button geometry and label style (Figma Button 3:61), used by
+/// the Material button themes and by Cupertino-adapted buttons.
+abstract final class CestaButtonMetrics {
+  static const height = 56.0;
+  static const horizontalPadding = 24.0;
+  static const iconGap = 10.0;
+  static const borderWidth = 1.5;
+  static const shape = StadiumBorder();
+  static const labelStyle = TextStyle(fontFamily: CestaFonts.family, fontWeight: FontWeight.w700, fontSize: 16);
 }
 
 /// The bundled typefaces (assets/fonts, declared in pubspec.yaml).
@@ -260,13 +273,6 @@ abstract final class CestaDisplayType {
     height: 1,
     letterSpacing: -0.165,
   );
-}
-
-/// Radii from the design beyond [CestaRadii].
-abstract final class CestaShapes {
-  static const listCard = 20.0;
-  static const sign = 4.0;
-  static const pill = 28.0;
 }
 
 /// Semantic status colours that follow light/dark mode.

@@ -668,6 +668,12 @@ abstract class AppLocalizations {
   /// **'You\'ve reached the limit of {limit} Lists. Delete one to create another.'**
   String errorListLimit(int limit);
 
+  /// Creating or restoring a List failed because the User reached the List limit, when the server did not report the number.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve reached the limit of Lists. Delete one to create another.'**
+  String get errorListLimitGeneric;
+
   /// The List is gone for good, or the User is no longer a Member.
   ///
   /// In en, this message translates to:

@@ -34,7 +34,7 @@ String? validateNewPassword(AppLocalizations l10n, String? value) =>
 
 String? validateDisplayName(AppLocalizations l10n, String? value) => switch (checkDisplayName(value ?? '')) {
   null => null,
-  DisplayNameProblem.blank => l10n.errorDisplayNameRequired,
-  DisplayNameProblem.tooLong => l10n.errorDisplayNameTooLong,
-  DisplayNameProblem.invalidCharacters => l10n.errorDisplayNameInvalid,
+  NameProblem.blank => l10n.errorDisplayNameRequired,
+  NameProblem.tooLong => l10n.errorDisplayNameTooLong,
+  NameProblem.invalidCharacters => l10n.errorDisplayNameInvalid,
 };

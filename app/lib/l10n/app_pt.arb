@@ -97,6 +97,7 @@
   "errorListNameTooLong": "Use até {max} caracteres.",
   "errorListNameInvalid": "Esse nome não pode ser usado. Tente outro.",
   "errorListLimit": "Você atingiu o limite de {limit} listas. Exclua uma para criar outra.",
+  "errorListLimitGeneric": "Você atingiu o limite de listas. Exclua uma para criar outra.",
   "errorListNotFound": "Esta lista não está mais disponível.",
   "errorListDeleted": "Esta lista foi excluída. Você pode restaurá-la em Excluídas recentemente.",
   "errorListNotRestorable": "Esta lista não está mais disponível e não pode ser restaurada."

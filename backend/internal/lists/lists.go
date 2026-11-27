@@ -81,6 +81,11 @@ func NewService(db *pgxpool.Pool, c clock.Clock, members *membership.Service, ma
 	return &Service{db: db, clock: c, members: members, maxPerUser: maxPerUser}
 }
 
+// MaxPerUser returns the configured maximum number of live Lists a User can own.
+func (s *Service) MaxPerUser() int {
+	return s.maxPerUser
+}
+
 // Create makes a List with the client-chosen id, owned by owner. Retrying with
 // an id owner already has returns that List unchanged and created false.
 func (s *Service) Create(ctx context.Context, owner, id uuid.UUID, name string) (sum Summary, created bool, err error) {
@@ -238,10 +243,11 @@ func (s *Service) Restore(ctx context.Context, userID, listID uuid.UUID) (Summar
 	return s.summary(ctx, listID, userID)
 }
 
-// lockOwner locks owner's row until tx ends. Every change that adds to the
-// Lists owner owns takes it first, so two at the limit can't both pass.
+// lockOwner takes a transaction-scoped advisory lock for owner. Every change
+// that adds to the Lists owner owns takes it first, so two at the limit can't
+// both pass.
 func lockOwner(ctx context.Context, tx pgx.Tx, owner uuid.UUID) error {
-	_, err := tx.Exec(ctx, "SELECT 1 FROM users WHERE id = $1 FOR UPDATE", owner)
+	_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('lists:owner:' || $1, 0))", owner.String())
 	return err
 }
 
@@ -264,22 +270,16 @@ func (s *Service) requireRoomFor(ctx context.Context, tx pgx.Tx, owner uuid.UUID
 // such Lists as gone, so how long after the window the purge runs doesn't show.
 func (s *Service) Purge(ctx context.Context, now time.Time) (int, error) {
 	var n int
-	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) (err error) {
-		n, err = PurgeIn(ctx, tx, now)
-		return err
+	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx,
+			"DELETE FROM lists WHERE deleted_at IS NOT NULL AND deleted_at <= $1", now.Add(-RestoreWindow))
+		if err != nil {
+			return wrap("purge", err)
+		}
+		n = int(tag.RowsAffected())
+		return nil
 	})
 	return n, err
-}
-
-// PurgeIn is Purge run inside tx, which the caller commits. Seam 1 uses it to
-// make requests meet a purge that hasn't committed yet.
-func PurgeIn(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
-	tag, err := tx.Exec(ctx,
-		"DELETE FROM lists WHERE deleted_at IS NOT NULL AND deleted_at <= $1", now.Add(-RestoreWindow))
-	if err != nil {
-		return 0, wrap("purge", err)
-	}
-	return int(tag.RowsAffected()), nil
 }
 
 // RecentlyDeleted returns the Lists owner deleted and can still restore, most

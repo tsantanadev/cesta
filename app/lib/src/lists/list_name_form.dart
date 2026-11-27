@@ -59,7 +59,7 @@ class _ListNameFormState extends State<ListNameForm> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CesTextField(
+          CesTextField.display(
             label: l10n.fieldListName,
             controller: _name,
             validator: (value) => validateListName(l10n, value),

@@ -328,6 +328,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get errorListLimitGeneric => 'You\'ve reached the limit of Lists. Delete one to create another.';
+
+  @override
   String get errorListNotFound => 'This List is no longer available.';
 
   @override

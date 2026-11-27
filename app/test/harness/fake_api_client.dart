@@ -184,7 +184,7 @@ class FakeApiClient implements ApiClient {
     return l;
   }
 
-  static ApiError _error(ApiErrorCode code) => ApiError(code: code, message: code.toJson());
+  static ApiError _error(ApiErrorCode code, {int? limit}) => ApiError(code: code, message: code.toJson(), limit: limit);
 
   static String? _validName(String raw) {
     final name = raw.trim();
@@ -238,7 +238,9 @@ class FakeApiClient implements ApiClient {
     }
     final name = _validName(body.name.value);
     if (name == null) return CreateList400(_error(ApiErrorCode.invalidListName));
-    if (_ownedLive(identity.uid) >= listLimit) return CreateList409(_error(ApiErrorCode.limitExceeded));
+    if (_ownedLive(identity.uid) >= listLimit) {
+      return CreateList409(_error(ApiErrorCode.limitExceeded, limit: listLimit));
+    }
     final created = _FakeList(
       id: body.id,
       ownerUid: identity.uid,
@@ -302,7 +304,7 @@ class FakeApiClient implements ApiClient {
     if (l == null) return RestoreList404(_error(ApiErrorCode.listNotFound));
     if (l.ownerUid != identity.uid) return RestoreList403(_error(ApiErrorCode.notListOwner));
     if (l.deletedAt != null && _ownedLive(identity.uid) >= listLimit) {
-      return RestoreList409(_error(ApiErrorCode.limitExceeded));
+      return RestoreList409(_error(ApiErrorCode.limitExceeded, limit: listLimit));
     }
     l.deletedAt = null;
     return RestoreList200(_summary(l, identity.uid));

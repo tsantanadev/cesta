@@ -17,9 +17,8 @@ abstract final class CestaTheme {
       fontFamily: CestaFonts.family,
     );
     // Figma Button (3:61): 56 dp pills, Plus Jakarta Sans Bold 16.
-    const pill = StadiumBorder();
-    const buttonLabel = TextStyle(fontFamily: CestaFonts.family, fontWeight: FontWeight.w700, fontSize: 16);
-    const buttonSize = Size(64, 56);
+    const buttonSize = Size(CestaButtonMetrics.height, CestaButtonMetrics.height);
+    const buttonPadding = EdgeInsets.symmetric(horizontal: CestaButtonMetrics.horizontalPadding);
     final fieldBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(CestaRadii.field),
       borderSide: BorderSide.none,
@@ -53,26 +52,29 @@ abstract final class CestaTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: buttonSize,
-          shape: pill,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          textStyle: buttonLabel,
+          shape: CestaButtonMetrics.shape,
+          padding: buttonPadding,
+          textStyle: CestaButtonMetrics.labelStyle,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: buttonSize,
-          shape: pill,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          textStyle: buttonLabel,
+          shape: CestaButtonMetrics.shape,
+          padding: buttonPadding,
+          textStyle: CestaButtonMetrics.labelStyle,
           foregroundColor: scheme.onSurface,
-          backgroundColor: scheme.surfaceContainerLow,
-          side: BorderSide(color: light ? CestaColors.checked : CestaColors.checkedDark, width: 1.5),
+          backgroundColor: Colors.transparent,
+          side: BorderSide(
+            color: light ? CestaColors.checked : CestaColors.checkedDark,
+            width: CestaButtonMetrics.borderWidth,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           minimumSize: const Size(48, 44),
-          shape: pill,
+          shape: CestaButtonMetrics.shape,
           textStyle: const TextStyle(fontFamily: CestaFonts.family, fontWeight: FontWeight.w700, fontSize: 15),
         ),
       ),
@@ -88,10 +90,11 @@ abstract final class CestaTheme {
         helperMaxLines: 3,
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        // Figma sheet (9:436): Checked grabber, 28 dp top corners.
-        showDragHandle: true,
-        dragHandleSize: const Size(40, 4),
-        dragHandleColor: light ? CestaColors.checked : CestaColors.checkedDark,
+        // Figma sheets (9:436, 32:1138, 32:1390, 32:1492): Branco ground, 28 dp
+        // top corners, on-banana 60% scrim. The grabber is drawn by _CesSheet so
+        // its top padding and spacing match the design exactly.
+        showDragHandle: false,
+        modalBarrierColor: CestaColors.onBanana.withValues(alpha: 0.6),
         backgroundColor: scheme.surfaceContainerLow,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(CestaRadii.sheet)),

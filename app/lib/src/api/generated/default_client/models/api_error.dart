@@ -9,12 +9,16 @@ class ApiError {
 
     /// Human-readable explanation, in English, for logs and debugging.
     required this.message,
+
+    /// Present when code is limit_exceeded: the configured maximum the User has reached.
+    this.limit,
     this.additionalProperties = const {},
   });
 
   factory ApiError.fromJson(Map<String, Object?> json) => ApiError(
     code: ApiErrorCode.fromJson(json["code"]),
     message: json["message"] as String,
+    limit: json.containsKey("limit") ? json["limit"] as int : null,
     additionalProperties: {
       for (final entry in json.entries)
         if (!_knownKeys.contains(entry.key)) entry.key: entry.value,
@@ -27,7 +31,10 @@ class ApiError {
   /// Human-readable explanation, in English, for logs and debugging.
   final String message;
 
-  static const _knownKeys = <String>{"code", "message"};
+  /// Present when code is limit_exceeded: the configured maximum the User has reached.
+  final int? limit;
+
+  static const _knownKeys = <String>{"code", "message", "limit"};
 
   final Map<String, Object?> additionalProperties;
 
@@ -36,5 +43,6 @@ class ApiError {
       if (!_knownKeys.contains(entry.key)) entry.key: entry.value,
     "code": this.code.toJson(),
     "message": this.message,
+    if (this.limit != null) "limit": this.limit,
   };
 }

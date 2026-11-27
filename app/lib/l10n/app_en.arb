@@ -192,6 +192,8 @@
   "@errorListNameInvalid": {"description": "List name has characters that can't be used (e.g. control characters), or the server rejected it."},
   "errorListLimit": "You've reached the limit of {limit} Lists. Delete one to create another.",
   "@errorListLimit": {"description": "Creating or restoring a List failed because the User already owns the most Lists allowed (limit).", "placeholders": {"limit": {"type": "int"}}},
+  "errorListLimitGeneric": "You've reached the limit of Lists. Delete one to create another.",
+  "@errorListLimitGeneric": {"description": "Creating or restoring a List failed because the User reached the List limit, when the server did not report the number."},
   "errorListNotFound": "This List is no longer available.",
   "@errorListNotFound": {"description": "The List is gone for good, or the User is no longer a Member."},
   "errorListDeleted": "This List was deleted. You can restore it from Recently deleted.",

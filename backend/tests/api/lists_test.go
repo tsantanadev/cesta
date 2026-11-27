@@ -47,7 +47,7 @@ func myLists(t *testing.T, c *testkit.Client) []listSummary {
 
 const groceriesID = "0190a3b4-7c5d-7e6f-8a9b-0c1d2e3f4a5b"
 
-func TestCreatingAListMakesTheCreatorItsOwner(t *testing.T) {
+func TestCreatingAListMakesTheUserItsOwner(t *testing.T) {
 	srv := testkit.NewServer(t)
 	ana := srv.As(testkit.Ana)
 
@@ -526,22 +526,58 @@ func TestAListThatNeverExistedIsNotFound(t *testing.T) {
 	res.RequireErrorCode(t, "list_not_found")
 }
 
-// A restore that checks the List while the purge is removing it must find it
-// gone, not fail with a server error or report a List that isn't there.
-func TestARestoreRacingThePurgeFindsTheListGone(t *testing.T) {
-	srv := testkit.NewServer(t)
+func TestTheListLimitIsConfigurable(t *testing.T) {
+	srv := testkit.NewServer(t, testkit.WithMaxListsPerUser(2))
 	ana := srv.As(testkit.Ana)
-	createList(t, ana, groceriesID, "Groceries")
-	ana.Delete(t, "/api/lists/"+groceriesID).RequireStatus(t, http.StatusOK)
-	srv.Clock.Advance(30*24*time.Hour - time.Millisecond)
-	var restore *testkit.Response
+	createList(t, ana, uuid.NewString(), "One")
+	createList(t, ana, uuid.NewString(), "Two")
 
-	srv.RunPurgeDuring(t, srv.Clock.Now().Add(time.Millisecond), func() {
-		restore = ana.Post(t, "/api/lists/"+groceriesID+"/restore", "")
+	res := ana.Post(t, "/api/lists", `{"id": "`+uuid.NewString()+`", "name": "Three"}`)
+
+	res.RequireStatus(t, http.StatusConflict)
+	res.RequireErrorCode(t, "limit_exceeded")
+	var body struct {
+		Limit int `json:"limit"`
+	}
+	if err := json.Unmarshal(res.Body, &body); err != nil {
+		t.Fatalf("decode error: %v\nbody: %s", err, res.Body)
+	}
+	if body.Limit != 2 {
+		t.Fatalf("error limit = %d, want 2", body.Limit)
+	}
+}
+
+// A restore racing the purge at the end of the restore window must find the
+// List gone cleanly, never failing with a server error or disagreeing with
+// the Lists the User sees.
+func TestARestoreRacingThePurgeFindsTheListGone(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	ana := srv.As(testkit.Ana)
+	const n = 10
+	ids := make([]string, n)
+	for i := range n {
+		ids[i] = uuid.NewString()
+		createList(t, ana, ids[i], "Groceries")
+		ana.Delete(t, "/api/lists/"+ids[i]).RequireStatus(t, http.StatusOK)
+	}
+	srv.Clock.Advance(30 * 24 * time.Hour)
+
+	restores := make([]*testkit.Response, n)
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		srv.RunPurge(t)
 	})
+	for i, id := range ids {
+		wg.Go(func() {
+			restores[i] = ana.Post(t, "/api/lists/"+id+"/restore", "")
+		})
+	}
+	wg.Wait()
 
-	restore.RequireStatus(t, http.StatusNotFound)
-	restore.RequireErrorCode(t, "list_not_found")
+	for _, res := range restores {
+		res.RequireStatus(t, http.StatusNotFound)
+		res.RequireErrorCode(t, "list_not_found")
+	}
 	if lists := myLists(t, ana); len(lists) != 0 {
 		t.Fatalf("Ana's Lists = %+v, want none after the purge", lists)
 	}

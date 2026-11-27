@@ -84,6 +84,16 @@ variable "rate_limit_per_user" {
   default     = "60/500ms"
 }
 
+variable "max_lists_per_user" {
+  description = "Backend MAX_LISTS_PER_USER: live Lists a User can own."
+  type        = number
+  default     = 100
+  validation {
+    condition     = var.max_lists_per_user > 0 && floor(var.max_lists_per_user) == var.max_lists_per_user
+    error_message = "max_lists_per_user must be a positive integer."
+  }
+}
+
 variable "image_reader_members" {
   description = "Extra principals allowed to pull from this environment's image repository (prod's deployer, on dev)."
   type        = list(string)

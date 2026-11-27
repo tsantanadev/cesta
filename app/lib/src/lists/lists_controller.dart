@@ -12,32 +12,65 @@ import '../session/session_controller.dart';
 /// The longest List name the server accepts, in characters.
 const maxListNameLength = 60;
 
-/// How many Lists a User can own that are not deleted, as the server enforces.
-const maxListsPerUser = 100;
-
 /// How long after deletion the Owner can still restore a List (the Restore window).
 const restoreWindow = Duration(days: 30);
 
 /// Why a change to a List (create, rename, delete, restore) or a load didn't
 /// go through. Operations return null when they did.
-enum ListFailure {
-  /// The server rejected the name.
-  invalidName,
+sealed class ListFailure {
+  const ListFailure();
 
-  /// The User already owns [maxListsPerUser] Lists.
-  limitReached,
+  /// The server rejected the name.
+  static const invalidName = ListInvalidName();
 
   /// The List is gone for good, or the User is no longer a Member.
-  notFound,
+  static const notFound = ListNotFound();
 
   /// The List was deleted (and can still be restored from Recently deleted).
-  deleted,
+  static const deleted = ListDeleted();
 
   /// Restoring found the List gone; the app can't tell why.
-  notRestorable,
-  rateLimited,
-  offline,
-  failed,
+  static const notRestorable = ListNotRestorable();
+
+  static const rateLimited = ListRateLimited();
+  static const offline = ListOffline();
+  static const failed = ListFailed();
+}
+
+final class ListInvalidName extends ListFailure {
+  const ListInvalidName();
+}
+
+/// The User already owns the configured maximum number of live Lists.
+final class ListLimitReached extends ListFailure {
+  const ListLimitReached(this.limit);
+
+  /// The maximum reported by the server, if provided.
+  final int? limit;
+}
+
+final class ListNotFound extends ListFailure {
+  const ListNotFound();
+}
+
+final class ListDeleted extends ListFailure {
+  const ListDeleted();
+}
+
+final class ListNotRestorable extends ListFailure {
+  const ListNotRestorable();
+}
+
+final class ListRateLimited extends ListFailure {
+  const ListRateLimited();
+}
+
+final class ListOffline extends ListFailure {
+  const ListOffline();
+}
+
+final class ListFailed extends ListFailure {
+  const ListFailed();
 }
 
 /// The signed-in User's Lists: what the Lists screen shows, and the changes
@@ -178,7 +211,7 @@ class ListsController extends ChangeNotifier {
   }
 
   static ListFailure _conflict(ApiError error) => switch (error.code) {
-    ApiErrorCode.limitExceeded => ListFailure.limitReached,
+    ApiErrorCode.limitExceeded => ListLimitReached(error.limit),
     _ => ListFailure.failed,
   };
 

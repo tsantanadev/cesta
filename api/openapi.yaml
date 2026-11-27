@@ -93,8 +93,8 @@ paths:
       description: >-
         The client picks the List's ID, so a retried request is safe: sending an ID
         the User already owns returns that List with 200 and changes nothing. The
-        creator becomes the List's Owner. A User can own at most 100 Lists that are
-        not deleted.
+        User who created the List becomes its Owner. A User can own at most the
+        configured limit of Lists that are not deleted (default 100).
       requestBody:
         required: true
         content:
@@ -185,7 +185,7 @@ paths:
       summary: Restore a deleted List (Owner only, within 30 days)
       description: >-
         Brings the List back for every Member. Restoring a List that isn't deleted
-        changes nothing. Restoring counts towards the limit of 100 Lists.
+        changes nothing. Restoring counts towards the Owner's List limit.
       responses:
         "200":
           description: The restored List
@@ -303,6 +303,10 @@ components:
         message:
           type: string
           description: Human-readable explanation, in English, for logs and debugging.
+        limit:
+          type: integer
+          minimum: 1
+          description: "Present when code is limit_exceeded: the configured maximum the User has reached."
     User:
       type: object
       required: [id, email, displayName, displayNameConfirmed]

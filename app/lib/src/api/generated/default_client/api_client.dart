@@ -180,7 +180,7 @@ class ApiClient {
 
   /// Create a List owned by the signed-in User
   ///
-  /// The client picks the List's ID, so a retried request is safe: sending an ID the User already owns returns that List with 200 and changes nothing. The creator becomes the List's Owner. A User can own at most 100 Lists that are not deleted.
+  /// The client picks the List's ID, so a retried request is safe: sending an ID the User already owns returns that List with 200 and changes nothing. The User who created the List becomes its Owner. A User can own at most the configured limit of Lists that are not deleted (default 100).
   Future<CreateListResult> createList({
     Map<String, Object?> extra = const {
       "openapi.servers": [
@@ -355,7 +355,7 @@ class ApiClient {
 
   /// Restore a deleted List (Owner only, within 30 days)
   ///
-  /// Brings the List back for every Member. Restoring a List that isn't deleted changes nothing. Restoring counts towards the limit of 100 Lists.
+  /// Brings the List back for every Member. Restoring a List that isn't deleted changes nothing. Restoring counts towards the Owner's List limit.
   Future<RestoreListResult> restoreList({
     Map<String, Object?> extra = const {
       "openapi.servers": [

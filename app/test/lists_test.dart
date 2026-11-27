@@ -18,7 +18,7 @@ void main() {
   });
 
   testWidgets(
-    'on iOS, Lists are created and renamed through Cupertino sheets',
+    'on iOS, Lists are created and renamed through the Cesta bottom sheets',
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
     (tester) async {
       final h = Harness(tester);
@@ -26,7 +26,19 @@ void main() {
       await h.pumpApp();
 
       await h.createList('Weekend feira');
-      await h.renameList('Weekend feira', 'Saturday feira');
+      await h.openListOptions('Weekend feira');
+      expect(find.byTooltip('Close'), findsOneWidget);
+      expect(find.text('Rename'), findsOneWidget);
+      expect(find.text('Delete list'), findsOneWidget);
+
+      await tester.tap(find.text('Rename'));
+      await tester.pumpAndSettle();
+      expect(find.text('Rename list'), findsOneWidget);
+      expect(h.textInField('Name'), 'Weekend feira');
+
+      await tester.enterText(field('Name'), 'Saturday feira');
+      await tester.tap(find.widgetWithText(CesButton, 'Save'));
+      await tester.pumpAndSettle();
 
       expect(find.text('Saturday feira'), findsOneWidget);
       expect(find.text('Weekend feira'), findsNothing);
@@ -148,6 +160,20 @@ void main() {
 
     expect(find.text("You've reached the limit of 100 Lists. Delete one to create another."), findsOneWidget);
     expect(h.api.listNamesOf(ana), isNot(contains('One too many')));
+  });
+
+  testWidgets('a configured List limit from the server is shown in the error', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    h.api.listLimit = 2;
+    h.api.addList(ana, name: 'One');
+    h.api.addList(ana, name: 'Two');
+    await h.pumpApp();
+
+    await h.createList('Three');
+
+    expect(find.text("You've reached the limit of 2 Lists. Delete one to create another."), findsOneWidget);
+    expect(h.api.listNamesOf(ana), isNot(contains('Three')));
   });
 
   testWidgets('creating a List offline says there is no connection', (tester) async {

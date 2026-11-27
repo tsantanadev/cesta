@@ -11,6 +11,7 @@
 //	TRUSTED_PROXY_HOPS           proxies in front of the backend that append to X-Forwarded-For (default 0)
 //	RATE_LIMIT_PER_IP            requests allowed per client IP, as <burst>/<every> (default 120/250ms)
 //	RATE_LIMIT_PER_USER          requests allowed per User, as <burst>/<every> (default 60/500ms)
+//	MAX_LISTS_PER_USER           live Lists a User can own (default 100)
 //	PORT                         HTTP port (default 8080)
 //	LOG_LEVEL                    debug, info, warn or error (default info)
 //	PUBLIC_HOST                  custom domain served by Firebase Hosting; other requests get 404 (off when unset)
@@ -161,6 +162,12 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	maxLists := 0
+	if v := os.Getenv("MAX_LISTS_PER_USER"); v != "" {
+		if maxLists, err = strconv.Atoi(v); err != nil || maxLists <= 0 {
+			return fmt.Errorf("MAX_LISTS_PER_USER = %q, want a positive integer", v)
+		}
+	}
 	publicHost := os.Getenv("PUBLIC_HOST")
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -194,6 +201,7 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 			TrustedProxyHops: hops,
 			RateLimits:       limits,
 			PublicHost:       publicHost,
+			MaxListsPerUser:  maxLists,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
