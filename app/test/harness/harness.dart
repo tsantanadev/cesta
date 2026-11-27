@@ -10,7 +10,8 @@ import 'fake_api_client.dart';
 import 'fake_auth_gateway.dart';
 import 'fields.dart';
 
-export 'package:cesta/src/ui/components.dart' show CesButton, CesCheckedItem, CesItemTile, CesMessage;
+export 'package:cesta/src/ui/components.dart'
+    show CesButton, CesCheckedItem, CesChoiceChip, CesItemTile, CesMessage, CesSearchField;
 
 export 'fake_api_client.dart';
 export 'fake_auth_gateway.dart';
@@ -201,6 +202,35 @@ class Harness {
   List<(String, String)> basketRows() => [
     for (final r in tester.widgetList<CesCheckedItem>(find.byType(CesCheckedItem))) (r.name, r.checkedBy),
   ];
+
+  /// From a List's screen, adds a new Item named [name] through Add items and
+  /// the New item sheet, pressing + [steps] times and picking [unit] (as its
+  /// chip reads); stays on Add items.
+  Future<void> addNewItem(String name, {required String listName, int steps = 0, String? unit}) async {
+    if (find.byType(CesSearchField).evaluate().isEmpty) await tap(find.text('Add an item'));
+    await search(name);
+    await tap(find.text('Add “$name” as a new item'));
+    for (var i = 0; i < steps; i++) {
+      await tap(find.bySemanticsLabel('More'));
+    }
+    if (unit != null) await tap(find.widgetWithText(CesChoiceChip, unit));
+    await tap(find.widgetWithText(CesButton, 'Add to $listName'));
+  }
+
+  /// Types [text] in Add items' search field.
+  Future<void> search(String text) async {
+    await tester.enterText(find.descendant(of: find.byType(CesSearchField), matching: find.byType(EditableText)), text);
+    await tester.pumpAndSettle();
+  }
+
+  /// Taps the tag of the Item named [name] (checks it).
+  Future<void> tapTag(String name) => tap(find.widgetWithText(CesItemTile, name));
+
+  /// Taps the In the basket row of the Item named [name] (unchecks it).
+  Future<void> tapBasketRow(String name) => tap(find.widgetWithText(CesCheckedItem, name));
+
+  /// Whether the List screen says some changes haven't reached the server yet.
+  bool get showsPending => find.byTooltip('Waiting to sync').evaluate().isNotEmpty;
 
   /// The text in the field labelled [label].
   String textInField(String label) => fieldController(tester, label).text;
