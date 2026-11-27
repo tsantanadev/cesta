@@ -12,6 +12,7 @@ import 'lists/lists_controller.dart';
 import 'router.dart';
 import 'session/session_controller.dart';
 import 'sync/sync_engine.dart';
+import 'ui/components.dart';
 import 'ui/theme.dart';
 
 /// The Cesta app. Its dependencies are passed in so tests can supply an
@@ -48,6 +49,8 @@ class _CestaAppState extends State<CestaApp> {
   late final ItemsStore _items;
   late final SyncEngine _sync;
   late final GoRouter _router;
+  late final StreamSubscription<RejectedChange> _rejections;
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
@@ -57,6 +60,7 @@ class _CestaAppState extends State<CestaApp> {
     _items = ItemsStore(widget.database);
     _sync = SyncEngine(api: widget.api, db: widget.database, items: _items);
     _session.addListener(_followSession);
+    _rejections = _sync.rejections.listen(_tellRejected);
     _router = buildRouter(
       session: _session,
       lists: _lists,
@@ -78,8 +82,18 @@ class _CestaAppState extends State<CestaApp> {
     }
   }
 
+  /// Says that a change was rolled back. A placeholder until the rejected-change
+  /// message is designed (#7 design gap).
+  void _tellRejected(RejectedChange change) {
+    final messenger = _messenger.currentState;
+    if (messenger == null) return;
+    final l10n = AppLocalizations.of(messenger.context);
+    showCesToastOn(messenger, message: l10n.errorItemRejected(change.itemName));
+  }
+
   @override
   void dispose() {
+    unawaited(_rejections.cancel());
     _session.removeListener(_followSession);
     unawaited(_sync.dispose());
     _items.dispose();
@@ -92,6 +106,7 @@ class _CestaAppState extends State<CestaApp> {
   @override
   Widget build(BuildContext context) => MaterialApp.router(
     routerConfig: _router,
+    scaffoldMessengerKey: _messenger,
     onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
     theme: CestaTheme.light(),
     darkTheme: CestaTheme.dark(),
