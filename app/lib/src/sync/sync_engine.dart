@@ -203,12 +203,12 @@ class SyncEngine {
             size = 1; // find which change it is
             break;
           }
-          await _rollBack(row, answer.refusal);
+          await _rollBack(row, answer.refusal, generation);
         } else if (r.status == MutationResultStatus.applied) {
           await _outbox.markApplied(row);
           continue;
         } else {
-          await _rollBack(row, r.reason?.code);
+          await _rollBack(row, r.reason?.code, generation);
         }
         if (row.type == MutationType.itemCreate.toJson()) droppedItems.add(row.itemId);
       }
@@ -248,12 +248,13 @@ class SyncEngine {
 
   /// Drops the refused change [row] (and, for a refused create, every later
   /// change to that Item), then reports it.
-  Future<void> _rollBack(OutboxData row, ApiErrorCode? reason) async {
+  Future<void> _rollBack(OutboxData row, ApiErrorCode? reason, int generation) async {
     final shown = await _items.readList(row.listId);
     final name =
         shown.where((i) => i.id == row.itemId).firstOrNull?.name ??
         ItemFields.fromJson(jsonDecode(row.fields) as Map<String, Object?>).name ??
         '';
+    if (generation != _generation) return;
     await _outbox.rollBack(row);
     _rejections.add(
       RejectedChange(type: MutationType.fromJson(row.type), itemName: name, listId: row.listId, reason: reason),
