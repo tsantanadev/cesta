@@ -338,4 +338,106 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorListNotRestorable => 'This List is no longer available and can\'t be restored.';
+
+  @override
+  String listToBuyInBasket(int toBuy, int inBasket) {
+    return '$toBuy to buy, $inBasket in the basket';
+  }
+
+  @override
+  String get listInTheBasket => 'In the basket';
+
+  @override
+  String get listAddAnItem => 'Add an item';
+
+  @override
+  String get listCheckedByYou => 'You';
+
+  @override
+  String get listSyncPending => 'Waiting to sync';
+
+  @override
+  String get itemCheck => 'Check';
+
+  @override
+  String get itemUncheck => 'Uncheck';
+
+  @override
+  String get addItemsSearch => 'Search items';
+
+  @override
+  String get addItemsDone => 'Done';
+
+  @override
+  String addItemsAddAsNew(String name) {
+    return 'Add “$name” as a new item';
+  }
+
+  @override
+  String get newItemTitle => 'New item';
+
+  @override
+  String get newItemName => 'Name';
+
+  @override
+  String get newItemHowMuch => 'How much';
+
+  @override
+  String get newItemQuantity => 'Quantity';
+
+  @override
+  String get newItemLess => 'Less';
+
+  @override
+  String get newItemMore => 'More';
+
+  @override
+  String get newItemNoteHint => 'Add a note, like “ripe ones”';
+
+  @override
+  String newItemAddTo(String list) {
+    return 'Add to $list';
+  }
+
+  @override
+  String get unitUn => 'units';
+
+  @override
+  String get unitKg => 'kg';
+
+  @override
+  String get unitG => 'g';
+
+  @override
+  String get unitL => 'L';
+
+  @override
+  String get unitMl => 'ml';
+
+  @override
+  String get unitPack => 'pack';
+
+  @override
+  String itemAdded(String item, String list) {
+    return '$item added to $list';
+  }
+
+  @override
+  String get itemUndo => 'Undo';
+
+  @override
+  String get errorItemNameRequired => 'Enter a name.';
+
+  @override
+  String errorItemNameTooLong(int max) {
+    return 'Use $max characters or fewer.';
+  }
+
+  @override
+  String get errorItemQuantityInvalid => 'Use a number above zero, like 2 or 1.5.';
+
+  @override
+  String errorItemRejected(String name) {
+    return 'Your change to “$name” couldn\'t be saved, so it was undone.';
+  }
 }

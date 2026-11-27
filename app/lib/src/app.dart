@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -5,9 +7,11 @@ import '../l10n/app_localizations.dart';
 import 'api/generated/cesta_api.dart';
 import 'auth/auth_gateway.dart';
 import 'db/app_database.dart';
+import 'items/items_store.dart';
 import 'lists/lists_controller.dart';
 import 'router.dart';
 import 'session/session_controller.dart';
+import 'sync/sync_engine.dart';
 import 'ui/theme.dart';
 
 /// The Cesta app. Its dependencies are passed in so tests can supply an
@@ -41,6 +45,8 @@ class CestaApp extends StatefulWidget {
 class _CestaAppState extends State<CestaApp> {
   late final SessionController _session;
   late final ListsController _lists;
+  late final ItemsStore _items;
+  late final SyncEngine _sync;
   late final GoRouter _router;
 
   @override
@@ -48,9 +54,14 @@ class _CestaAppState extends State<CestaApp> {
     super.initState();
     _session = SessionController(auth: widget.auth, api: widget.api, db: widget.database)..start();
     _lists = ListsController(api: widget.api, db: widget.database, session: _session);
+    _items = ItemsStore(widget.database);
+    _sync = SyncEngine(api: widget.api, db: widget.database, items: _items);
+    _session.addListener(_followSession);
     _router = buildRouter(
       session: _session,
       lists: _lists,
+      items: _items,
+      sync: _sync,
       auth: widget.auth,
       api: widget.api,
       database: widget.database,
@@ -58,8 +69,20 @@ class _CestaAppState extends State<CestaApp> {
     );
   }
 
+  /// Syncs while a User is signed in.
+  void _followSession() {
+    if (_session.status == SessionStatus.signedIn && _session.user != null) {
+      _sync.start();
+    } else {
+      unawaited(_sync.stop());
+    }
+  }
+
   @override
   void dispose() {
+    _session.removeListener(_followSession);
+    unawaited(_sync.dispose());
+    _items.dispose();
     _router.dispose();
     _lists.dispose();
     _session.dispose();

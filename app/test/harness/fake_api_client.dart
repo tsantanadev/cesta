@@ -325,6 +325,189 @@ class FakeApiClient implements ApiClient {
     return ListDeletedLists200(DeletedLists(lists: [for (final l in deleted) _deleted(l)]));
   }
 
+  // ---- Items and sync ---------------------------------------------------
+
+  /// How many Items a List may hold, like the server's 500.
+  int itemLimit = 500;
+
+  /// When set, every pushed mutation is rejected with this code, as when the
+  /// User was removed from the List meanwhile.
+  ApiErrorCode? rejectMutations;
+
+  /// Every Item the fake backend knows, removed or not, in creation order.
+  final _items = <String, _FakeItem>{};
+  final _mutationResults = <String, MutationResult>{};
+  int _changeSeq = 0;
+  int _nextItemId = 1;
+
+  /// Stores an Item on List [listId], as if added earlier by [addedBy].
+  /// [checkedBy] checks it.
+  String addItem(
+    String listId, {
+    required String name,
+    required FakeIdentity addedBy,
+    String? quantity,
+    ItemUnit? unit,
+    FakeIdentity? checkedBy,
+  }) {
+    final id = '00000000-0000-4000-9000-${(_nextItemId++).toString().padLeft(12, '0')}';
+    final now = DateTime.now().toUtc();
+    _items[id] = _FakeItem(
+      id: id,
+      listId: listId,
+      name: name,
+      quantity: quantity,
+      unit: unit?.toJson(),
+      addedByUid: addedBy.uid,
+      addedAt: now.add(Duration(milliseconds: _nextItemId)),
+      checkedByUid: checkedBy?.uid,
+      checkedAt: checkedBy == null ? null : now,
+      seq: ++_changeSeq,
+    );
+    return id;
+  }
+
+  /// [by] checks the Item named [name] behind the app's back, e.g. on another phone.
+  void checkItemNow(String name, {required FakeIdentity by}) => _liveItems.firstWhere((i) => i.name == name)
+    ..checkedByUid = by.uid
+    ..checkedAt = DateTime.now().toUtc()
+    ..seq = ++_changeSeq;
+
+  Iterable<_FakeItem> get _liveItems => _items.values.where((i) => !i.deleted);
+
+  /// Names of the Items on List [listId] still to buy, in insertion order.
+  List<String> itemsToBuy(String listId) => [
+    for (final i in _liveItems)
+      if (i.listId == listId && i.checkedAt == null) i.name,
+  ];
+
+  /// Names of the Checked Items on List [listId].
+  List<String> itemsInBasket(String listId) => [
+    for (final i in _liveItems)
+      if (i.listId == listId && i.checkedAt != null) i.name,
+  ];
+
+  /// The Item named [name], as the server stores it.
+  Item serverItem(String name) => _toItem(_liveItems.firstWhere((i) => i.name == name));
+
+  String _displayNameOf(String uid) => _users[uid]?.displayName ?? uid;
+
+  String _userIdOf(String uid) => _users[uid]?.id ?? 'user-$uid';
+
+  Item _toItem(_FakeItem i) => Item(
+    id: i.id,
+    listId: i.listId,
+    name: i.name,
+    quantity: i.quantity,
+    unit: i.unit == null ? null : ItemUnit.fromJson(i.unit),
+    note: i.note,
+    addedBy: UserRef(id: _userIdOf(i.addedByUid), displayName: _displayNameOf(i.addedByUid)),
+    addedAt: i.addedAt,
+    checkedAt: i.checkedAt,
+    checkedBy: i.checkedByUid == null
+        ? null
+        : ItemCheckedBy(id: _userIdOf(i.checkedByUid!), displayName: _displayNameOf(i.checkedByUid!)),
+    updatedAt: i.addedAt,
+  );
+
+  @override
+  Future<PushMutationsResult> pushMutations({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required PushRequest body,
+  }) async {
+    _failIfOffline('/api/sync/push');
+    final identity = auth.current;
+    if (identity == null) return const PushMutations401(_unauthenticated);
+    if (body.mutations.isEmpty || body.mutations.length > 100) {
+      return PushMutations400(_error(ApiErrorCode.invalidItem));
+    }
+    return PushMutations200(
+      PushResponse(results: [for (final m in body.mutations) _mutationResults[m.id] ??= _apply(identity, m)]),
+    );
+  }
+
+  MutationResult _apply(FakeIdentity identity, Mutation m) {
+    MutationResult rejected(ApiErrorCode code) =>
+        MutationResult(mutationId: m.id, status: MutationResultStatus.rejected, reason: _error(code));
+    final applied = MutationResult(mutationId: m.id, status: MutationResultStatus.applied);
+    if (rejectMutations case final code?) return rejected(code);
+    final fields = m.fields ?? const ItemFields();
+    switch (m.type) {
+      case MutationType.itemCreate:
+        final listId = m.listId;
+        final list = listId == null ? null : _visible(listId, identity.uid);
+        if (listId == null || list == null) return rejected(ApiErrorCode.listNotFound);
+        if (list.deletedAt != null) return rejected(ApiErrorCode.listDeleted);
+        if (_items.containsKey(m.entityId)) return rejected(ApiErrorCode.invalidItem);
+        final name = fields.name?.trim() ?? '';
+        if (name.isEmpty || name.runes.length > 80) return rejected(ApiErrorCode.invalidItem);
+        if (_liveItems.where((i) => i.listId == listId).length >= itemLimit) {
+          return rejected(ApiErrorCode.limitExceeded);
+        }
+        _items[m.entityId] = _FakeItem(
+          id: m.entityId,
+          listId: listId,
+          name: name,
+          quantity: fields.quantity,
+          unit: fields.unit?.toJson(),
+          note: fields.note,
+          addedByUid: identity.uid,
+          addedAt: DateTime.now().toUtc(),
+          seq: ++_changeSeq,
+        );
+        return applied;
+      case MutationType.itemUpdate || MutationType.itemDelete:
+        final item = _items[m.entityId];
+        if (item == null || _visible(item.listId, identity.uid) == null) return rejected(ApiErrorCode.itemNotFound);
+        if (item.deleted) return rejected(ApiErrorCode.itemDeleted);
+        if (m.type == MutationType.itemDelete) {
+          item.deleted = true;
+        } else {
+          if (fields.name case final name?) item.name = name.trim();
+          if (fields.quantity case final q?) item.quantity = q;
+          if (fields.unit case final u?) item.unit = u.toJson();
+          if (fields.note case final n?) item.note = n;
+          if (fields.checked case final checked?) {
+            item.checkedAt = checked ? DateTime.now().toUtc() : null;
+            item.checkedByUid = checked ? identity.uid : null;
+          }
+        }
+        item.seq = ++_changeSeq;
+        return applied;
+    }
+  }
+
+  @override
+  Future<PullChangesResult> pullChanges({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    String? cursor,
+    int? limit,
+  }) async {
+    _failIfOffline('/api/sync/pull');
+    final identity = auth.current;
+    if (identity == null) return const PullChanges401(_unauthenticated);
+    final since = cursor == null ? 0 : int.parse(cursor);
+    final changed = _items.values.where((i) {
+      final list = _lists[i.listId];
+      return i.seq > since && list != null && list.deletedAt == null && list.members.contains(identity.uid);
+    }).toList()..sort((a, b) => a.seq.compareTo(b.seq));
+    final page = changed.take(limit ?? 500).toList();
+    return PullChanges200(
+      PullResponse(
+        items: [for (final i in page.where((i) => !i.deleted)) _toItem(i)],
+        tombstones: [
+          for (final i in page.where((i) => i.deleted)) Tombstone(type: TombstoneType.item, id: i.id, listId: i.listId),
+        ],
+        cursor: '${page.isEmpty ? since : page.last.seq}',
+        hasMore: page.length < changed.length,
+      ),
+    );
+  }
+
   static const _unauthenticated = ApiError(code: ApiErrorCode.unauthenticated, message: 'no valid token');
 
   void _failIfOffline(String path) {
@@ -360,4 +543,36 @@ class _FakeList {
   final Set<String> members;
   final int uncheckedItemCount;
   DateTime? deletedAt;
+}
+
+/// An Item as the fake backend stores it.
+class _FakeItem {
+  _FakeItem({
+    required this.id,
+    required this.listId,
+    required this.name,
+    required this.addedByUid,
+    required this.addedAt,
+    required this.seq,
+    this.quantity,
+    this.unit,
+    this.note,
+    this.checkedByUid,
+    this.checkedAt,
+  });
+
+  final String id;
+  final String listId;
+  String name;
+  String? quantity;
+  String? unit;
+  String? note;
+  final String addedByUid;
+  final DateTime addedAt;
+  String? checkedByUid;
+  DateTime? checkedAt;
+  bool deleted = false;
+
+  /// The server's change sequence when this Item last changed: the pull cursor.
+  int seq;
 }

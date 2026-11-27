@@ -46,6 +46,70 @@ class KnownLists extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Items as the server last reported them through sync pulls. What the app
+/// shows is these with the [Outbox]'s changes on top (see `ItemsStore`), so
+/// dropping a rejected change from the outbox rolls the display back.
+/// Cleared on sign out.
+class SyncedItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get listId => text()();
+  TextColumn get name => text()();
+  TextColumn get quantity => text().nullable()();
+
+  /// The [ItemUnit] wire value.
+  TextColumn get unit => text().nullable()();
+  TextColumn get note => text().nullable()();
+  TextColumn get addedById => text()();
+  TextColumn get addedByName => text()();
+
+  /// Microseconds since the epoch (UTC): Items show in this order, so it keeps
+  /// more precision than Drift's DateTime columns.
+  IntColumn get addedAtMicros => integer()();
+  IntColumn get checkedAtMicros => integer().nullable()();
+  TextColumn get checkedById => text().nullable()();
+  TextColumn get checkedByName => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// The device's Item changes not yet confirmed by the server, oldest first
+/// (ADR-0001). A change stays here, shown on top of [SyncedItems], until the
+/// server applied it and a pull brought its result back, or until the server
+/// rejected it. Cleared on sign out.
+class Outbox extends Table {
+  /// Order the changes were made in, which is the order they are pushed in.
+  IntColumn get seq => integer().autoIncrement()();
+
+  /// The client mutation ID, so retrying a push applies it once.
+  TextColumn get mutationId => text().unique()();
+
+  /// The [MutationType] wire value.
+  TextColumn get type => text()();
+  TextColumn get itemId => text()();
+  TextColumn get listId => text()();
+
+  /// The changed fields as [ItemFields] JSON.
+  TextColumn get fields => text()();
+  IntColumn get clientTimestampMicros => integer()();
+
+  /// The signed-in User when the change was made: shown as who added or checked it.
+  TextColumn get byId => text()();
+  TextColumn get byName => text()();
+
+  /// True once the server applied it; it is dropped after the next full pull.
+  BoolColumn get applied => boolean().withDefault(const Constant(false))();
+}
+
+/// The last pull cursor (single row, id 1). Cleared on sign out.
+class SyncCursor extends Table {
+  IntColumn get id => integer()();
+  TextColumn get cursor => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Stores [Role] by its API wire value.
 class _RoleConverter extends TypeConverter<Role, String> {
   const _RoleConverter();
@@ -91,20 +155,33 @@ class _HealthDatabaseConverter extends TypeConverter<HealthDatabase, String> {
 ///
 /// Production opens it with `driftDatabase(name: 'cesta')`; tests pass
 /// `NativeDatabase.memory()`.
-@DriftDatabase(tables: [KnownHealth, SignedInUser, KnownLists])
+@DriftDatabase(tables: [KnownHealth, SignedInUser, KnownLists, SyncedItems, Outbox, SyncCursor])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (m, from, to) async {
       if (from < 2) await m.createTable(signedInUser);
       if (from < 3) await m.createTable(knownLists);
+      if (from < 4) {
+        await m.createTable(syncedItems);
+        await m.createTable(outbox);
+        await m.createTable(syncCursor);
+      }
     },
   );
+
+  /// Forgets every Item, pending change and the pull cursor (sign out, or
+  /// another User signing in).
+  Future<void> clearSyncedData() => transaction(() async {
+    await delete(syncedItems).go();
+    await delete(outbox).go();
+    await delete(syncCursor).go();
+  });
 
   /// Replaces the cached Lists with [lists] (the server's full answer).
   Future<void> saveKnownLists(List<ListSummary> lists) => transaction(() async {

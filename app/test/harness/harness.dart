@@ -1,6 +1,7 @@
 import 'package:cesta/src/app.dart';
 import 'package:cesta/src/db/app_database.dart';
 import 'package:cesta/src/ui/components.dart';
+import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -9,7 +10,7 @@ import 'fake_api_client.dart';
 import 'fake_auth_gateway.dart';
 import 'fields.dart';
 
-export 'package:cesta/src/ui/components.dart' show CesButton, CesItemTile, CesMessage;
+export 'package:cesta/src/ui/components.dart' show CesButton, CesCheckedItem, CesItemTile, CesMessage;
 
 export 'fake_api_client.dart';
 export 'fake_auth_gateway.dart';
@@ -27,7 +28,13 @@ const iPhone = Size(390, 844);
 /// and [auth] can be reused across [pumpApp] calls to simulate the app
 /// restarting with the same storage and the same stored session.
 class Harness {
-  Harness(this.tester) : auth = FakeAuthGateway(), db = AppDatabase(NativeDatabase.memory()) {
+  Harness(this.tester)
+    : auth = FakeAuthGateway(),
+      db = AppDatabase(
+        // Close stream queries at once when their listener goes, rather than on a
+        // later timer that a widget test's fake clock would never run.
+        DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true),
+      ) {
     api = FakeApiClient(auth: auth);
     addTearDown(db.close);
   }
@@ -183,6 +190,17 @@ class Harness {
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
   }
+
+  /// Opens the List named [name] from the Lists screen.
+  Future<void> openList(String name) => tap(find.text(name));
+
+  /// The names on the Item tags shown, in order.
+  List<String> tagNames() => [for (final t in tester.widgetList<CesItemTile>(find.byType(CesItemTile))) t.name];
+
+  /// The rows In the basket: each Checked Item's name and who checked it.
+  List<(String, String)> basketRows() => [
+    for (final r in tester.widgetList<CesCheckedItem>(find.byType(CesCheckedItem))) (r.name, r.checkedBy),
+  ];
 
   /// The text in the field labelled [label].
   String textInField(String label) => fieldController(tester, label).text;
