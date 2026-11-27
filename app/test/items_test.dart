@@ -20,9 +20,7 @@ void main() {
 
     expect(find.text('Weekend feira'), findsOneWidget);
     expect(find.text('3 to buy, 2 in the basket'), findsOneWidget);
-    expect(h.tagNames(), ['Tomatoes', 'Bread rolls', 'Coffee']);
-    expect(find.text('1 kg'), findsOneWidget);
-    expect(find.text('10'), findsOneWidget);
+    expect(h.tags(), ['1 kg Tomatoes', '10 Bread rolls', 'Coffee']);
     expect(h.basketRows(), [('Bananas', 'Rui'), ('Cookies', 'You')]);
   });
 
@@ -37,14 +35,14 @@ void main() {
 
     await h.tapTag('Tomatoes');
 
-    expect(h.tagNames(), ['Coffee']);
+    expect(h.tags(), ['Coffee']);
     expect(h.basketRows(), [('Tomatoes', 'You')]);
     expect(find.text('1 to buy, 1 in the basket'), findsOneWidget);
     expect(h.api.itemsInBasket(list), ['Tomatoes']);
 
     await h.tapBasketRow('Tomatoes');
 
-    expect(h.tagNames(), ['Tomatoes', 'Coffee']);
+    expect(h.tags(), ['Tomatoes', 'Coffee']);
     expect(h.basketRows(), isEmpty);
     expect(h.api.itemsInBasket(list), isEmpty);
   });
@@ -62,20 +60,19 @@ void main() {
     await h.tap(find.text('Done'));
     await h.tapTag('Coffee');
 
-    expect(h.tagNames(), ['Tomatoes']);
-    expect(find.text('2 kg'), findsOneWidget);
+    expect(h.tags(), ['2 kg Tomatoes']);
     expect(h.basketRows(), [('Coffee', 'You')]);
-    expect(h.offlinePill, 'Offline · 2 changes waiting to sync');
+    expect(find.text('Offline · 2 changes waiting to sync'), findsOneWidget);
     expect(h.api.itemsToBuy(list), ['Coffee']);
 
     await h.goOnline();
 
-    expect(h.offlinePill, isNull);
+    expect(find.byType(CesStatusPill), findsNothing);
     expect(h.api.itemsToBuy(list), ['Tomatoes']);
     expect(h.api.itemsInBasket(list), ['Coffee']);
     expect(h.api.serverItem('Tomatoes').quantity?.value, '2');
     expect(h.api.serverItem('Tomatoes').unit?.value, ItemUnit.kg);
-    expect(h.tagNames(), ['Tomatoes']);
+    expect(h.tags(), ['2 kg Tomatoes']);
     expect(h.basketRows(), [('Coffee', 'You')]);
   });
 
@@ -91,7 +88,7 @@ void main() {
     await h.tap(find.text('Undo'));
     await h.tap(find.text('Done'));
 
-    expect(h.tagNames(), isEmpty);
+    expect(h.tags(), isEmpty);
     expect(h.api.itemsToBuy(list), isEmpty);
   });
 
@@ -106,10 +103,10 @@ void main() {
 
     await h.tapTag('Coffee');
 
-    expect(h.tagNames(), ['Coffee']);
+    expect(h.tags(), ['Coffee']);
     expect(h.basketRows(), isEmpty);
     expect(find.text('Couldn’t save “Coffee”. The list is no longer available.'), findsOneWidget);
-    expect(h.offlinePill, isNull);
+    expect(find.byType(CesStatusPill), findsNothing);
   });
 
   testWidgets('pulling down shows changes made on another phone', (tester) async {
@@ -153,7 +150,7 @@ void main() {
     await h.tap(find.widgetWithText(CesButton, 'Save'));
 
     expect(find.text('Edit item'), findsNothing);
-    expect(h.tagNames(), ['Cherry tomatoes']);
+    expect(h.tags(), ['Cherry tomatoes']);
     final saved = h.api.serverItem('Cherry tomatoes');
     expect(saved.quantity?.value, isNull);
     expect(saved.unit?.value, isNull);
@@ -192,13 +189,13 @@ void main() {
     await h.openItem('Tomatoes');
     await h.tap(find.text('Remove item'));
 
-    expect(h.tagNames(), ['Coffee']);
+    expect(h.tags(), ['Coffee']);
     expect(find.text('Tomatoes removed'), findsOneWidget);
     expect(h.api.itemsToBuy(list), ['Coffee']);
 
     await h.tap(find.text('Undo'));
 
-    expect(h.tagNames(), containsAll(['Tomatoes', 'Coffee']));
+    expect(h.tags(), containsAll(['1 kg Tomatoes', 'Coffee']));
     expect(h.api.itemsToBuy(list), containsAll(['Tomatoes', 'Coffee']));
     expect(h.api.serverItem('Tomatoes').quantity?.value, '1');
     expect(h.api.serverItem('Tomatoes').unit?.value, ItemUnit.kg);
@@ -218,8 +215,8 @@ void main() {
     await h.tap(find.text('Remove item'));
     await h.tap(find.text('Undo'));
 
-    expect(h.tagNames(), ['Tomatoes', 'Coffee']);
-    expect(h.offlinePill, 'Offline');
+    expect(h.tags(), ['Tomatoes', 'Coffee']);
+    expect(find.text('Offline'), findsOneWidget);
     await h.goOnline();
     expect(h.api.itemsToBuy(list), ['Tomatoes', 'Coffee']);
   });
@@ -237,7 +234,7 @@ void main() {
     await h.tapTag('Milk');
 
     expect(find.text('Couldn’t save “Milk”. It was removed.'), findsOneWidget);
-    expect(h.tagNames(), ['Coffee']);
+    expect(h.tags(), ['Coffee']);
     expect(h.basketRows(), isEmpty);
   });
 
@@ -292,7 +289,7 @@ void main() {
     expect(find.text('Nothing to buy yet'), findsOneWidget);
     expect(find.text('Start your list'), findsOneWidget);
     expect(find.text('Add what you need. Everyone on this list sees it right away.'), findsOneWidget);
-    expect(h.tagNames(), isEmpty);
+    expect(h.tags(), isEmpty);
 
     await h.addNewItem('Tomatoes', listName: 'Weekend feira');
     await h.tap(find.text('Done'));
@@ -323,7 +320,7 @@ void main() {
 
     h.goOffline();
     await h.tap(find.text('Desfazer'));
-    expect(h.offlinePill, 'Sem conexão · 2 alterações aguardando sincronização');
+    expect(find.text('Sem conexão · 2 alterações aguardando sincronização'), findsOneWidget);
 
     await h.tap(find.byTooltip('Voltar'));
     await h.openList('Vazia');

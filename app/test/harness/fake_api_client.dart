@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cesta/src/api/generated/cesta_api.dart';
+import 'package:cesta/src/sync/network_status.dart';
 import 'package:dio/dio.dart';
 
 import 'fake_auth_gateway.dart';
@@ -11,7 +13,8 @@ const _maxDisplayNameLength = 50;
 /// Seam 2 fake: stands in for the generated [ApiClient].
 ///
 /// It answers from in-memory state and can be switched [offline], in which
-/// case every call fails the way Dio does when the network is unreachable.
+/// case every call fails the way Dio does when the network is unreachable,
+/// and its [network] reports the phone's connection gone.
 /// It acts on behalf of whoever is signed in to [auth], as the real client
 /// does by sending that User's ID token.
 class FakeApiClient implements ApiClient {
@@ -31,8 +34,23 @@ class FakeApiClient implements ApiClient {
   /// The health the fake backend reports.
   Health health;
 
-  /// When true, every call throws a connection error.
-  bool offline = false;
+  /// When true, every call throws a connection error and [network] reports
+  /// no connection.
+  bool get offline => _offline;
+  set offline(bool value) {
+    if (value == _offline) return;
+    _offline = value;
+    _connectivity.add(!value);
+  }
+
+  bool _offline = false;
+  final _connectivity = StreamController<bool>.broadcast();
+
+  /// The phone's connection as the OS reports it, which follows [offline]: so
+  /// tests switch one thing to take the phone off the network.
+  late final NetworkStatus network = _FakeNetworkStatus(this);
+
+  Future<void> close() => _connectivity.close();
 
   /// When set, every call throws this instead of answering, e.g. a parse
   /// failure on a malformed response.
@@ -603,4 +621,17 @@ class _FakeItem {
 
   /// The server's change sequence when this Item last changed: the pull cursor.
   int seq;
+}
+
+/// The OS's connectivity report, following [FakeApiClient.offline].
+class _FakeNetworkStatus implements NetworkStatus {
+  _FakeNetworkStatus(this._api);
+
+  final FakeApiClient _api;
+
+  @override
+  Future<bool> isConnected() async => !_api.offline;
+
+  @override
+  Stream<bool> get changes => _api._connectivity.stream;
 }
