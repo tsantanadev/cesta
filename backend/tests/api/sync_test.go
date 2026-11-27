@@ -383,6 +383,21 @@ func TestTheFiveHundredAndFirstItemIsRejected(t *testing.T) {
 	}
 }
 
+func TestTheItemLimitIsConfigurable(t *testing.T) {
+	srv := testkit.NewServer(t, testkit.WithMaxItemsPerList(2))
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	pushOK(t, ana, createItem(groceriesID, uuid.NewString(), `{"name": "Milk"}`),
+		createItem(groceriesID, uuid.NewString(), `{"name": "Bread"}`))
+
+	res := push(t, ana, createItem(groceriesID, uuid.NewString(), `{"name": "Eggs"}`))
+
+	requireRejected(t, res[0], "limit_exceeded")
+	if res[0].Reason.Limit == nil || *res[0].Reason.Limit != 2 {
+		t.Fatalf("reason = %+v, want limit 2", res[0].Reason)
+	}
+}
+
 func TestCheckingAnItemRecordsWhoCheckedItAndWhen(t *testing.T) {
 	srv := testkit.NewServer(t)
 	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)

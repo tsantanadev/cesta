@@ -106,6 +106,10 @@ resource "google_cloud_run_v2_service" "backend" {
         value = tostring(var.max_lists_per_user)
       }
       env {
+        name  = "MAX_ITEMS_PER_LIST"
+        value = tostring(var.max_items_per_list)
+      }
+      env {
         name  = "OTEL_EXPORTER_OTLP_ENDPOINT"
         value = var.otel_exporter_otlp_endpoint
       }
