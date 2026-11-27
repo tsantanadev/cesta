@@ -110,6 +110,8 @@
   "itemUncheck": "Desmarcar",
   "itemOpen": "Abrir",
   "addItemsMatches": "Resultados",
+  "addItemsBoughtBefore": "Comprados antes",
+  "itemAddAgain": "Adicionar",
   "addItemsSearch": "Buscar itens",
   "addItemsDone": "Concluir",
   "addItemsAddAsNew": "Adicionar “{name}” como novo item",

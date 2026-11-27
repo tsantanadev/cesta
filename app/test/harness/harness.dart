@@ -240,7 +240,12 @@ class Harness {
   /// ("2 L leite").
   List<String> matches() => [for (final n in find.semantics.byHint(_open).evaluate()) n.label];
 
+  /// The past Items on Add items, in order, each as its label reads: under
+  /// Bought before, or under Matches after the List's own.
+  List<String> pastItems() => [for (final n in find.semantics.byHint(_addAgain).evaluate()) n.label];
+
   /// What tapping a tag or a basket row does, as screen readers say it.
+  static final _addAgain = RegExp(r'^(Add|Adicionar)$');
   static final _check = RegExp(r'^(Check|Marcar como comprado)$');
   static final _open = RegExp(r'^(Open|Abrir)$');
   static final _uncheck = RegExp(r'^(Uncheck|Desmarcar)$');
