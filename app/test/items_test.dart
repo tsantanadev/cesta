@@ -415,4 +415,18 @@ void main() {
 
     expect(find.text('Offline'), findsOneWidget);
   });
+
+  testWidgets('opening a List shows the changes other Members made since', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final rui = h.existingUser(email: 'rui@example.com', password: 'x', displayName: 'Rui');
+    final list = h.api.addList(ana, name: 'Weekend feira', sharedWith: [rui]);
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+
+    h.api.checkItemNow('Coffee', by: rui);
+    await h.openList('Weekend feira');
+
+    expect(h.basketRows(), [('Coffee', 'Rui')]);
+  });
 }

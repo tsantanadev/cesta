@@ -60,6 +60,8 @@ class _ListScreenState extends State<ListScreen> {
           }),
         );
     _pendingSub = widget.items.watchPendingCount(widget.listId).listen((n) => setState(() => _pending = n));
+    // Show what other Members changed since the last sync (story 43).
+    unawaited(widget.sync.sync());
   }
 
   @override
