@@ -728,6 +728,18 @@ abstract class AppLocalizations {
   /// **'Uncheck'**
   String get itemUncheck;
 
+  /// Screen reader hint on an Item tag under Matches: tapping it opens that Item instead of adding another.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get itemOpen;
+
+  /// Heading on Add items over the Items whose names match what was typed.
+  ///
+  /// In en, this message translates to:
+  /// **'Matches'**
+  String get addItemsMatches;
+
   /// Label of the search field on Add items.
   ///
   /// In en, this message translates to:

@@ -170,8 +170,19 @@ class ItemsStore {
   /// Removes Item [itemId] from List [listId]. An Item added on this device
   /// that hasn't reached the server yet just goes, with its changes, so
   /// nothing is left waiting to sync.
-  Future<void> remove({required String itemId, required String listId, required Actor by}) async {
+  ///
+  /// With [undoableUntil] (the Undo window), the removal waits to be pushed
+  /// until it completes, so [restore] meanwhile just drops it.
+  Future<void> remove({
+    required String itemId,
+    required String listId,
+    required Actor by,
+    Future<void>? undoableUntil,
+  }) async {
     if (await _outbox.dropPendingCreate(itemId)) return;
+    if (undoableUntil != null) {
+      return _outbox.enqueueHeldRemoval(itemId: itemId, listId: listId, by: by, until: undoableUntil);
+    }
     await _outbox.enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
   }
 

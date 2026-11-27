@@ -222,11 +222,11 @@ void main() {
     expect(h.api.itemsInBasket(list), ['Milk']);
   });
 
-  testWidgets('Remove item takes it off the List, and Undo brings it back', (tester) async {
+  testWidgets('Remove item takes it off the List, and Undo brings it back with no remove synced', (tester) async {
     final h = Harness(tester);
     final ana = h.signedIn();
     final list = h.api.addList(ana, name: 'Weekend feira');
-    h.api.addItem(list, name: 'Tomatoes', addedBy: ana, quantity: '1', unit: ItemUnit.kg);
+    final tomatoes = h.api.addItem(list, name: 'Tomatoes', addedBy: ana, quantity: '1', unit: ItemUnit.kg);
     h.api.addItem(list, name: 'Coffee', addedBy: ana);
     await h.pumpApp();
     await h.openList('Weekend feira');
@@ -236,14 +236,56 @@ void main() {
 
     expect(h.tags(), ['Coffee']);
     expect(find.text('Tomatoes removed'), findsOneWidget);
-    expect(h.api.itemsToBuy(list), ['Coffee']);
+    expect(h.api.itemsToBuy(list), ['Tomatoes', 'Coffee']); // held while Undo is offered
 
     await h.tap(find.text('Undo'));
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
 
-    expect(h.tags(), containsAll(['1 kg Tomatoes', 'Coffee']));
-    expect(h.api.itemsToBuy(list), containsAll(['Tomatoes', 'Coffee']));
-    expect(h.api.serverItem('Tomatoes').quantity?.value, '1');
-    expect(h.api.serverItem('Tomatoes').unit?.value, ItemUnit.kg);
+    expect(h.tags(), ['1 kg Tomatoes', 'Coffee']);
+    expect(h.api.itemsToBuy(list), ['Tomatoes', 'Coffee']);
+    expect(h.api.serverItem('Tomatoes').id, tomatoes); // the same Item, never removed
+  });
+
+  testWidgets('a removal not undone is synced once the Undo Toast closes', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Tomatoes', addedBy: ana);
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await h.openItem('Tomatoes');
+    await h.tap(find.text('Remove item'));
+    await h.tapTag('Coffee'); // a later change syncs while the removal waits
+
+    expect(h.api.itemsToBuy(list), ['Tomatoes']);
+    expect(h.api.itemsInBasket(list), ['Coffee']);
+
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tomatoes removed'), findsNothing);
+    expect(h.tags(), isEmpty);
+    expect(h.api.itemsToBuy(list), isEmpty);
+    expect(h.api.itemsInBasket(list), ['Coffee']);
+  });
+
+  testWidgets('signing out while Undo is offered takes the Undo away with the session', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Tomatoes', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await h.openItem('Tomatoes');
+    await h.tap(find.text('Remove item'));
+    await h.tap(find.byTooltip('Back'));
+    await h.signOut();
+
+    expect(find.text('Undo'), findsNothing);
   });
 
   testWidgets('offline, Undo of a removal just drops the waiting change', (tester) async {
@@ -258,6 +300,7 @@ void main() {
 
     await h.openItem('Tomatoes');
     await h.tap(find.text('Remove item'));
+    expect(find.text('Offline · 1 change waiting to sync'), findsOneWidget);
     await h.tap(find.text('Undo'));
 
     expect(h.tags(), ['Tomatoes', 'Coffee']);
@@ -367,6 +410,9 @@ void main() {
 
     h.goOffline();
     await h.tap(find.text('Desfazer'));
+    expect(find.text('Sem conexão'), findsOneWidget); // Undo just dropped the removal
+    await h.tapBasketRow('Arroz');
+    await h.tapTag('Arroz');
     expect(find.text('Sem conexão · 2 alterações aguardando sincronização'), findsOneWidget);
 
     await h.tap(find.byTooltip('Voltar'));
@@ -519,5 +565,66 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(h.api.itemsInBasket(list), ['Coffee']);
+  });
+  testWidgets('typing in Add items highlights the List’s Item under Matches; tapping it opens that Item', (
+    tester,
+  ) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'leite', addedBy: ana, quantity: '2', unit: ItemUnit.l);
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    await h.tap(find.text('Add an item'));
+
+    await h.search('Leite');
+
+    expect(find.text('Matches'), findsOneWidget);
+    expect(h.matches(), ['2 L leite']);
+
+    await h.tap(find.widgetWithText(CesItemTile, 'leite'));
+
+    expect(find.text('Edit item'), findsOneWidget);
+    expect(h.textInField('Name'), 'leite');
+    expect(find.text('Added by you'), findsOneWidget);
+    expect(h.api.itemsToBuy(list), ['leite', 'Coffee']);
+  });
+
+  testWidgets('"Add “…” as a new item" still adds a second Item when one matches', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'leite', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+
+    await h.addNewItem('Leite', listName: 'Weekend feira');
+    await h.tap(find.text('Done'));
+
+    expect(h.tags(), ['leite', 'Leite']);
+    expect(h.api.itemsToBuy(list), ['leite', 'Leite']);
+  });
+
+  testWidgets('Matches ignore case and accents, and leave out what is In the basket', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Feira');
+    h.api.addItem(list, name: 'Pão de forma', addedBy: ana);
+    h.api.addItem(list, name: 'Pãozinho', addedBy: ana, checkedBy: ana);
+    h.api.addItem(list, name: 'Arroz', addedBy: ana);
+    await h.pumpApp(locale: brazilianPortuguese);
+    await h.openList('Feira');
+    await h.tap(find.text('Adicionar um item'));
+
+    await h.search('PAO');
+
+    expect(find.text('Resultados'), findsOneWidget);
+    expect(h.matches(), ['Pão de forma']);
+
+    await h.search('feijão');
+
+    expect(find.text('Resultados'), findsNothing);
+    expect(h.matches(), isEmpty);
   });
 }
