@@ -55,9 +55,10 @@ type mutationResult struct {
 	} `json:"reason"`
 }
 
-// mutation is one outbox entry; fields is a JSON object literal or "".
+// mutation is one outbox entry; fields is a JSON object literal or "", at a
+// client timestamp or "" for a fixed one.
 type mutation struct {
-	id, typ, entity, list, fields string
+	id, typ, entity, list, fields, at string
 }
 
 func (m mutation) json() string {
@@ -72,7 +73,10 @@ func (m mutation) json() string {
 	if m.fields != "" {
 		b.WriteString(`, "fields": ` + m.fields)
 	}
-	b.WriteString(`, "clientTimestamp": "2026-03-02T08:00:00Z"}`)
+	if m.at == "" {
+		m.at = "2026-03-02T08:00:00Z"
+	}
+	b.WriteString(`, "clientTimestamp": "` + m.at + `"}`)
 	return b.String()
 }
 
@@ -173,8 +177,6 @@ func findItem(t *testing.T, p pulled, id string) item {
 	return item{}
 }
 
-func str(s string) *string { return &s }
-
 const milkID = "0190a3b4-7c5d-7e6f-8a9b-000000000001"
 
 func TestAnAddedItemIsPulledWithItsFields(t *testing.T) {
@@ -197,5 +199,186 @@ func TestAnAddedItemIsPulledWithItsFields(t *testing.T) {
 		*got.Quantity != "1.5" || *got.Unit != "L" || *got.Note != "semi-skimmed" ||
 		got.AddedBy.DisplayName != "Ana Souza" || got.CheckedAt != nil || got.CheckedBy != nil {
 		t.Fatalf("pulled Item = %+v", got)
+	}
+}
+
+func TestPushingTheSameMutationTwiceAppliesItOnce(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	add := createItem(groceriesID, milkID, `{"name": "Milk"}`)
+	add.id = uuid.NewString()
+	pushOK(t, ana, add)
+	pushOK(t, ana, updateItem(milkID, `{"name": "Oat milk"}`))
+
+	again := push(t, ana, add)
+
+	if again[0].Status != "applied" || again[0].MutationID != add.id {
+		t.Fatalf("retried create = %+v, want its original result, applied", again[0])
+	}
+	p := pullAll(t, ana, "")
+	if len(p.Items) != 1 || p.Items[0].Name != "Oat milk" {
+		t.Fatalf("pulled Items = %+v, want just Oat milk: the retry must not apply again", p.Items)
+	}
+}
+
+func TestARetriedRejectionReturnsTheSameRejection(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	edit := updateItem(milkID, `{"name": "Oat milk"}`)
+	edit.id = uuid.NewString()
+	requireRejected(t, push(t, ana, edit)[0], "item_not_found")
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+
+	requireRejected(t, push(t, ana, edit)[0], "item_not_found")
+
+	if got := findItem(t, pullAll(t, ana, ""), milkID); got.Name != "Milk" {
+		t.Fatalf("Item = %+v, want Milk unchanged", got)
+	}
+}
+
+func TestOfflineEditsToDifferentFieldsOfAnItemBothSurvive(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.AddEditor(t, groceriesID, testkit.Bruno)
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+
+	pushOK(t, ana, updateItem(milkID, `{"quantity": "2", "unit": "L"}`))
+	pushOK(t, bruno, updateItem(milkID, `{"note": "lactose-free"}`))
+
+	got := findItem(t, pullAll(t, ana, ""), milkID)
+	if got.Name != "Milk" || *got.Quantity != "2" || *got.Unit != "L" || *got.Note != "lactose-free" {
+		t.Fatalf("Item = %+v, want both edits kept", got)
+	}
+}
+
+func TestOfTwoEditsToTheSameFieldTheLaterReceivedWins(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.AddEditor(t, groceriesID, testkit.Bruno)
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+	// Bruno's edit carries an earlier client timestamp but reaches the server last.
+	brunos := updateItem(milkID, `{"name": "Whole milk"}`)
+	brunos.at = "2026-03-02T07:00:00Z"
+	anas := updateItem(milkID, `{"name": "Oat milk"}`)
+
+	pushOK(t, ana, anas)
+	pushOK(t, bruno, brunos)
+
+	if got := findItem(t, pullAll(t, ana, ""), milkID); got.Name != "Whole milk" {
+		t.Fatalf("name = %q, want Whole milk, the edit received last", got.Name)
+	}
+}
+
+func TestAnEditToAnItemRemovedConcurrentlyDoesNotBringItBack(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.AddEditor(t, groceriesID, testkit.Bruno)
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+	before := pullAll(t, bruno, "")
+
+	pushOK(t, ana, deleteItem(milkID))
+	edit := push(t, bruno, updateItem(milkID, `{"quantity": "2", "checked": true}`))
+
+	requireRejected(t, edit[0], "item_deleted")
+	p := pullAll(t, bruno, before.Cursor)
+	if len(p.Items) != 0 || len(p.Tombstones) != 1 ||
+		p.Tombstones[0] != (tombstone{Type: "item", ID: milkID, ListID: groceriesID}) {
+		t.Fatalf("pull = %+v, want only Milk's tombstone", p)
+	}
+	if full := pullAll(t, ana, ""); len(full.Items) != 0 {
+		t.Fatalf("full pull Items = %+v, want none", full.Items)
+	}
+}
+
+func TestRemovingAnItemTwiceIsApplied(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+
+	pushOK(t, ana, deleteItem(milkID), deleteItem(milkID))
+}
+
+const breadID = "0190a3b4-7c5d-7e6f-8a9b-000000000002"
+
+func TestAPullReturnsOnlyChangesSinceTheCursor(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+	first := pullAll(t, ana, "")
+
+	pushOK(t, ana, createItem(groceriesID, breadID, `{"name": "Bread"}`))
+
+	p := pullAll(t, ana, first.Cursor)
+	if len(p.Items) != 1 || p.Items[0].ID != breadID || len(p.Tombstones) != 0 {
+		t.Fatalf("pull since cursor = %+v, want just Bread", p)
+	}
+	if none := pullAll(t, ana, p.Cursor); len(none.Items) != 0 || len(none.Tombstones) != 0 || none.Cursor != p.Cursor {
+		t.Fatalf("pull with nothing new = %+v, want empty and the same cursor", none)
+	}
+}
+
+func TestAPullReturnsOnlyListsTheUserIsAMemberOf(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+	brunosList := uuid.NewString()
+	createList(t, bruno, brunosList, "Hardware")
+	pushOK(t, bruno, createItem(brunosList, breadID, `{"name": "Nails"}`))
+
+	p := pullAll(t, bruno, "")
+
+	if len(p.Items) != 1 || p.Items[0].ID != breadID {
+		t.Fatalf("Bruno's pull = %+v, want only his Nails", p.Items)
+	}
+}
+
+func TestANonMemberCannotChangeItemsOnTheList(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	pushOK(t, ana, createItem(groceriesID, milkID, `{"name": "Milk"}`))
+
+	res := push(t, bruno,
+		createItem(groceriesID, breadID, `{"name": "Bread"}`),
+		updateItem(milkID, `{"name": "Mine"}`),
+		deleteItem(milkID))
+
+	requireRejected(t, res[0], "list_not_found")
+	requireRejected(t, res[1], "item_not_found")
+	requireRejected(t, res[2], "item_not_found")
+	p := pullAll(t, ana, "")
+	if len(p.Items) != 1 || p.Items[0].Name != "Milk" {
+		t.Fatalf("Ana's Items = %+v, want Milk unchanged", p.Items)
+	}
+}
+
+func TestTheFiveHundredAndFirstItemIsRejected(t *testing.T) {
+	srv := testkit.NewServer(t, generousRateLimits())
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	for range 5 {
+		batch := make([]mutation, 100)
+		for i := range batch {
+			batch[i] = createItem(groceriesID, uuid.NewString(), `{"name": "Thing"}`)
+		}
+		pushOK(t, ana, batch...)
+	}
+
+	res := push(t, ana, createItem(groceriesID, uuid.NewString(), `{"name": "One too many"}`))
+
+	requireRejected(t, res[0], "limit_exceeded")
+	if res[0].Reason.Limit == nil || *res[0].Reason.Limit != 500 {
+		t.Fatalf("reason = %+v, want limit 500", res[0].Reason)
+	}
+	if p := pullAll(t, ana, ""); len(p.Items) != 500 {
+		t.Fatalf("the List has %d Items, want 500", len(p.Items))
 	}
 }
