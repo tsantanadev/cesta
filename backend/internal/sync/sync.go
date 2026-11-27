@@ -1,15 +1,17 @@
-// Package sync owns Items and the offline-first sync of them (ADR-0001).
+// Package sync carries Item changes between devices and the server, offline
+// first (ADR-0001). Package lists owns the Items; this package applies the
+// mutations devices push through it and serves the changes they pull.
 //
 // Devices push batches of mutations from their outbox and pull the changes
 // made since their cursor. The server is authoritative:
 //   - Every mutation is idempotent by its client mutation ID: the first result
-//     is stored and returned again on any retry.
-//   - Each mutation re-checks, under a lock on the Item's List, that the User
-//     is a Member of it and it is not deleted (packages lists and membership
-//     decide).
+//     is stored and returned again on any retry, with the client timestamp
+//     recorded for diagnosis.
+//   - Each mutation is applied by package lists, which re-checks under a lock
+//     on the Item's List that the User is a Member of it and it is not deleted.
 //   - Conflicts resolve last-write-wins per field, in order of server receipt.
 //     A mutation changes only the fields it carries.
-//   - A delete wins: a removed Item keeps a tombstone row, and later edits to it
+//   - A delete wins: a removed Item keeps a tombstone, and later edits to it
 //     are rejected with ReasonItemDeleted.
 //
 // Every change a pull must see is numbered by package changeseq, so a pull
@@ -26,13 +28,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/tsantanadev/cesta/backend/internal/identity"
 	"github.com/tsantanadev/cesta/backend/internal/lists"
 	"github.com/tsantanadev/cesta/backend/internal/membership"
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
 )
-
-// DefaultMaxItemsPerList is how many Items a List can hold, not counting removed ones.
-const DefaultMaxItemsPerList = 500
 
 // MaxBatch is the most mutations one push can carry.
 const MaxBatch = 100
@@ -47,25 +47,6 @@ const (
 	ItemDelete MutationType = "item_delete"
 )
 
-// Field is an optional field of a mutation. Present false leaves the field as
-// it is; Present with a nil Value clears it.
-type Field[T any] struct {
-	Present bool
-	Value   *T
-}
-
-// Fields are the Item fields a mutation sets.
-type Fields struct {
-	// Name is required on ItemCreate and can't be cleared; nil leaves it as it is.
-	Name     *string
-	Quantity Field[string]
-	Unit     Field[string]
-	Note     Field[string]
-	// Checked true marks the Item bought by the pushing User at receipt time;
-	// false unchecks it; nil leaves it as it is.
-	Checked *bool
-}
-
 // Mutation is one change from a device's outbox.
 type Mutation struct {
 	// ID is chosen by the client; retrying the same ID is safe.
@@ -74,7 +55,9 @@ type Mutation struct {
 	EntityID uuid.UUID
 	// ListID is required on ItemCreate and ignored otherwise.
 	ListID uuid.UUID
-	Fields Fields
+	// Fields are what ItemCreate and ItemUpdate set; Checked true marks the
+	// Item bought by the pushing User at receipt time.
+	Fields lists.ItemFields
 	// ClientTimestamp is recorded for diagnosis only; receipt order decides conflicts.
 	ClientTimestamp time.Time
 }
@@ -113,17 +96,14 @@ type Service struct {
 	clock    clock.Clock
 	lists    *lists.Service
 	members  *membership.Service
-	maxItems int
+	identity *identity.Service
 }
 
-// NewService returns a Service backed by db. maxItemsPerList <= 0 means DefaultMaxItemsPerList.
+// NewService returns a Service backed by db.
 func NewService(
-	db *pgxpool.Pool, c clock.Clock, ls *lists.Service, members *membership.Service, maxItemsPerList int,
+	db *pgxpool.Pool, c clock.Clock, ls *lists.Service, members *membership.Service, users *identity.Service,
 ) *Service {
-	if maxItemsPerList <= 0 {
-		maxItemsPerList = DefaultMaxItemsPerList
-	}
-	return &Service{db: db, clock: c, lists: ls, members: members, maxItems: maxItemsPerList}
+	return &Service{db: db, clock: c, lists: ls, members: members, identity: users}
 }
 
 // Push applies ms in order, each in its own transaction, on behalf of userID
@@ -218,31 +198,56 @@ func clientTimestamp(t time.Time) *time.Time {
 	return &t
 }
 
+// apply makes m's change inside tx through package lists, or returns why it can't.
+func (s *Service) apply(ctx context.Context, tx pgx.Tx, userID uuid.UUID, m Mutation, now time.Time) (Result, error) {
+	var err error
+	switch m.Type {
+	case ItemCreate:
+		if m.ListID == uuid.Nil {
+			return rejected(ReasonInvalidRequest, "listId is required to create an Item"), nil
+		}
+		err = s.lists.CreateItem(ctx, tx, userID, m.ListID, m.EntityID, m.Fields, now)
+	case ItemUpdate:
+		err = s.lists.UpdateItem(ctx, tx, userID, m.EntityID, m.Fields, now)
+	case ItemDelete:
+		err = s.lists.RemoveItem(ctx, tx, userID, m.EntityID, now)
+	default:
+		return rejected(ReasonInvalidRequest, fmt.Sprintf("unknown mutation type %q", m.Type)), nil
+	}
+	return result(err)
+}
+
+// result turns what package lists answered into a Result: a rejection for a
+// change it refused, or the error for anything unexpected.
+func result(err error) (Result, error) {
+	if invalid, ok := errors.AsType[*lists.InvalidItemError](err); ok {
+		return rejected(ReasonInvalidItem, invalid.Message), nil
+	}
+	if full, ok := errors.AsType[*lists.ItemLimitError](err); ok {
+		r := rejected(ReasonLimitExceeded, fmt.Sprintf("the List already holds the limit of %d Items", full.Limit))
+		r.Limit = full.Limit
+		return r, nil
+	}
+	switch {
+	case err == nil:
+		return applied(), nil
+	case errors.Is(err, lists.ErrNotFound):
+		return rejected(ReasonListNotFound, "no such List"), nil
+	case errors.Is(err, lists.ErrDeleted):
+		return rejected(ReasonListDeleted, "the List is deleted"), nil
+	case errors.Is(err, lists.ErrItemNotFound):
+		return rejected(ReasonItemNotFound, "no such Item"), nil
+	case errors.Is(err, lists.ErrItemDeleted):
+		return rejected(ReasonItemDeleted, "the Item was removed"), nil
+	case errors.Is(err, lists.ErrItemIDTaken):
+		return rejected(ReasonInvalidItem, "another Item has this id"), nil
+	default:
+		return Result{}, err
+	}
+}
+
 func applied() Result { return Result{Applied: true} }
 
 func rejected(reason Reason, message string) Result {
 	return Result{Reason: reason, Message: message}
-}
-
-// UncheckedCounts returns how many Items to buy (not removed, not checked)
-// each of listIDs has. Lists with none are missing from the map.
-func (s *Service) UncheckedCounts(ctx context.Context, listIDs []uuid.UUID) (map[uuid.UUID]int, error) {
-	rows, err := s.db.Query(ctx, `
-		SELECT list_id, count(*) FROM items
-		WHERE list_id = ANY($1) AND deleted_at IS NULL AND checked_at IS NULL
-		GROUP BY list_id`, listIDs)
-	if err != nil {
-		return nil, fmt.Errorf("sync: unchecked counts: %w", err)
-	}
-	out := map[uuid.UUID]int{}
-	var id uuid.UUID
-	var n int
-	_, err = pgx.ForEachRow(rows, []any{&id, &n}, func() error {
-		out[id] = n
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("sync: unchecked counts: %w", err)
-	}
-	return out, nil
 }

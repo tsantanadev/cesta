@@ -140,6 +140,25 @@ func (s *Service) SetDisplayName(ctx context.Context, userID uuid.UUID, name str
 		userID, name, s.clock.Now()), "set display name")
 }
 
+// DisplayNamesIn returns the display name of each of userIDs that exists,
+// read inside the caller's transaction tx.
+func (s *Service) DisplayNamesIn(ctx context.Context, tx pgx.Tx, userIDs []uuid.UUID) (map[uuid.UUID]string, error) {
+	rows, err := tx.Query(ctx, "SELECT id, display_name FROM users WHERE id = ANY($1)", userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("identity: display names: %w", err)
+	}
+	out := make(map[uuid.UUID]string, len(userIDs))
+	var id uuid.UUID
+	var name string
+	if _, err := pgx.ForEachRow(rows, []any{&id, &name}, func() error {
+		out[id] = name
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("identity: display names: %w", err)
+	}
+	return out, nil
+}
+
 func scanUserOrWrap(row pgx.Row, what string) (User, error) {
 	u, err := scanUser(row)
 	if err != nil {

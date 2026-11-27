@@ -1,4 +1,4 @@
--- Items and offline sync (sync module, ADR-0001).
+-- Items (lists module) and their offline sync (sync module, ADR-0001).
 --
 -- Every change a pull must see takes a number from change_seq, under one
 -- transaction-scoped advisory lock held until commit (package changeseq), so

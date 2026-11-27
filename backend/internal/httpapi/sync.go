@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/oapi-codegen/nullable"
 
+	"github.com/tsantanadev/cesta/backend/internal/lists"
 	cestasync "github.com/tsantanadev/cesta/backend/internal/sync"
 )
 
@@ -100,7 +101,7 @@ func syncMutation(m Mutation) cestasync.Mutation {
 		out.ListID = *m.ListId
 	}
 	if f := m.Fields; f != nil {
-		out.Fields = cestasync.Fields{
+		out.Fields = lists.ItemFields{
 			Name:     f.Name,
 			Quantity: field(f.Quantity, func(v string) string { return v }),
 			Unit:     field(f.Unit, func(v ItemFieldsUnit) string { return string(v) }),
@@ -111,15 +112,15 @@ func syncMutation(m Mutation) cestasync.Mutation {
 	return out
 }
 
-func field[T any](n nullable.Nullable[T], conv func(T) string) cestasync.Field[string] {
+func field[T any](n nullable.Nullable[T], conv func(T) string) lists.ItemField[string] {
 	if !n.IsSpecified() {
-		return cestasync.Field[string]{}
+		return lists.ItemField[string]{}
 	}
 	if n.IsNull() {
-		return cestasync.Field[string]{Present: true}
+		return lists.ItemField[string]{Present: true}
 	}
 	v := conv(n.MustGet())
-	return cestasync.Field[string]{Present: true, Value: &v}
+	return lists.ItemField[string]{Present: true, Value: &v}
 }
 
 func apiMutationResult(r cestasync.Result) MutationResult {

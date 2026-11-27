@@ -24,7 +24,7 @@ func (s *Server) ListLists(ctx context.Context, _ ListListsRequestObject) (ListL
 	for _, l := range mine {
 		ids = append(ids, l.ID)
 	}
-	counts, err := s.Sync.UncheckedCounts(ctx, ids)
+	counts, err := s.Lists.UncheckedCounts(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func limitExceeded(limit int) ApiError {
 
 // listSummary returns l as the API shows it, with its count of Items to buy.
 func (s *Server) listSummary(ctx context.Context, l lists.Summary) (ListSummary, error) {
-	counts, err := s.Sync.UncheckedCounts(ctx, []uuid.UUID{l.ID})
+	counts, err := s.Lists.UncheckedCounts(ctx, []uuid.UUID{l.ID})
 	if err != nil {
 		return ListSummary{}, err
 	}

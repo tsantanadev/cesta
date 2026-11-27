@@ -11,6 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/tsantanadev/cesta/backend/internal/lists"
 )
 
 // DefaultPullLimit and MaxPullLimit bound how many changes one pull returns.
@@ -112,38 +114,6 @@ func parseCursor(c string) (position, error) {
 	return position{seq: seq, id: id}, nil
 }
 
-// pullQuery lists, in order, every change past a position ($5, $6) to the
-// Lists given as arrays: their ids ($1), whether each is deleted ($2), when it
-// was last deleted or restored ($3) and when the User joined it ($4), as
-// packages lists and membership report them. It returns:
-//   - an Item of a List they are a Member of that is not deleted, at the later
-//     of its own change and the List becoming visible to them (joining it, or
-//     it being restored), so a newly visible List arrives whole;
-//   - a removed Item, at its removal;
-//   - a deleted List they are a Member of, at its deletion.
-const pullQuery = `
-WITH vis AS (
-	SELECT v.id, v.deleted, v.visible_seq, GREATEST(v.joined_seq, v.visible_seq) AS vseq
-	FROM unnest($1::uuid[], $2::boolean[], $3::bigint[], $4::bigint[]) AS v(id, deleted, visible_seq, joined_seq)
-), changes AS (
-	SELECT 'item' AS kind, i.id, i.list_id,
-		CASE WHEN i.deleted_at IS NULL THEN GREATEST(i.seq, v.vseq) ELSE i.seq END AS pos
-	FROM items i JOIN vis v ON v.id = i.list_id AND NOT v.deleted
-	UNION ALL
-	SELECT 'list', v.id, v.id, v.visible_seq FROM vis v WHERE v.deleted
-)
-SELECT c.kind, c.id, c.list_id, c.pos, i.deleted_at IS NOT NULL,
-	i.name, trim_scale(i.quantity)::text, i.unit, i.note,
-	i.added_by, a.display_name, i.added_at,
-	i.checked_by, b.display_name, i.checked_at, i.updated_at
-FROM changes c
-LEFT JOIN items i ON c.kind = 'item' AND i.id = c.id
-LEFT JOIN users a ON a.id = i.added_by
-LEFT JOIN users b ON b.id = i.checked_by
-WHERE (c.pos, c.id) > ($5, $6)
-ORDER BY c.pos, c.id
-LIMIT $7`
-
 // Pull returns the changes past cursor that userID should see, at most limit
 // of them (0 means DefaultPullLimit). An empty cursor starts from the beginning.
 func (s *Service) Pull(ctx context.Context, userID uuid.UUID, cursor string, limit int) (Changes, error) {
@@ -171,93 +141,72 @@ func (s *Service) Pull(ctx context.Context, userID uuid.UUID, cursor string, lim
 	return out, nil
 }
 
-// pull reads, inside tx, the changes past from that userID should see.
+// pull reads, inside tx, the changes past from that userID should see: the
+// Lists they joined (package membership), those Lists' changes (package
+// lists) and the names of the Users the Items mention (package identity).
 func (s *Service) pull(ctx context.Context, tx pgx.Tx, userID uuid.UUID, from position, limit int) (Changes, error) {
 	joined, err := s.members.JoinedIn(ctx, tx, userID)
 	if err != nil {
 		return Changes{}, err
 	}
-	joinedAt := make(map[uuid.UUID]int64, len(joined))
-	ids := make([]uuid.UUID, 0, len(joined))
-	for _, j := range joined {
-		joinedAt[j.ListID] = j.Seq
-		ids = append(ids, j.ListID)
-	}
-	vis, err := s.lists.VisibilityIn(ctx, tx, ids)
+	changes, err := s.lists.ChangesIn(ctx, tx, joined, from.seq, from.id, limit+1)
 	if err != nil {
 		return Changes{}, err
 	}
-	var (
-		visIDs   = make([]uuid.UUID, 0, len(vis))
-		deleted  = make([]bool, 0, len(vis))
-		visSeqs  = make([]int64, 0, len(vis))
-		joinSeqs = make([]int64, 0, len(vis))
-	)
-	for _, v := range vis {
-		visIDs, deleted = append(visIDs, v.ID), append(deleted, v.Deleted)
-		visSeqs, joinSeqs = append(visSeqs, v.Seq), append(joinSeqs, joinedAt[v.ID])
-	}
-	rows, err := tx.Query(ctx, pullQuery, visIDs, deleted, visSeqs, joinSeqs, from.seq, from.id, limit+1)
-	if err != nil {
-		return Changes{}, err
-	}
-	defer rows.Close()
 	out := Changes{Items: []Item{}, Tombstones: []Tombstone{}}
-	last, n := from, 0
-	for rows.Next() {
-		if n == limit {
-			out.HasMore = true
-			break
-		}
-		n++
-		var (
-			kind               string
-			id, listID         uuid.UUID
-			pos                int64
-			removed            *bool
-			name               *string
-			it                 Item
-			addedBy            *uuid.UUID
-			addedByName        *string
-			addedAt, updatedAt *time.Time
-			checkedBy          *uuid.UUID
-			checkedByName      *string
-		)
-		if err := rows.Scan(&kind, &id, &listID, &pos, &removed,
-			&name, &it.Quantity, &it.Unit, &it.Note,
-			&addedBy, &addedByName, &addedAt,
-			&checkedBy, &checkedByName, &it.CheckedAt, &updatedAt); err != nil {
-			return Changes{}, err
-		}
-		last = position{seq: pos, id: id}
-		switch {
-		case kind == "list":
-			out.Tombstones = append(out.Tombstones, Tombstone{Type: TombstoneList, ID: id})
-		case removed != nil && *removed:
-			out.Tombstones = append(out.Tombstones, Tombstone{Type: TombstoneItem, ID: id, ListID: listID})
-		default:
-			it.ID, it.ListID, it.Name = id, listID, deref(name)
-			it.AddedBy = UserRef{ID: deref(addedBy), DisplayName: deref(addedByName)}
-			it.AddedAt, it.UpdatedAt = deref(addedAt).UTC(), deref(updatedAt).UTC()
-			if it.CheckedAt != nil {
-				at := it.CheckedAt.UTC()
-				it.CheckedAt = &at
-				it.CheckedBy = &UserRef{ID: deref(checkedBy), DisplayName: deref(checkedByName)}
-			}
-			out.Items = append(out.Items, it)
-		}
+	if len(changes) > limit {
+		changes, out.HasMore = changes[:limit], true
 	}
-	if err := rows.Err(); err != nil {
+	names, err := s.identity.DisplayNamesIn(ctx, tx, mentioned(changes))
+	if err != nil {
 		return Changes{}, err
+	}
+	ref := func(id uuid.UUID) UserRef { return UserRef{ID: id, DisplayName: names[id]} }
+	last := from
+	for _, c := range changes {
+		last = position{seq: c.Seq, id: c.ID}
+		switch c.Kind {
+		case lists.ListDeleted:
+			out.Tombstones = append(out.Tombstones, Tombstone{Type: TombstoneList, ID: c.ID})
+		case lists.ItemRemoved:
+			out.Tombstones = append(out.Tombstones, Tombstone{Type: TombstoneItem, ID: c.ID, ListID: c.ListID})
+		case lists.ItemChanged:
+			it := c.Item
+			item := Item{
+				ID: it.ID, ListID: it.ListID, Name: it.Name,
+				Quantity: it.Quantity, Unit: it.Unit, Note: it.Note,
+				AddedBy: ref(it.AddedBy), AddedAt: it.AddedAt,
+				CheckedAt: it.CheckedAt, UpdatedAt: it.UpdatedAt,
+			}
+			if it.CheckedBy != nil {
+				by := ref(*it.CheckedBy)
+				item.CheckedBy = &by
+			}
+			out.Items = append(out.Items, item)
+		}
 	}
 	out.Cursor = last.String()
 	return out, nil
 }
 
-func deref[T any](p *T) T {
-	var zero T
-	if p == nil {
-		return zero
+// mentioned returns the Users who added or checked the Items in changes.
+func mentioned(changes []lists.Change) []uuid.UUID {
+	seen := map[uuid.UUID]bool{}
+	var ids []uuid.UUID
+	add := func(id uuid.UUID) {
+		if !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
 	}
-	return *p
+	for _, c := range changes {
+		if c.Item == nil {
+			continue
+		}
+		add(c.Item.AddedBy)
+		if c.Item.CheckedBy != nil {
+			add(*c.Item.CheckedBy)
+		}
+	}
+	return ids
 }
