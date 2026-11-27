@@ -354,9 +354,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get listCheckedByYou => 'You';
 
   @override
-  String get listSyncPending => 'Waiting to sync';
-
-  @override
   String get itemCheck => 'Check';
 
   @override
@@ -437,7 +434,76 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorItemQuantityInvalid => 'Use a number above zero, like 2 or 1.5.';
 
   @override
-  String errorItemRejected(String name) {
-    return 'Your change to “$name” couldn\'t be saved, so it was undone.';
+  String listOffline(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Offline · $count changes waiting to sync',
+      one: 'Offline · 1 change waiting to sync',
+      zero: 'Offline',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get listNothingToBuyYet => 'Nothing to buy yet';
+
+  @override
+  String get listEmptyTitle => 'Start your list';
+
+  @override
+  String get listEmptyBody => 'Add what you need. Everyone on this list sees it right away.';
+
+  @override
+  String get itemEditTitle => 'Edit item';
+
+  @override
+  String get itemSave => 'Save';
+
+  @override
+  String itemAddedBy(String name) {
+    return 'Added by $name';
+  }
+
+  @override
+  String get itemAddedByYou => 'Added by you';
+
+  @override
+  String itemCheckedBy(String name) {
+    return 'Checked by $name';
+  }
+
+  @override
+  String get itemCheckedByYou => 'Checked by you';
+
+  @override
+  String get itemRemove => 'Remove item';
+
+  @override
+  String itemRemoved(String item) {
+    return '$item removed';
+  }
+
+  @override
+  String itemRejectedRemoved(String name) {
+    return 'Couldn’t save “$name”. It was removed.';
+  }
+
+  @override
+  String itemRejectedListGone(String name) {
+    return 'Couldn’t save “$name”. The list is no longer available.';
+  }
+
+  @override
+  String itemRejected(String name) {
+    return 'Couldn’t save “$name”.';
+  }
+
+  @override
+  String get itemLimitTitle => 'This list is full';
+
+  @override
+  String itemLimitBody(int max) {
+    return 'A list can hold up to $max items. Clear checked items, or remove ones you no longer need, to make room.';
   }
 }

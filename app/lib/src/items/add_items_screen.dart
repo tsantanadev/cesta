@@ -8,8 +8,8 @@ import '../lists/lists_controller.dart';
 import '../session/session_controller.dart';
 import '../ui/components.dart';
 import '../ui/tokens.dart';
+import 'item_form.dart';
 import 'items_store.dart';
-import 'new_item_form.dart';
 
 /// Add items (Figma "05 Add items" 4:269): search what to add; "Add “…” as a
 /// new item" opens the New item sheet. Matches and Bought before come with #8.
@@ -53,9 +53,10 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
         title: l10n.newItemTitle,
         closeTooltip: l10n.sheetClose,
         sectionGap: 18,
-        child: NewItemForm(
-          listName: _listName,
-          initialName: _search.text.trim(),
+        child: ItemForm(
+          submitLabel: l10n.newItemAddTo(_listName),
+          submitIcon: CesIcons.plus,
+          initial: (name: _search.text.trim(), quantity: null, unit: null, note: null),
           onSubmit: (draft) async {
             final id = await widget.items.add(
               listId: widget.listId,

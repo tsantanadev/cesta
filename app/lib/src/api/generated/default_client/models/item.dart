@@ -28,20 +28,16 @@ class Item {
     id: json["id"] as String,
     listId: json["listId"] as String,
     name: json["name"] as String,
-    quantity: json.containsKey("quantity") ? json["quantity"] as String? : null,
-    unit: json.containsKey("unit") ? ItemUnit.fromJson(json["unit"]) : null,
-    note: json.containsKey("note") ? json["note"] as String? : null,
+    quantity: json.containsKey("quantity") ? (value: json["quantity"] as String?) : null,
+    unit: json.containsKey("unit") ? (value: json["unit"] == null ? null : ItemUnit.fromJson(json["unit"])) : null,
+    note: json.containsKey("note") ? (value: json["note"] as String?) : null,
     addedBy: UserRef.fromJson(json["addedBy"] as Map<String, Object?>),
     addedAt: DateTime.parse(json["addedAt"] as String).toUtc(),
     checkedAt: json.containsKey("checkedAt")
-        ? json["checkedAt"] == null
-              ? null
-              : DateTime.parse(json["checkedAt"] as String).toUtc()
+        ? (value: json["checkedAt"] == null ? null : DateTime.parse(json["checkedAt"] as String).toUtc())
         : null,
     checkedBy: json.containsKey("checkedBy")
-        ? json["checkedBy"] == null
-              ? null
-              : ItemCheckedBy.fromJson(json["checkedBy"] as Map<String, Object?>)
+        ? (value: json["checkedBy"] == null ? null : ItemCheckedBy.fromJson(json["checkedBy"] as Map<String, Object?>))
         : null,
     updatedAt: DateTime.parse(json["updatedAt"] as String).toUtc(),
     additionalProperties: {
@@ -57,20 +53,20 @@ class Item {
   final String name;
 
   /// See Quantity.
-  final String? quantity;
+  final ({String? value})? quantity;
 
   /// See Unit.
-  final ItemUnit? unit;
+  final ({ItemUnit? value})? unit;
 
-  final String? note;
+  final ({String? value})? note;
 
   final UserRef addedBy;
 
   final DateTime addedAt;
 
-  final DateTime? checkedAt;
+  final ({DateTime? value})? checkedAt;
 
-  final ItemCheckedBy? checkedBy;
+  final ({ItemCheckedBy? value})? checkedBy;
 
   final DateTime updatedAt;
 
@@ -96,13 +92,13 @@ class Item {
     "id": this.id,
     "listId": this.listId,
     "name": this.name,
-    if (this.quantity != null) "quantity": this.quantity,
-    if (this.unit != null) "unit": this.unit?.toJson(),
-    if (this.note != null) "note": this.note,
+    if (this.quantity case final record?) "quantity": record.value,
+    if (this.unit case final record?) "unit": record.value?.toJson(),
+    if (this.note case final record?) "note": record.value,
     "addedBy": this.addedBy.toJson(),
     "addedAt": this.addedAt.toUtc().toIso8601String(),
-    if (this.checkedAt != null) "checkedAt": this.checkedAt?.toUtc().toIso8601String(),
-    if (this.checkedBy != null) "checkedBy": this.checkedBy?.toJson(),
+    if (this.checkedAt case final record?) "checkedAt": record.value?.toUtc().toIso8601String(),
+    if (this.checkedBy case final record?) "checkedBy": record.value?.toJson(),
     "updatedAt": this.updatedAt.toUtc().toIso8601String(),
   };
 }

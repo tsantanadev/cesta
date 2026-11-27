@@ -8,13 +8,24 @@ import 'package:material_ui/material_ui.dart';
 
 import 'fake_api_client.dart';
 import 'fake_auth_gateway.dart';
+import 'fake_network_status.dart';
 import 'fields.dart';
 
 export 'package:cesta/src/ui/components.dart'
-    show CesButton, CesCheckedItem, CesChoiceChip, CesItemTile, CesMessage, CesSearchField;
+    show
+        CesButton,
+        CesCheckedItem,
+        CesChoiceChip,
+        CesItemTile,
+        CesMessage,
+        CesSearchField,
+        CesSoftField,
+        CesStatusPill,
+        CesStepper;
 
 export 'fake_api_client.dart';
 export 'fake_auth_gateway.dart';
+export 'fake_network_status.dart';
 export 'fields.dart';
 
 const english = Locale('en');
@@ -37,11 +48,15 @@ class Harness {
         DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true),
       ) {
     api = FakeApiClient(auth: auth);
+    addTearDown(network.close);
     addTearDown(db.close);
   }
 
   final WidgetTester tester;
   final FakeAuthGateway auth;
+
+  /// The phone's connection, as the OS reports it.
+  final network = FakeNetworkStatus();
   late final FakeApiClient api;
   final AppDatabase db;
 
@@ -65,6 +80,7 @@ class Harness {
         api: api,
         auth: auth,
         database: db,
+        network: network,
         locale: locale,
         themeMode: themeMode,
         initialLocation: initialLocation,
@@ -139,6 +155,16 @@ class Harness {
   void goOffline() {
     api.goOffline();
     auth.offline = true;
+    network.connected = false;
+  }
+
+  /// The network and both servers become reachable again; waits for the app
+  /// to notice and sync.
+  Future<void> goOnline() async {
+    api.goOnline();
+    auth.offline = false;
+    network.connected = true;
+    await tester.pumpAndSettle();
   }
 
   /// Scrolls [target] into view, taps it and waits for the app to settle.
@@ -196,7 +222,10 @@ class Harness {
   Future<void> openList(String name) => tap(find.text(name));
 
   /// The names on the Item tags shown, in order.
-  List<String> tagNames() => [for (final t in tester.widgetList<CesItemTile>(find.byType(CesItemTile))) t.name];
+  List<String> tagNames() => [
+    for (final t in tester.widgetList<CesItemTile>(find.byType(CesItemTile)))
+      if (t.onTap != null) t.name,
+  ];
 
   /// The rows In the basket: each Checked Item's name and who checked it.
   List<(String, String)> basketRows() => [
@@ -226,11 +255,32 @@ class Harness {
   /// Taps the tag of the Item named [name] (checks it).
   Future<void> tapTag(String name) => tap(find.widgetWithText(CesItemTile, name));
 
+  /// Long-presses the tag of the Item named [name] (opens it).
+  Future<void> openItem(String name) async {
+    await tester.longPress(find.widgetWithText(CesItemTile, name));
+    await tester.pumpAndSettle();
+  }
+
+  /// The quantity typed in the open Item sheet's stepper.
+  String get quantityText => tester
+      .widget<EditableText>(find.descendant(of: find.byType(CesStepper), matching: find.byType(EditableText)))
+      .controller
+      .text;
+
+  /// The label of the selected unit chip, or null.
+  String? get selectedUnit =>
+      tester.widgetList<CesChoiceChip>(find.byType(CesChoiceChip)).where((c) => c.selected).firstOrNull?.label;
+
+  /// The note field of the open Item sheet.
+  Finder get noteField => find.descendant(of: find.byType(CesSoftField), matching: find.byType(EditableText));
+
+  String get noteText => tester.widget<EditableText>(noteField).controller.text;
+
   /// Taps the In the basket row of the Item named [name] (unchecks it).
   Future<void> tapBasketRow(String name) => tap(find.widgetWithText(CesCheckedItem, name));
 
-  /// Whether the List screen says some changes haven't reached the server yet.
-  bool get showsPending => find.byTooltip('Waiting to sync').evaluate().isNotEmpty;
+  /// The List screen's offline pill, or null when it isn't shown.
+  String? get offlinePill => tester.widgetList<CesStatusPill>(find.byType(CesStatusPill)).firstOrNull?.label;
 
   /// The text in the field labelled [label].
   String textInField(String label) => fieldController(tester, label).text;

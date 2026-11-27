@@ -15,6 +15,8 @@ final class ShownItem {
     required this.listId,
     required this.name,
     required this.addedAt,
+    required this.addedById,
+    required this.addedByName,
     this.quantity,
     this.unit,
     this.note,
@@ -34,6 +36,10 @@ final class ShownItem {
   final String? note;
   final DateTime addedAt;
 
+  /// Who added it, as the server (or, before it confirms, this device) says.
+  final String addedById;
+  final String addedByName;
+
   /// When the Item was checked (it is In the basket); null while it is to buy.
   final DateTime? checkedAt;
   final String? checkedById;
@@ -44,28 +50,44 @@ final class ShownItem {
 
   bool get checked => checkedAt != null;
 
-  ShownItem _copy({
-    String? name,
-    String? quantity,
-    ItemUnit? unit,
-    String? note,
-    (DateTime, String, String)? checked,
-    bool uncheck = false,
-    bool? pending,
+  /// A copy with [fields] applied, as an item_update would: a field present
+  /// in [fields] replaces the current value, and a present null clears it.
+  ShownItem _updated(
+    ItemFields fields, {
+    required DateTime at,
+    required String byId,
+    required String byName,
+    required bool pending,
   }) => ShownItem(
     id: id,
     listId: listId,
-    name: name ?? this.name,
+    name: fields.name ?? name,
     addedAt: addedAt,
-    quantity: quantity ?? this.quantity,
-    unit: unit ?? this.unit,
-    note: note ?? this.note,
-    checkedAt: uncheck ? null : (checked?.$1 ?? checkedAt),
-    checkedById: uncheck ? null : (checked?.$2 ?? checkedById),
-    checkedByName: uncheck ? null : (checked?.$3 ?? checkedByName),
-    pending: pending ?? this.pending,
+    addedById: addedById,
+    addedByName: addedByName,
+    quantity: fields.quantity == null ? quantity : fields.quantity!.value,
+    unit: fields.unit == null ? unit : _unit(fields.unit!.value),
+    note: fields.note == null ? note : fields.note!.value,
+    checkedAt: switch (fields.checked) {
+      true => at,
+      false => null,
+      null => checkedAt,
+    },
+    checkedById: switch (fields.checked) {
+      true => byId,
+      false => null,
+      null => checkedById,
+    },
+    checkedByName: switch (fields.checked) {
+      true => byName,
+      false => null,
+      null => checkedByName,
+    },
+    pending: pending,
   );
 }
+
+ItemUnit? _unit(ItemFieldsUnit? u) => u == null ? null : ItemUnit.fromJson(u.toJson());
 
 /// The signed-in User making a change, recorded with it so the change shows
 /// who made it before the server confirms it.
@@ -128,13 +150,37 @@ class ItemsStore {
       by: by,
       fields: ItemFields(
         name: name.trim(),
-        quantity: quantity,
-        unit: unit == null ? null : ItemFieldsUnit.fromJson(unit.toJson()),
-        note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
+        quantity: quantity == null ? null : (value: quantity),
+        unit: unit == null ? null : (value: ItemFieldsUnit.fromJson(unit.toJson())),
+        note: _note(note) == null ? null : (value: _note(note)),
       ),
     );
     return id;
   }
+
+  /// Edits [item]: its name, and how much and the note, which are cleared
+  /// when null. Only what changed is sent.
+  Future<void> update(
+    ShownItem item, {
+    required Actor by,
+    required String name,
+    String? quantity,
+    ItemUnit? unit,
+    String? note,
+  }) {
+    final trimmed = name.trim();
+    final cleanNote = _note(note);
+    final fields = ItemFields(
+      name: trimmed == item.name ? null : trimmed,
+      quantity: quantity == item.quantity ? null : (value: quantity),
+      unit: unit == item.unit ? null : (value: unit == null ? null : ItemFieldsUnit.fromJson(unit.toJson())),
+      note: cleanNote == item.note ? null : (value: cleanNote),
+    );
+    if (fields.toJson().isEmpty) return Future.value();
+    return _enqueue(MutationType.itemUpdate, itemId: item.id, listId: item.listId, by: by, fields: fields);
+  }
+
+  static String? _note(String? note) => (note?.trim().isEmpty ?? true) ? null : note!.trim();
 
   /// Checks [item] (puts it In the basket), or unchecks it when [checked] is false.
   Future<void> setChecked(ShownItem item, {required bool checked, required Actor by}) => _enqueue(
@@ -148,6 +194,39 @@ class ItemsStore {
   /// Removes Item [itemId] from List [listId].
   Future<void> remove({required String itemId, required String listId, required Actor by}) =>
       _enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
+
+  /// Undoes the removal of [item]: drops the removal while it is still
+  /// waiting to sync, or else adds the Item again as it was (the server keeps
+  /// removed Items removed, so it comes back as a new Item).
+  Future<void> restore(ShownItem item, {required Actor by}) async {
+    final dropped =
+        await (_db.delete(_db.outbox)..where(
+              (t) =>
+                  t.itemId.equals(item.id) & t.type.equals(MutationType.itemDelete.toJson()) & t.applied.equals(false),
+            ))
+            .go();
+    if (dropped > 0) {
+      _changes.add(null);
+      return;
+    }
+    final id = await add(
+      listId: item.listId,
+      by: by,
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+      note: item.note,
+    );
+    if (item.checked) {
+      await _enqueue(
+        MutationType.itemUpdate,
+        itemId: id,
+        listId: item.listId,
+        by: by,
+        fields: const ItemFields(checked: true),
+      );
+    }
+  }
 
   Future<void> _enqueue(
     MutationType type, {
@@ -182,7 +261,6 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
   for (final m in pending) {
     final fields = ItemFields.fromJson(jsonDecode(m.fields) as Map<String, Object?>);
     final at = DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true);
-    final unit = fields.unit == null ? null : ItemUnit.fromJson(fields.unit!.toJson());
     switch (MutationType.fromJson(m.type)) {
       case MutationType.itemCreate:
         items.putIfAbsent(
@@ -192,22 +270,22 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
             listId: m.listId,
             name: fields.name ?? '',
             addedAt: at,
-            quantity: fields.quantity,
-            unit: unit,
-            note: fields.note,
+            addedById: m.byId,
+            addedByName: m.byName,
+            quantity: fields.quantity?.value,
+            unit: _unit(fields.unit?.value),
+            note: fields.note?.value,
             pending: !m.applied,
           ),
         );
       case MutationType.itemUpdate:
         final item = items[m.itemId];
         if (item == null) continue;
-        items[m.itemId] = item._copy(
-          name: fields.name,
-          quantity: fields.quantity,
-          unit: unit,
-          note: fields.note,
-          checked: fields.checked == true ? (at, m.byId, m.byName) : null,
-          uncheck: fields.checked == false,
+        items[m.itemId] = item._updated(
+          fields,
+          at: at,
+          byId: m.byId,
+          byName: m.byName,
           pending: item.pending || !m.applied,
         );
       case MutationType.itemDelete:
@@ -225,6 +303,8 @@ ShownItem _fromRow(SyncedItem r) => ShownItem(
   listId: r.listId,
   name: r.name,
   addedAt: DateTime.fromMicrosecondsSinceEpoch(r.addedAtMicros, isUtc: true),
+  addedById: r.addedById,
+  addedByName: r.addedByName,
   quantity: r.quantity,
   unit: r.unit == null ? null : ItemUnit.fromJson(r.unit),
   note: r.note,

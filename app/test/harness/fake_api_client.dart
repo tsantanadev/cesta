@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cesta/src/api/generated/cesta_api.dart';
 import 'package:dio/dio.dart';
 
@@ -348,6 +350,7 @@ class FakeApiClient implements ApiClient {
     required FakeIdentity addedBy,
     String? quantity,
     ItemUnit? unit,
+    String? note,
     FakeIdentity? checkedBy,
   }) {
     final id = '00000000-0000-4000-9000-${(_nextItemId++).toString().padLeft(12, '0')}';
@@ -358,6 +361,7 @@ class FakeApiClient implements ApiClient {
       name: name,
       quantity: quantity,
       unit: unit?.toJson(),
+      note: note,
       addedByUid: addedBy.uid,
       addedAt: now.add(Duration(milliseconds: _nextItemId)),
       checkedByUid: checkedBy?.uid,
@@ -371,6 +375,11 @@ class FakeApiClient implements ApiClient {
   void checkItemNow(String name, {required FakeIdentity by}) => _liveItems.firstWhere((i) => i.name == name)
     ..checkedByUid = by.uid
     ..checkedAt = DateTime.now().toUtc()
+    ..seq = ++_changeSeq;
+
+  /// Someone removes the Item named [name] behind the app's back.
+  void removeItemNow(String name) => _liveItems.firstWhere((i) => i.name == name)
+    ..deleted = true
     ..seq = ++_changeSeq;
 
   Iterable<_FakeItem> get _liveItems => _items.values.where((i) => !i.deleted);
@@ -398,15 +407,18 @@ class FakeApiClient implements ApiClient {
     id: i.id,
     listId: i.listId,
     name: i.name,
-    quantity: i.quantity,
-    unit: i.unit == null ? null : ItemUnit.fromJson(i.unit),
-    note: i.note,
+    // Like the server, every optional field is sent, as null when empty.
+    quantity: (value: i.quantity),
+    unit: (value: i.unit == null ? null : ItemUnit.fromJson(i.unit)),
+    note: (value: i.note),
     addedBy: UserRef(id: _userIdOf(i.addedByUid), displayName: _displayNameOf(i.addedByUid)),
     addedAt: i.addedAt,
-    checkedAt: i.checkedAt,
-    checkedBy: i.checkedByUid == null
-        ? null
-        : ItemCheckedBy(id: _userIdOf(i.checkedByUid!), displayName: _displayNameOf(i.checkedByUid!)),
+    checkedAt: (value: i.checkedAt),
+    checkedBy: (
+      value: i.checkedByUid == null
+          ? null
+          : ItemCheckedBy(id: _userIdOf(i.checkedByUid!), displayName: _displayNameOf(i.checkedByUid!)),
+    ),
     updatedAt: i.addedAt,
   );
 
@@ -420,6 +432,8 @@ class FakeApiClient implements ApiClient {
     _failIfOffline('/api/sync/push');
     final identity = auth.current;
     if (identity == null) return const PushMutations401(_unauthenticated);
+    // Read the request as the server would: from the JSON on the wire.
+    body = PushRequest.fromJson(_wire(body.toJson()));
     if (body.mutations.isEmpty || body.mutations.length > 100) {
       return PushMutations400(_error(ApiErrorCode.invalidItem));
     }
@@ -450,9 +464,9 @@ class FakeApiClient implements ApiClient {
           id: m.entityId,
           listId: listId,
           name: name,
-          quantity: fields.quantity,
-          unit: fields.unit?.toJson(),
-          note: fields.note,
+          quantity: fields.quantity?.value,
+          unit: fields.unit?.value?.toJson(),
+          note: fields.note?.value,
           addedByUid: identity.uid,
           addedAt: DateTime.now().toUtc(),
           seq: ++_changeSeq,
@@ -466,9 +480,10 @@ class FakeApiClient implements ApiClient {
           item.deleted = true;
         } else {
           if (fields.name case final name?) item.name = name.trim();
-          if (fields.quantity case final q?) item.quantity = q;
-          if (fields.unit case final u?) item.unit = u.toJson();
-          if (fields.note case final n?) item.note = n;
+          // A field present as null clears it.
+          if (fields.quantity case final q?) item.quantity = q.value;
+          if (fields.unit case final u?) item.unit = u.value?.toJson();
+          if (fields.note case final n?) item.note = n.value;
           if (fields.checked case final checked?) {
             item.checkedAt = checked ? DateTime.now().toUtc() : null;
             item.checkedByUid = checked ? identity.uid : null;
@@ -497,7 +512,7 @@ class FakeApiClient implements ApiClient {
     }).toList()..sort((a, b) => a.seq.compareTo(b.seq));
     final page = changed.take(limit ?? 500).toList();
     return PullChanges200(
-      PullResponse(
+      _pullResponse(
         items: [for (final i in page.where((i) => !i.deleted)) _toItem(i)],
         tombstones: [
           for (final i in page.where((i) => i.deleted)) Tombstone(type: TombstoneType.item, id: i.id, listId: i.listId),
@@ -509,6 +524,19 @@ class FakeApiClient implements ApiClient {
   }
 
   static const _unauthenticated = ApiError(code: ApiErrorCode.unauthenticated, message: 'no valid token');
+
+  /// [json] as it arrives after a trip over the wire.
+  static Map<String, Object?> _wire(Map<String, Object?> json) => jsonDecode(jsonEncode(json)) as Map<String, Object?>;
+
+  /// A pull response as the app's client decodes it from the wire.
+  static PullResponse _pullResponse({
+    required List<Item> items,
+    required List<Tombstone> tombstones,
+    required String cursor,
+    required bool hasMore,
+  }) => PullResponse.fromJson(
+    _wire(PullResponse(items: items, tombstones: tombstones, cursor: cursor, hasMore: hasMore).toJson()),
+  );
 
   void _failIfOffline(String path) {
     if (offline) {

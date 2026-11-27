@@ -20,9 +20,11 @@ class ItemFields {
 
   factory ItemFields.fromJson(Map<String, Object?> json) => ItemFields(
     name: json.containsKey("name") ? json["name"] as String : null,
-    quantity: json.containsKey("quantity") ? json["quantity"] as String? : null,
-    unit: json.containsKey("unit") ? ItemFieldsUnit.fromJson(json["unit"]) : null,
-    note: json.containsKey("note") ? json["note"] as String? : null,
+    quantity: json.containsKey("quantity") ? (value: json["quantity"] as String?) : null,
+    unit: json.containsKey("unit")
+        ? (value: json["unit"] == null ? null : ItemFieldsUnit.fromJson(json["unit"]))
+        : null,
+    note: json.containsKey("note") ? (value: json["note"] as String?) : null,
     checked: json.containsKey("checked") ? json["checked"] as bool : null,
     additionalProperties: {
       for (final entry in json.entries)
@@ -34,12 +36,12 @@ class ItemFields {
   final String? name;
 
   /// See Quantity.
-  final String? quantity;
+  final ({String? value})? quantity;
 
   /// See Unit.
-  final ItemFieldsUnit? unit;
+  final ({ItemFieldsUnit? value})? unit;
 
-  final String? note;
+  final ({String? value})? note;
 
   final bool? checked;
 
@@ -51,9 +53,9 @@ class ItemFields {
     for (final entry in additionalProperties.entries)
       if (!_knownKeys.contains(entry.key)) entry.key: entry.value,
     if (this.name != null) "name": this.name,
-    if (this.quantity != null) "quantity": this.quantity,
-    if (this.unit != null) "unit": this.unit?.toJson(),
-    if (this.note != null) "note": this.note,
+    if (this.quantity case final record?) "quantity": record.value,
+    if (this.unit case final record?) "unit": record.value?.toJson(),
+    if (this.note case final record?) "note": record.value,
     if (this.checked != null) "checked": this.checked,
   };
 }

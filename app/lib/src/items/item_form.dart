@@ -1,41 +1,76 @@
+import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../api/generated/cesta_api.dart';
 import '../names.dart';
 import '../ui/components.dart';
+import '../ui/tokens.dart';
 import 'item_text.dart';
 
-/// A new Item as the New item sheet filled it in.
+/// An Item as the New item or Opened item sheet filled it in.
 typedef ItemDraft = ({String name, String? quantity, ItemUnit? unit, String? note});
 
-/// The New item sheet's content (Figma "07 New item" 9:436): the tag preview,
-/// Name, How much (a stepper that also takes typed decimals, and unit chips),
-/// a note and "Add to [listName]". Closes its sheet, then hands the draft to
-/// [onSubmit].
-class NewItemForm extends StatefulWidget {
-  const NewItemForm({super.key, required this.listName, required this.onSubmit, this.initialName = ''});
+/// The content of the Item sheets: the tag preview, Name, How much (a stepper
+/// that also takes typed decimals, and unit chips), a note, then any
+/// [details] lines and the [submitLabel] button. Closes its sheet, then hands
+/// the draft to [onSubmit].
+///
+/// - New item (Figma "07 New item" 9:436): empty but for the name, "Add to …".
+/// - Opened item (Figma "12 Opened item" 38:2519): filled in, "Added by …"
+///   details, Save, and a Remove item row ([onRemove]).
+class ItemForm extends StatefulWidget {
+  const ItemForm({
+    super.key,
+    required this.submitLabel,
+    required this.onSubmit,
+    this.submitIcon,
+    this.initial = (name: '', quantity: null, unit: null, note: null),
+    this.details = const [],
+    this.onRemove,
+  });
 
-  final String listName;
-  final String initialName;
+  final String submitLabel;
+  final IconData? submitIcon;
+  final ItemDraft initial;
+
+  /// Lines under the note, e.g. "Added by Ana".
+  final List<String> details;
   final void Function(ItemDraft draft) onSubmit;
 
+  /// Shows a Remove item row that closes the sheet, then calls this.
+  final VoidCallback? onRemove;
+
   @override
-  State<NewItemForm> createState() => _NewItemFormState();
+  State<ItemForm> createState() => _ItemFormState();
 }
 
-class _NewItemFormState extends State<NewItemForm> {
+class _ItemFormState extends State<ItemForm> {
   final _formKey = GlobalKey<FormState>();
-  late final _name = TextEditingController(text: widget.initialName)..addListener(_changed);
+  late final _name = TextEditingController(text: widget.initial.name)..addListener(_changed);
   final _quantity = TextEditingController();
-  final _note = TextEditingController();
-  ItemUnit? _unit;
+  late final _note = TextEditingController(text: widget.initial.note);
+  late ItemUnit? _unit = widget.initial.unit;
   bool _quantityInvalid = false;
+  bool _quantityShown = false;
 
   @override
   void initState() {
     super.initState();
     _quantity.addListener(_changed);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Shown with the locale's decimal separator, which parseQuantity accepts.
+    if (!_quantityShown) {
+      _quantityShown = true;
+      if (widget.initial.quantity case final q?) {
+        final locale = AppLocalizations.of(context).localeName;
+        _quantity.text = q.replaceAll('.', NumberFormat.decimalPattern(locale).symbols.DECIMAL_SEP);
+      }
+    }
   }
 
   void _changed() => setState(() => _quantityInvalid = false);
@@ -161,8 +196,24 @@ class _NewItemFormState extends State<NewItemForm> {
           ],
           gap,
           CesSoftField(controller: _note, hint: l10n.newItemNoteHint, maxLength: maxItemNoteLength),
+          for (final line in widget.details) ...[
+            gap,
+            Text(
+              line,
+              style: TextStyle(
+                fontFamily: CestaFonts.family,
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
           gap,
-          CesButton(label: l10n.newItemAddTo(widget.listName), icon: CesIcons.plus, onPressed: _submit),
+          CesButton(label: widget.submitLabel, icon: widget.submitIcon, onPressed: _submit),
+          if (widget.onRemove case final onRemove?) ...[
+            gap,
+            CesSheetItem(icon: CesIcons.delete, label: l10n.itemRemove, destructive: true, onTap: onRemove),
+          ],
         ],
       ),
     );
