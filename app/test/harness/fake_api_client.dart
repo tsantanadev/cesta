@@ -368,6 +368,10 @@ class FakeApiClient implements ApiClient {
   /// User was removed from the List meanwhile.
   ApiErrorCode? rejectMutations;
 
+  /// When set, only mutations of these types are rejected by
+  /// [rejectMutations]; the others are applied as usual.
+  Set<MutationType>? rejectOnly;
+
   /// Every Item the fake backend knows, removed or not, in creation order.
   final _items = <String, _FakeItem>{};
   final _mutationResults = <String, MutationResult>{};
@@ -542,7 +546,7 @@ class FakeApiClient implements ApiClient {
       reason: _error(code, limit: limit),
     );
     final applied = MutationResult(mutationId: m.id, status: MutationResultStatus.applied);
-    if (rejectMutations case final code?) return rejected(code);
+    if (rejectMutations case final code? when rejectOnly?.contains(m.type) ?? true) return rejected(code);
     final fields = m.fields ?? const ItemFields();
     switch (m.type) {
       case MutationType.itemCreate:

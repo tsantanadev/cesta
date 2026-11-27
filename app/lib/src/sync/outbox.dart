@@ -159,15 +159,30 @@ class ChangeOutbox {
     _db.outbox,
   )..where((t) => t.seq.equals(change.seq))).write(const OutboxCompanion(applied: Value(true)));
 
-  /// Drops the refused [change] and, for a refused create, every later change
-  /// to that Item.
-  Future<void> rollBack(OutboxData change) =>
-      (_db.delete(_db.outbox)..where(
-            (t) => change.type == MutationType.itemCreate
-                ? t.itemId.equals(change.itemId) & t.applied.equals(false)
-                : t.seq.equals(change.seq),
-          ))
-          .go();
+  /// Drops the refused [change] and the later changes that depended on it:
+  /// for a refused create, every later change to that Item; for a refused
+  /// check, the clear queued after it. Returns the [OutboxData.seq] of each
+  /// change dropped.
+  Future<Set<int>> rollBack(OutboxData change) => _db.transaction(() async {
+    final refusedCheck = change.type == MutationType.itemUpdate && change.fields.checked == true;
+    final dropped =
+        await (_db.select(_db.outbox)..where(
+              (t) => switch (change.type) {
+                MutationType.itemCreate => t.itemId.equals(change.itemId) & t.applied.equals(false),
+                _ when refusedCheck =>
+                  t.seq.equals(change.seq) |
+                      (t.itemId.equals(change.itemId) &
+                          t.applied.equals(false) &
+                          t.type.equalsValue(MutationType.itemClear) &
+                          t.seq.isBiggerThanValue(change.seq)),
+                _ => t.seq.equals(change.seq),
+              },
+            ))
+            .get();
+    final seqs = {for (final r in dropped) r.seq};
+    await (_db.delete(_db.outbox)..where((t) => t.seq.isIn(seqs))).go();
+    return seqs;
+  });
 
   /// Drops every change to List [listId], which is gone.
   Future<void> dropList(String listId) => (_db.delete(_db.outbox)..where((t) => t.listId.equals(listId))).go();
