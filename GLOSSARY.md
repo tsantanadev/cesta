@@ -61,7 +61,7 @@ One entry on a List representing something to buy.
 _Avoid_: Product, entry, line
 
 **Checked Item**:
-An Item marked as bought; it stays visible, crossed out at the bottom of the List, until cleared.
+An Item marked as bought; it stays visible, crossed out at the bottom of the List, until cleared. Items not yet checked are the ones "to buy"; Checked Items are "in the basket".
 _Avoid_: Done item, completed item, purchased item
 
 **Clear checked**:
