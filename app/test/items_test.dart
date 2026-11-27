@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cesta/src/api/generated/cesta_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -350,5 +352,26 @@ void main() {
     expect(find.text('Quantidade'), findsOneWidget);
     expect(find.text('Adicionar a Feira'), findsOneWidget);
     expect(find.widgetWithText(CesChoiceChip, 'un'), findsOneWidget);
+  });
+
+  testWidgets('a sync still in flight when a User signs out leaves nothing behind for the next User', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final bruno = h.existingUser(email: 'bruno@example.com', password: 'secret123', displayName: 'Bruno');
+    final brunos = h.api.addList(bruno, name: 'Bruno’s groceries');
+    h.api.addItem(brunos, name: 'Milk', addedBy: bruno);
+    final anas = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(anas, name: 'Coffee', addedBy: ana);
+    h.api.slowSync = Completer();
+    await h.pumpApp();
+
+    await h.signOut();
+    h.api.slowSync!.complete(); // Ana's pull arrives after she signed out
+    h.api.slowSync = null;
+    await tester.pumpAndSettle();
+    await h.signInWithEmail('bruno@example.com', 'secret123');
+    await h.openList('Bruno’s groceries');
+
+    expect(h.tags(), ['Milk']);
   });
 }

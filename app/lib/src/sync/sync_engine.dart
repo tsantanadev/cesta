@@ -69,6 +69,10 @@ class SyncEngine {
   ValueListenable<bool> get offline => _offline;
 
   bool _started = false;
+
+  /// Bumped by [stop]: a sync begun before then writes nothing more, so a
+  /// pull still in flight at sign-out can't bring the old User's data back.
+  int _generation = 0;
   bool _again = false;
   int _failures = 0;
   Future<void>? _current;
@@ -103,6 +107,7 @@ class SyncEngine {
   /// Stops syncing (sign out) and waits for a sync in flight to finish.
   Future<void> stop() async {
     _started = false;
+    _generation++;
     _retry?.cancel();
     _retry = null;
     _failures = 0;
@@ -143,9 +148,11 @@ class SyncEngine {
 
   /// One push and pull; false when the server couldn't be reached or refused.
   Future<bool> _attempt() async {
+    final generation = _generation;
     try {
-      await _push();
-      await _pull();
+      await _push(generation);
+      await _pull(generation);
+      if (generation != _generation) return true; // stopped meanwhile: nothing to retry
       _offline.value = false;
       return true;
     } on DioException catch (e) {
@@ -166,8 +173,9 @@ class SyncEngine {
     _retry = Timer(delay > maxRetry ? maxRetry : delay, () => unawaited(sync()));
   }
 
-  Future<void> _push() async {
-    while (_started) {
+  Future<void> _push(int generation) async {
+    bool stopped() => generation != _generation;
+    while (!stopped()) {
       final batch =
           await (_db.select(_db.outbox)
                 ..where((t) => t.applied.equals(false))
@@ -180,9 +188,11 @@ class SyncEngine {
         PushMutations200(:final value) => value.results,
         _ => throw _Refused(result),
       };
+      if (stopped()) return;
       final byId = {for (final r in results) r.mutationId: r};
       var progressed = false;
       for (final row in batch) {
+        if (stopped()) return;
         final r = byId[row.mutationId];
         if (r == null) continue;
         progressed = true;
@@ -230,15 +240,18 @@ class SyncEngine {
     _rejections.add(RejectedChange(type: type, itemName: name, listId: row.listId, reason: reason));
   }
 
-  Future<void> _pull() async {
+  Future<void> _pull(int generation) async {
+    bool stopped() => generation != _generation;
     var cursor = (await (_db.select(_db.syncCursor)..where((t) => t.id.equals(1))).getSingleOrNull())?.cursor;
-    while (_started) {
+    while (!stopped()) {
       final result = await _api.pullChanges(cursor: cursor);
       final page = switch (result) {
         PullChanges200(:final value) => value,
         _ => throw _Refused(result),
       };
       await _db.transaction(() async {
+        // Checked inside the transaction: data cleared at sign-out waits for it.
+        if (stopped()) return;
         for (final item in page.items) {
           await _db.into(_db.syncedItems).insertOnConflictUpdate(_row(item));
         }

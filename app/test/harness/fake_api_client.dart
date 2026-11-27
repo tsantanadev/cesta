@@ -350,6 +350,10 @@ class FakeApiClient implements ApiClient {
   /// How many Items a List may hold, like the server's 500.
   int itemLimit = 500;
 
+  /// While set, sync answers reach the app only once it completes, as over a
+  /// slow network: the server has already answered by then.
+  Completer<void>? slowSync;
+
   /// When set, every pushed mutation is rejected with this code, as when the
   /// User was removed from the List meanwhile.
   ApiErrorCode? rejectMutations;
@@ -529,7 +533,7 @@ class FakeApiClient implements ApiClient {
       return i.seq > since && list != null && list.deletedAt == null && list.members.contains(identity.uid);
     }).toList()..sort((a, b) => a.seq.compareTo(b.seq));
     final page = changed.take(limit ?? 500).toList();
-    return PullChanges200(
+    final answer = PullChanges200(
       _pullResponse(
         items: [for (final i in page.where((i) => !i.deleted)) _toItem(i)],
         tombstones: [
@@ -539,6 +543,8 @@ class FakeApiClient implements ApiClient {
         hasMore: page.length < changed.length,
       ),
     );
+    await slowSync?.future;
+    return answer;
   }
 
   static const _unauthenticated = ApiError(code: ApiErrorCode.unauthenticated, message: 'no valid token');
