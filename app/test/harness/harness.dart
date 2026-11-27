@@ -240,9 +240,9 @@ class Harness {
   /// ("2 L leite").
   List<String> matches() => [for (final n in find.semantics.byHint(_open).evaluate()) n.label];
 
-  /// The past Items on Add items, in order, each as its label reads: under
-  /// Bought before, or under Matches after the List's own.
-  List<String> pastItems() => [for (final n in find.semantics.byHint(_addAgain).evaluate()) n.label];
+  /// The tags from the List's Item history on Add items, in order, each as
+  /// its label reads: under Bought before, or under Matches after the List's own.
+  List<String> fromItemHistory() => [for (final n in find.semantics.byHint(_addAgain).evaluate()) n.label];
 
   /// What tapping a tag or a basket row does, as screen readers say it.
   static final _addAgain = RegExp(r'^(Add|Adicionar)$');
@@ -299,7 +299,7 @@ class Harness {
 
   /// List [listId]'s Item history on the device, most recent first, as
   /// screens read it.
-  Future<List<HistoryItem>> itemHistory(String listId) => tester
+  Future<List<HistoryEntry>> itemHistory(String listId) => tester
       .runAsync(() async {
         final outbox = ChangeOutbox(db);
         try {

@@ -74,13 +74,20 @@ class ChangeOutbox {
     _heldRemovals.update(itemId, (n) => n + 1, ifAbsent: () => 1);
     unawaited(
       until.catchError((Object _) {}).whenComplete(() {
-        if (_heldRemovals.update(itemId, (n) => n - 1) == 0) _heldRemovals.remove(itemId);
+        // Gone already when [releaseHolds] let it go first.
+        if (_heldRemovals.containsKey(itemId) && _heldRemovals.update(itemId, (n) => n - 1) == 0) {
+          _heldRemovals.remove(itemId);
+        }
         // Pushes it now, unless it was undone meanwhile (nothing then to push).
         if (!_changes.isClosed) _changes.add(listId);
       }),
     );
     await enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
   }
+
+  /// Lets every held removal be pushed now, Undo or not (sign out: the Undo
+  /// goes with the session, the removal mustn't).
+  void releaseHolds() => _heldRemovals.clear();
 
   /// Drops every change to Item [itemId] while its creation is still waiting
   /// to be pushed, so the Item never reaches the server; false when it can't
@@ -152,15 +159,30 @@ class ChangeOutbox {
     _db.outbox,
   )..where((t) => t.seq.equals(change.seq))).write(const OutboxCompanion(applied: Value(true)));
 
-  /// Drops the refused [change] and, for a refused create, every later change
-  /// to that Item.
-  Future<void> rollBack(OutboxData change) =>
-      (_db.delete(_db.outbox)..where(
-            (t) => change.type == MutationType.itemCreate
-                ? t.itemId.equals(change.itemId) & t.applied.equals(false)
-                : t.seq.equals(change.seq),
-          ))
-          .go();
+  /// Drops the refused [change] and the later changes that depended on it:
+  /// for a refused create, every later change to that Item; for a refused
+  /// check, the clear queued after it. Returns the [OutboxData.seq] of each
+  /// change dropped.
+  Future<Set<int>> rollBack(OutboxData change) => _db.transaction(() async {
+    final refusedCheck = change.type == MutationType.itemUpdate && change.fields.checked == true;
+    final dropped =
+        await (_db.select(_db.outbox)..where(
+              (t) => switch (change.type) {
+                MutationType.itemCreate => t.itemId.equals(change.itemId) & t.applied.equals(false),
+                _ when refusedCheck =>
+                  t.seq.equals(change.seq) |
+                      (t.itemId.equals(change.itemId) &
+                          t.applied.equals(false) &
+                          t.type.equalsValue(MutationType.itemClear) &
+                          t.seq.isBiggerThanValue(change.seq)),
+                _ => t.seq.equals(change.seq),
+              },
+            ))
+            .get();
+    final seqs = {for (final r in dropped) r.seq};
+    await (_db.delete(_db.outbox)..where((t) => t.seq.isIn(seqs))).go();
+    return seqs;
+  });
 
   /// Drops every change to List [listId], which is gone.
   Future<void> dropList(String listId) => (_db.delete(_db.outbox)..where((t) => t.listId.equals(listId))).go();

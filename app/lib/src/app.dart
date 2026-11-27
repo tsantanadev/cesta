@@ -67,7 +67,9 @@ class _CestaAppState extends State<CestaApp> {
     _outbox = ChangeOutbox(widget.database);
     _items = ItemsStore(widget.database, _outbox);
     _sync = SyncEngine(api: widget.api, db: widget.database, items: _items, outbox: _outbox, network: widget.network);
-    _session.addListener(_followSession);
+    _session
+      ..beforeSignOut = _beforeSignOut
+      ..addListener(_followSession);
     _rejections = _sync.rejections.listen(_tellRejected);
     _listsChanged = _sync.listsChanged.listen((c) => _lists.changed(gone: c.gone, toBuy: c.toBuy));
     _router = buildRouter(
@@ -93,12 +95,15 @@ class _CestaAppState extends State<CestaApp> {
     }
   }
 
-  /// Clears the Checked Items of List [listId] as the signed-in User.
-  Future<void> _clearChecked(String listId) async {
-    final user = _session.user;
-    if (user == null) return;
-    await _items.clearChecked(listId: listId, by: (id: user.id, displayName: user.displayName));
+  /// Takes away the Undo and pushes what's left to sync, so a removal held
+  /// for Undo isn't lost with the session's data.
+  Future<void> _beforeSignOut() async {
+    _messenger.currentState?.removeCurrentSnackBar();
+    await _sync.flush();
   }
+
+  /// Clears the Checked Items of List [listId] as the signed-in User.
+  void _clearChecked(String listId) => _session.asMe((me) => unawaited(_items.clearChecked(listId: listId, by: me)));
 
   /// Says that a change was rolled back (Figma "13b Change not saved"
   /// 38:2815). A create refused because the List is full opens the Item limit
@@ -114,12 +119,13 @@ class _CestaAppState extends State<CestaApp> {
   /// Opens the Item limit sheet for the List [change] was refused on,
   /// offering Clear checked when it has Checked Items.
   Future<void> _showItemLimit(RejectedChange change) async {
-    final anyChecked = (await _items.readList(change.listId)).any((i) => i.checked);
+    final items = await _items.readList(change.listId);
     if (_router.routerDelegate.navigatorKey.currentContext case final context? when context.mounted) {
       await showItemLimitSheet(
         context,
         limit: change.limit ?? _sync.itemLimit.value,
-        onClearChecked: anyChecked ? () => unawaited(_clearChecked(change.listId)) : null,
+        items: items,
+        onClearChecked: () => _clearChecked(change.listId),
       );
     } else {
       _toastRejected(change);

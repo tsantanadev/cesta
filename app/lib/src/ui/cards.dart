@@ -224,7 +224,7 @@ class CesItemTile extends StatelessWidget {
       suggestion = true;
 
   /// A white tag with an outline (Figma "Item tile" State=Suggestion 3:39):
-  /// something to add, such as a past Item under Bought before, rather than
+  /// something to add, such as an Item under Bought before, rather than
   /// an Item on the List.
   final bool suggestion;
 

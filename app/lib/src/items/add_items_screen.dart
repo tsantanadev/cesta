@@ -17,7 +17,7 @@ import 'opened_item.dart';
 /// types, Matches (4:280) shows the List's Items to buy whose names match,
 /// highlighted; tapping one opens that Item instead of adding a duplicate.
 /// "Add “…” as a new item" opens the New item sheet, even when something
-/// matches. Past Items from the List's Item history show white: as Bought
+/// matches. Items from the List's Item history show white: as Bought
 /// before while nothing is typed, and under Matches after the List's own as
 /// the Member types. Tapping one adds it straight away as last bought, with
 /// an Undo Toast.
@@ -42,9 +42,9 @@ class AddItemsScreen extends StatefulWidget {
 class _AddItemsScreenState extends State<AddItemsScreen> {
   final _search = TextEditingController();
   List<ShownItem> _onList = const [];
-  List<HistoryItem> _history = const [];
+  List<HistoryEntry> _history = const [];
   StreamSubscription<List<ShownItem>>? _itemsSub;
-  StreamSubscription<List<HistoryItem>>? _historySub;
+  StreamSubscription<List<HistoryEntry>>? _historySub;
 
   @override
   void initState() {
@@ -61,34 +61,26 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     super.dispose();
   }
 
-  Actor? get _me => switch (widget.session.user) {
-    final user? => (id: user.id, displayName: user.displayName),
-    null => null,
-  };
-
   /// Opens [item], already on the List, instead of adding it again.
-  void _openItem(ShownItem item) {
-    final me = _me;
-    if (me == null) return;
-    showOpenedItem(context, items: widget.items, item: item, me: me);
-  }
+  void _openItem(ShownItem item) =>
+      widget.session.asMe((me) => showOpenedItem(context, items: widget.items, item: item, me: me));
 
   String get _listName => widget.lists.lists.where((l) => l.id == widget.listId).firstOrNull?.name ?? '';
 
   void _addAsNew() {
     final l10n = AppLocalizations.of(context);
-    final me = _me;
-    if (me == null) return;
-    unawaited(
-      showCesItemSheet(
-        context,
-        title: l10n.newItemTitle,
-        closeTooltip: l10n.sheetClose,
-        child: ItemForm(
-          submitLabel: l10n.newItemAddTo(_listName),
-          submitIcon: CesIcons.plus,
-          initial: ItemDetails(name: _search.text.trim()),
-          onSubmit: (draft) => unawaited(_add(draft, me)),
+    widget.session.asMe(
+      (me) => unawaited(
+        showCesItemSheet(
+          context,
+          title: l10n.newItemTitle,
+          closeTooltip: l10n.sheetClose,
+          child: ItemForm(
+            submitLabel: l10n.newItemAddTo(_listName),
+            submitIcon: CesIcons.plus,
+            initial: ItemDetails(name: _search.text.trim()),
+            onSubmit: (draft) => unawaited(_add(draft, me)),
+          ),
         ),
       ),
     );
@@ -110,12 +102,8 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     );
   }
 
-  /// Adds [past] again, as it was last bought.
-  void _addAgain(HistoryItem past) {
-    final me = _me;
-    if (me == null) return;
-    unawaited(_add(past.details, me));
-  }
+  /// Adds [entry] of the Item history again, as it was last bought.
+  void _addAgain(HistoryEntry entry) => widget.session.asMe((me) => unawaited(_add(entry.details, me)));
 
   Widget _section(String heading, List<Widget> tiles) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -134,7 +122,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
     final l10n = AppLocalizations.of(context);
     final query = _search.text.trim();
     final matches = listMatches(_onList, query);
-    final past = pastItems(_history, _onList, query);
+    final fromHistory = historyToOffer(_history, _onList, query);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -162,8 +150,9 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
               ),
             ),
             // Matches (Figma 4:280): the List's Items to buy, as on the List,
-            // then past Items; Bought before while nothing is typed.
-            if (matches.isNotEmpty || past.isNotEmpty)
+            // then Items from the Item history; Bought before (Figma 4:311,
+            // heading 4:312) while nothing is typed.
+            if (matches.isNotEmpty || fromHistory.isNotEmpty)
               _section(query.isEmpty ? l10n.addItemsBoughtBefore : l10n.addItemsMatches, [
                 for (final item in matches)
                   CesItemTile(
@@ -173,9 +162,9 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                     semanticHint: l10n.itemOpen,
                     onTap: () => _openItem(item),
                   ),
-                for (final item in past)
+                for (final item in fromHistory)
                   CesItemTile(
-                    key: ValueKey('past ${item.itemId}'),
+                    key: ValueKey('history ${item.itemId}'),
                     name: item.name,
                     quantity: tagQuantity(l10n, item.quantity, item.unit),
                     semanticHint: l10n.itemAddAgain,

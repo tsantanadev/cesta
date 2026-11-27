@@ -16,25 +16,28 @@ List<ShownItem> listMatches(List<ShownItem> items, String query) => [
     if (!item.checked && nameMatches(item.name, query)) item,
 ];
 
-/// The past Items to offer from a List's Item [history] (most recent first):
-/// each name once, as last bought, leaving out names the List already has
+/// The entries of a List's Item [history] (most recent first) to offer on
+/// Add items: each name once, as last bought, leaving out names the List already has
 /// to buy ([onList]), since the List's own Item wins. With a blank [query]
-/// they are Bought before (the most recent [limit]); otherwise the ones that
+/// they are Bought before (the most recent [boughtBeforeCap]); otherwise the ones that
 /// match, shown under Matches after the List's.
-List<HistoryItem> pastItems(List<HistoryItem> history, List<ShownItem> onList, String query, {int limit = 12}) {
+List<HistoryEntry> historyToOffer(List<HistoryEntry> history, List<ShownItem> onList, String query) {
   final seen = {
     for (final item in onList)
       if (!item.checked) foldName(item.name.trim()),
   };
   final blank = query.trim().isEmpty;
-  final past = <HistoryItem>[];
+  final offered = <HistoryEntry>[];
   for (final entry in history) {
     if (!seen.add(foldName(entry.name.trim()))) continue;
-    if (blank || nameMatches(entry.name, query)) past.add(entry);
-    if (blank && past.length == limit) break;
+    if (blank || nameMatches(entry.name, query)) offered.add(entry);
+    if (blank && offered.length == boughtBeforeCap) break;
   }
-  return past;
+  return offered;
 }
+
+/// How many names Bought before shows at most.
+const boughtBeforeCap = 12;
 
 /// [text] lower-cased with the accents of Portuguese and other Latin
 /// letters taken off, so names compare as a person reads them.

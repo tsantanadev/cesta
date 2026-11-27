@@ -7,6 +7,7 @@ import '../api/generated/cesta_api.dart';
 import '../api/network.dart';
 import '../auth/auth_gateway.dart';
 import '../db/app_database.dart';
+import '../sync/outbox.dart';
 
 enum SessionStatus {
   /// Waiting for the identity provider to report the stored session.
@@ -48,6 +49,18 @@ class SessionController extends ChangeNotifier {
   /// The signed-in User, from the server or the device cache; null until known.
   User? get user => _user;
   User? _user;
+
+  /// The signed-in User as who makes a change; null until known.
+  Actor? get me => switch (_user) {
+    final user? => (id: user.id, displayName: user.displayName),
+    null => null,
+  };
+
+  /// Runs [change] as the signed-in User ([me]); does nothing while no User
+  /// is known.
+  void asMe(void Function(Actor me) change) {
+    if (me case final me?) change(me);
+  }
 
   /// True while the first load of the User for a session with nothing cached is in flight.
   bool get loadingUser => _loadingUser;
@@ -153,7 +166,18 @@ class SessionController extends ChangeNotifier {
     }
   }
 
-  Future<void> signOut() => _auth.signOut();
+  /// Runs while the User is still signed in, just before [signOut] ends the
+  /// session (e.g. to push changes not yet synced).
+  Future<void> Function()? beforeSignOut;
+
+  Future<void> signOut() async {
+    try {
+      await beforeSignOut?.call();
+    } catch (_) {
+      // Best effort: signing out goes on.
+    }
+    await _auth.signOut();
+  }
 
   Future<void> _keep(AuthSession session, User user) async {
     if (_session?.uid != session.uid) return;

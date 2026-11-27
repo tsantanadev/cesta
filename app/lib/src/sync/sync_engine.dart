@@ -9,7 +9,7 @@ import 'package:material_ui/material_ui.dart' show AppLifecycleListener, ValueNo
 import '../api/generated/cesta_api.dart';
 import '../api/network.dart';
 import '../db/app_database.dart';
-import '../items/items_store.dart';
+import '../items/items_store.dart' hide HistoryEntry;
 import 'network_status.dart';
 import 'outbox.dart';
 
@@ -158,6 +158,15 @@ class SyncEngine {
     await _current;
   }
 
+  /// Before signing out: pushes what this device still holds, held removals
+  /// included, if the phone is online, waiting at most [timeout]. Best effort:
+  /// whatever doesn't reach the server is lost with the session's data.
+  Future<void> flush({Duration timeout = const Duration(seconds: 3)}) async {
+    _outbox.releaseHolds();
+    if (!_started || !await _network.isConnected()) return;
+    await sync().timeout(timeout, onTimeout: () {});
+  }
+
   /// Syncs now. When a sync is already running, another one follows it, and
   /// the returned future completes after that one.
   Future<void> sync() {
@@ -240,23 +249,21 @@ class SyncEngine {
     ({Map<String, MutationResult> results, ApiErrorCode? refusal}) answer,
     int generation,
   ) async {
-    // Items whose refused create took their later changes with it: those
-    // changes' own results are moot and already reported.
-    final droppedItems = <String>{};
+    // Changes a refused change took with it (a refused create's later
+    // changes, a refused check's clear): their own results are moot.
+    final dropped = <int>{};
     for (final row in batch) {
       if (generation != _generation) return null;
-      if (droppedItems.contains(row.itemId)) continue;
+      if (dropped.contains(row.seq)) continue;
       final r = answer.results[row.mutationId];
       if (r == null) {
         if (batch.length > 1) return 1; // find which change it is
-        await _rollBack(row, answer.refusal, null, generation);
+        dropped.addAll(await _rollBack(row, answer.refusal, null, generation));
       } else if (r.status == MutationResultStatus.applied) {
         await _outbox.markApplied(row);
-        continue;
       } else {
-        await _rollBack(row, r.reason?.code, r.reason?.limit, generation);
+        dropped.addAll(await _rollBack(row, r.reason?.code, r.reason?.limit, generation));
       }
-      if (row.type == MutationType.itemCreate) droppedItems.add(row.itemId);
     }
     return null;
   }
@@ -283,27 +290,26 @@ class SyncEngine {
     type: m.type,
     entityId: m.itemId,
     listId: m.type == MutationType.itemCreate ? m.listId : null,
-    // A remove or a clear carries nothing but the Item.
-    fields: m.type == MutationType.itemDelete || m.type == MutationType.itemClear ? null : m.fields,
+    fields: m.type.removesItem ? null : m.fields,
     clientTimestamp: DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true),
   );
 
-  /// Drops the refused change [row] (and, for a refused create, every later
-  /// change to that Item), then reports it. [limit] comes with
-  /// `limit_exceeded`.
-  Future<void> _rollBack(OutboxData row, ApiErrorCode? reason, int? limit, int generation) async {
-    final before = (await _items.readList(row.listId)).where((i) => i.id == row.itemId).firstOrNull?.name;
-    if (generation != _generation) return;
-    await _outbox.rollBack(row);
-    // A removed or cleared Item shows again once its change is rolled back.
-    final name =
-        before ??
-        (await _items.readList(row.listId)).where((i) => i.id == row.itemId).firstOrNull?.name ??
-        row.fields.name ??
-        '';
+  /// Drops the refused change [row] and the changes that depended on it
+  /// (see [ChangeOutbox.rollBack]), then reports it; the seqs dropped.
+  /// [limit] comes with `limit_exceeded`.
+  Future<Set<int>> _rollBack(OutboxData row, ApiErrorCode? reason, int? limit, int generation) async {
+    Future<String?> shownName() async =>
+        (await _items.readList(row.listId)).where((i) => i.id == row.itemId).firstOrNull?.name;
+    // Named as the device showed it before the rollback; a removed or
+    // cleared Item (or one a later clear hides) as it shows again after.
+    final before = row.type.removesItem ? null : await shownName();
+    if (generation != _generation) return const {};
+    final dropped = await _outbox.rollBack(row);
+    final name = before ?? await shownName() ?? row.fields.name ?? '';
     unawaited(_recount({row.listId}));
     if (limit != null) _itemLimit.value = limit;
     _rejections.add(RejectedChange(listId: row.listId, itemName: name, reason: reason, limit: limit));
+    return dropped;
   }
 
   Future<void> _pull(int generation) async {

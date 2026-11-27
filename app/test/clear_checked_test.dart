@@ -94,6 +94,29 @@ void main() {
     expect([for (final e in await h.itemHistory(list)) e.name], ['Cookies']);
   });
 
+  testWidgets('a refused check is reported once, not again for the Clear checked that followed it', (tester) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Coffee', addedBy: ana);
+    h.api.addItem(list, name: 'Rice', addedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    h.goOffline();
+
+    await h.tapTag('Coffee');
+    await h.tap(find.text('Clear checked'));
+    h.api
+      ..rejectMutations = ApiErrorCode.invalidItem
+      ..rejectOnly = {MutationType.itemUpdate}; // the check, not the clear
+    await h.goOnline();
+
+    expect(find.text('Couldn’t save “Coffee”.'), findsOneWidget);
+    expect(find.text('Couldn’t clear “Coffee”. It’s no longer checked.'), findsNothing);
+    expect(h.tags(), ['Coffee', 'Rice']);
+    expect(h.api.itemsToBuy(list), ['Coffee', 'Rice']);
+  });
+
   testWidgets('a full List with Checked Items offers Clear checked, which makes room', (tester) async {
     final h = Harness(tester);
     final ana = h.signedIn();

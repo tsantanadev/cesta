@@ -82,10 +82,9 @@ WITH joined AS (
 	SELECT 'list', v.id, v.id, v.visible_seq FROM vis v WHERE v.deleted
 )
 SELECT c.kind, c.id, c.list_id, c.pos, i.deleted_at IS NOT NULL,
-	COALESCE(i.name, h.name), trim_scale(COALESCE(i.quantity, h.quantity))::text,
-	COALESCE(i.unit, h.unit), COALESCE(i.note, h.note),
+	i.name, trim_scale(i.quantity)::text, i.unit, i.note,
 	i.added_by, i.added_at, i.checked_by, i.checked_at, i.updated_at,
-	h.cleared_by, h.cleared_at
+	h.name, trim_scale(h.quantity)::text, h.unit, h.note, h.cleared_by, h.cleared_at
 FROM changes c
 LEFT JOIN items i ON c.kind = 'item' AND i.id = c.id
 LEFT JOIN item_history h ON c.kind = 'history' AND h.item_id = c.id
@@ -113,17 +112,20 @@ func (s *Service) ChangesIn(
 			c                  Change
 			kind               string
 			removed            *bool
-			name               *string
+			itemName           *string
 			it                 Item
 			addedBy            *uuid.UUID
 			addedAt, updatedAt *time.Time
-			clearedBy          *uuid.UUID
-			clearedAt          *time.Time
+			// The history entry's columns, all null unless kind is "history".
+			entryName *string
+			entry     HistoryEntry
+			clearedBy *uuid.UUID
+			clearedAt *time.Time
 		)
 		if err := row.Scan(&kind, &c.ID, &c.ListID, &c.Seq, &removed,
-			&name, &it.Quantity, &it.Unit, &it.Note,
+			&itemName, &it.Quantity, &it.Unit, &it.Note,
 			&addedBy, &addedAt, &it.CheckedBy, &it.CheckedAt, &updatedAt,
-			&clearedBy, &clearedAt); err != nil {
+			&entryName, &entry.Quantity, &entry.Unit, &entry.Note, &clearedBy, &clearedAt); err != nil {
 			return Change{}, err
 		}
 		switch {
@@ -131,16 +133,14 @@ func (s *Service) ChangesIn(
 			c.Kind = ListDeleted
 		case kind == "history":
 			c.Kind = HistoryRecorded
-			c.History = &HistoryEntry{
-				ItemID: c.ID, ListID: c.ListID, Name: deref(name),
-				Quantity: it.Quantity, Unit: it.Unit, Note: it.Note,
-				ClearedBy: deref(clearedBy), ClearedAt: deref(clearedAt).UTC(),
-			}
+			entry.ItemID, entry.ListID, entry.Name = c.ID, c.ListID, deref(entryName)
+			entry.ClearedBy, entry.ClearedAt = deref(clearedBy), deref(clearedAt).UTC()
+			c.History = &entry
 		case removed != nil && *removed:
 			c.Kind = ItemRemoved
 		default:
 			c.Kind = ItemChanged
-			it.ID, it.ListID, it.Name = c.ID, c.ListID, deref(name)
+			it.ID, it.ListID, it.Name = c.ID, c.ListID, deref(itemName)
 			it.AddedBy, it.AddedAt, it.UpdatedAt = deref(addedBy), deref(addedAt).UTC(), deref(updatedAt).UTC()
 			if it.CheckedAt != nil {
 				at := it.CheckedAt.UTC()

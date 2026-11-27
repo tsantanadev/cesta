@@ -72,6 +72,18 @@ _Avoid_: Archive, reset
 The record of Items that were bought (cleared after being checked) on a List.
 _Avoid_: Purchase log, past items
 
+**Matches**:
+What Add items offers as the Member types: first the List's Items to buy whose names contain what was typed, ignoring case and accents, highlighted so the Member opens the Item already there instead of adding a duplicate; then the names from the List's Item history that match and aren't already to buy.
+_Avoid_: Suggestions, search results, autocomplete
+
+**Bought before**:
+What Add items offers before anything is typed: the most recent distinct names from the List's Item history that aren't already to buy. Tapping one adds it to the List again, as it was last bought.
+_Avoid_: Past items, recent items, favourites
+
+**Undo window**:
+The few seconds after an Item is added or removed during which a Toast offers Undo. A removal reaches the other Members only once the Undo window has closed, so undoing it changes nothing for them.
+_Avoid_: Grace period, undo timeout
+
 ### Future
 
 **Shopping mode**:
