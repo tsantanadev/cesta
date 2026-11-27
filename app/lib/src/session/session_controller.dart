@@ -76,6 +76,7 @@ class SessionController extends ChangeNotifier {
       notifyListeners();
       await _db.clearSignedInUser();
       await _db.clearKnownLists();
+      await _db.clearSyncedData();
       return;
     }
 
@@ -88,6 +89,7 @@ class SessionController extends ChangeNotifier {
       if (cached != null) {
         await _db.clearSignedInUser();
         await _db.clearKnownLists(); // another User's Lists
+        await _db.clearSyncedData(); // and their Items and unsynced changes
       }
     }
     _loadingUser = _user == null;

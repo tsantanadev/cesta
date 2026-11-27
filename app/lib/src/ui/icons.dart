@@ -26,6 +26,8 @@ abstract final class CesIcons {
   static const delete = IconData(0xe4a6, fontFamily: _regular);
   static const restore = IconData(0xe038, fontFamily: _regular);
   static const recentlyDeleted = IconData(0xe1a0, fontFamily: _regular);
+  static const back = IconData(0xe138, fontFamily: _regular);
+  static const search = IconData(0xe30c, fontFamily: _regular);
 
   // Produce, for Item tiles.
   static const orange = IconData(0xee40, fontFamily: _fill);

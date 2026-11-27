@@ -1,6 +1,7 @@
 import 'package:cesta/src/app.dart';
 import 'package:cesta/src/db/app_database.dart';
 import 'package:cesta/src/ui/components.dart';
+import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -9,7 +10,8 @@ import 'fake_api_client.dart';
 import 'fake_auth_gateway.dart';
 import 'fields.dart';
 
-export 'package:cesta/src/ui/components.dart' show CesButton, CesItemTile, CesMessage;
+export 'package:cesta/src/ui/components.dart'
+    show CesButton, CesCheckedItem, CesChoiceChip, CesItemTile, CesMessage, CesSearchField;
 
 export 'fake_api_client.dart';
 export 'fake_auth_gateway.dart';
@@ -27,7 +29,13 @@ const iPhone = Size(390, 844);
 /// and [auth] can be reused across [pumpApp] calls to simulate the app
 /// restarting with the same storage and the same stored session.
 class Harness {
-  Harness(this.tester) : auth = FakeAuthGateway(), db = AppDatabase(NativeDatabase.memory()) {
+  Harness(this.tester)
+    : auth = FakeAuthGateway(),
+      db = AppDatabase(
+        // Close stream queries at once when their listener goes, rather than on a
+        // later timer that a widget test's fake clock would never run.
+        DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true),
+      ) {
     api = FakeApiClient(auth: auth);
     addTearDown(db.close);
   }
@@ -183,6 +191,46 @@ class Harness {
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
   }
+
+  /// Opens the List named [name] from the Lists screen.
+  Future<void> openList(String name) => tap(find.text(name));
+
+  /// The names on the Item tags shown, in order.
+  List<String> tagNames() => [for (final t in tester.widgetList<CesItemTile>(find.byType(CesItemTile))) t.name];
+
+  /// The rows In the basket: each Checked Item's name and who checked it.
+  List<(String, String)> basketRows() => [
+    for (final r in tester.widgetList<CesCheckedItem>(find.byType(CesCheckedItem))) (r.name, r.checkedBy),
+  ];
+
+  /// From a List's screen, adds a new Item named [name] through Add items and
+  /// the New item sheet, pressing + [steps] times and picking [unit] (as its
+  /// chip reads); stays on Add items.
+  Future<void> addNewItem(String name, {required String listName, int steps = 0, String? unit}) async {
+    if (find.byType(CesSearchField).evaluate().isEmpty) await tap(find.text('Add an item'));
+    await search(name);
+    await tap(find.text('Add “$name” as a new item'));
+    for (var i = 0; i < steps; i++) {
+      await tap(find.bySemanticsLabel('More'));
+    }
+    if (unit != null) await tap(find.widgetWithText(CesChoiceChip, unit));
+    await tap(find.widgetWithText(CesButton, 'Add to $listName'));
+  }
+
+  /// Types [text] in Add items' search field.
+  Future<void> search(String text) async {
+    await tester.enterText(find.descendant(of: find.byType(CesSearchField), matching: find.byType(EditableText)), text);
+    await tester.pumpAndSettle();
+  }
+
+  /// Taps the tag of the Item named [name] (checks it).
+  Future<void> tapTag(String name) => tap(find.widgetWithText(CesItemTile, name));
+
+  /// Taps the In the basket row of the Item named [name] (unchecks it).
+  Future<void> tapBasketRow(String name) => tap(find.widgetWithText(CesCheckedItem, name));
+
+  /// Whether the List screen says some changes haven't reached the server yet.
+  bool get showsPending => find.byTooltip('Waiting to sync').evaluate().isNotEmpty;
 
   /// The text in the field labelled [label].
   String textInField(String label) => fieldController(tester, label).text;

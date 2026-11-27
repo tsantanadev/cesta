@@ -12,6 +12,9 @@ enum ApiErrorCode {
   listDeleted("list_deleted"),
   listIdTaken("list_id_taken"),
   limitExceeded("limit_exceeded"),
+  invalidItem("invalid_item"),
+  itemNotFound("item_not_found"),
+  itemDeleted("item_deleted"),
   internal("internal");
 
   const ApiErrorCode(this.value);

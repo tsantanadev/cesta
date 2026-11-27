@@ -8,6 +8,12 @@ abstract final class Routes {
   static const onboardingName = '/onboarding/name';
   static const home = '/';
   static const recentlyDeleted = '/lists/deleted';
+
+  /// A List's screen (04).
+  static String list(String listId) => '/lists/$listId';
+
+  /// Add items (05) for a List.
+  static String addItems(String listId) => '/lists/$listId/add';
   static const changeDisplayName = '/me/name';
   static const serverStatus = '/server-status';
 }

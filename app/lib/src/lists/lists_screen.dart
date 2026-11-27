@@ -186,6 +186,7 @@ class _ListsScreenState extends State<ListsScreen> {
               key: ValueKey(list.id),
               name: list.name,
               subtitle: _subtitle(l10n, list),
+              onTap: () => unawaited(context.push(Routes.list(list.id))),
               action: list.role == Role.owner
                   ? CesIconButton(
                       icon: CesIcons.more,

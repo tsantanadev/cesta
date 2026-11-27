@@ -170,8 +170,18 @@ class CesSheetItem extends StatelessWidget {
 
 /// Shows a short message at the bottom of the screen (the design's Toast),
 /// with an optional action such as "Undo".
-void showCesToast(BuildContext context, {required String message, String? actionLabel, VoidCallback? onAction}) {
-  ScaffoldMessenger.of(context)
+void showCesToast(BuildContext context, {required String message, String? actionLabel, VoidCallback? onAction}) =>
+    showCesToastOn(ScaffoldMessenger.of(context), message: message, actionLabel: actionLabel, onAction: onAction);
+
+/// [showCesToast] through a given [messenger], e.g. the app's, for messages
+/// that don't belong to one screen.
+void showCesToastOn(
+  ScaffoldMessengerState messenger, {
+  required String message,
+  String? actionLabel,
+  VoidCallback? onAction,
+}) {
+  messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
@@ -192,11 +202,12 @@ Future<void> showCesFormSheet(
   required String title,
   required String closeTooltip,
   required Widget child,
+  double? sectionGap,
 }) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   builder: (context) =>
-      _CesSheet(title: title, closeTooltip: closeTooltip, sectionGap: context.spacing.lg, child: child),
+      _CesSheet(title: title, closeTooltip: closeTooltip, sectionGap: sectionGap ?? context.spacing.lg, child: child),
 );
 
 /// The round close button of a sheet (Figma 9:440, 32:1496, 32:1394): 36 dp,
