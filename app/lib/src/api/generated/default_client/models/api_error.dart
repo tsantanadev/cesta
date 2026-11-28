@@ -10,7 +10,7 @@ class ApiError {
     /// Human-readable explanation, in English, for logs and debugging.
     required this.message,
 
-    /// Present when code is limit_exceeded: the configured maximum the User has reached.
+    /// Present when code is limit_exceeded or list_full: the maximum reached (Lists the User owns, Invitations they sent in 24 hours, or Members of the List).
     this.limit,
     this.additionalProperties = const {},
   });
@@ -31,7 +31,7 @@ class ApiError {
   /// Human-readable explanation, in English, for logs and debugging.
   final String message;
 
-  /// Present when code is limit_exceeded: the configured maximum the User has reached.
+  /// Present when code is limit_exceeded or list_full: the maximum reached (Lists the User owns, Invitations they sent in 24 hours, or Members of the List).
   final int? limit;
 
   static const _knownKeys = <String>{"code", "message", "limit"};

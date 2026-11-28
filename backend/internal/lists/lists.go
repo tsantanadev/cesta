@@ -419,3 +419,61 @@ func wrap(what string, err error) error {
 func normalizeName(name string) (string, bool) {
 	return names.Normalize(name, MaxNameLength)
 }
+
+// LockOwnedLive locks listID until tx ends and returns its name, if userID
+// owns it and it is not deleted. It returns ErrNotFound, ErrNotOwner or
+// ErrDeleted otherwise. Package sharing calls it before an Owner-only change.
+func (s *Service) LockOwnedLive(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (string, error) {
+	l, err := s.lockOwned(ctx, tx, userID, listID)
+	switch {
+	case err != nil:
+		return "", wrap("lock", err)
+	case l.deletedAt != nil:
+		return "", ErrDeleted
+	}
+	return l.name, nil
+}
+
+// LockLive locks listID until tx ends and returns its name, whoever asks. It
+// returns ErrNotFound if the List is gone and ErrDeleted if it is deleted.
+// Package sharing calls it before someone joins the List.
+func (s *Service) LockLive(ctx context.Context, tx pgx.Tx, listID uuid.UUID) (string, error) {
+	var l listRow
+	err := tx.QueryRow(ctx, "SELECT name, deleted_at FROM lists WHERE id = $1 FOR UPDATE", listID).
+		Scan(&l.name, &l.deletedAt)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return "", ErrNotFound
+	case err != nil:
+		return "", wrap("lock", err)
+	case l.deletedAt != nil && !s.restorable(*l.deletedAt):
+		return "", ErrNotFound
+	case l.deletedAt != nil:
+		return "", ErrDeleted
+	}
+	return l.name, nil
+}
+
+// LiveNamesIn returns the name of each of listIDs that exists and is not
+// deleted, read inside the caller's transaction tx.
+func (s *Service) LiveNamesIn(ctx context.Context, tx pgx.Tx, listIDs []uuid.UUID) (map[uuid.UUID]string, error) {
+	rows, err := tx.Query(ctx, "SELECT id, name FROM lists WHERE id = ANY($1) AND deleted_at IS NULL", listIDs)
+	if err != nil {
+		return nil, wrap("names", err)
+	}
+	out := make(map[uuid.UUID]string, len(listIDs))
+	var id uuid.UUID
+	var name string
+	if _, err := pgx.ForEachRow(rows, []any{&id, &name}, func() error {
+		out[id] = name
+		return nil
+	}); err != nil {
+		return nil, wrap("names", err)
+	}
+	return out, nil
+}
+
+// Get returns listID as userID sees it, or ErrNotFound if userID is not a Member.
+func (s *Service) Get(ctx context.Context, userID, listID uuid.UUID) (Summary, error) {
+	return s.summary(ctx, listID, userID)
+}

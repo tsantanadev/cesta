@@ -10,6 +10,7 @@ import (
 	"github.com/tsantanadev/cesta/backend/internal/identity"
 	"github.com/tsantanadev/cesta/backend/internal/lists"
 	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
+	"github.com/tsantanadev/cesta/backend/internal/sharing"
 	cestasync "github.com/tsantanadev/cesta/backend/internal/sync"
 )
 
@@ -27,6 +28,7 @@ type Server struct {
 	Logger   *slog.Logger
 	Identity *identity.Service
 	Lists    *lists.Service
+	Sharing  *sharing.Service
 	Sync     *cestasync.Service
 	PerIP    *ratelimit.Limiter
 	// TrustedProxyHops is how many proxies in front of the backend append to

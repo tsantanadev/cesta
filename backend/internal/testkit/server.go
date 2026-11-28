@@ -43,6 +43,8 @@ type Server struct {
 	URL string
 	// Clock is the backend's clock; tests advance it to move time.
 	Clock *fakes.Clock
+	// Emails captures every email the backend sends.
+	Emails *fakes.EmailSender
 
 	tokens *fakes.TokenVerifier
 	router routers.Router
@@ -78,6 +80,7 @@ func NewServer(t testing.TB, opts ...Option) *Server {
 
 	s := &Server{
 		Clock:  fakes.NewClock(time.Date(2026, time.March, 2, 9, 0, 0, 0, time.UTC)),
+		Emails: &fakes.EmailSender{},
 		tokens: fakes.NewTokenVerifier(),
 		router: contractRouter(t),
 		dbName: dbName,
@@ -86,6 +89,7 @@ func NewServer(t testing.TB, opts ...Option) *Server {
 		DB:               pool,
 		Logger:           slog.New(telemetry.LogHandler(slog.NewTextHandler(testWriter{t}, nil))),
 		TokenVerifier:    s.tokens,
+		EmailSender:      s.Emails,
 		Clock:            s.Clock,
 		TrustedProxyHops: 1,
 	}
