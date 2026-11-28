@@ -28,6 +28,8 @@ abstract final class CesIcons {
   static const recentlyDeleted = IconData(0xe1a0, fontFamily: _regular);
   static const back = IconData(0xe138, fontFamily: _regular);
   static const search = IconData(0xe30c, fontFamily: _regular);
+  static const share = IconData(0xe408, fontFamily: _regular);
+  static const envelope = IconData(0xe218, fontFamily: _regular);
 
   // Produce, for Item tiles.
   static const orange = IconData(0xee40, fontFamily: _fill);

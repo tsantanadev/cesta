@@ -12,6 +12,7 @@ import 'items/items_store.dart';
 import 'lists/lists_controller.dart';
 import 'router.dart';
 import 'session/session_controller.dart';
+import 'sharing/sharing.dart';
 import 'sync/network_status.dart';
 import 'sync/outbox.dart';
 import 'sync/sync_engine.dart';
@@ -80,6 +81,7 @@ class _CestaAppState extends State<CestaApp> {
       auth: widget.auth,
       api: widget.api,
       database: widget.database,
+      sharing: Sharing(api: widget.api),
       initialLocation: widget.initialLocation,
     );
   }

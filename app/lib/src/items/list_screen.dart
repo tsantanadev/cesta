@@ -120,6 +120,13 @@ class _ListScreenState extends State<ListScreen> {
                     children: [
                       CesBackButton(onPressed: () => context.pop()),
                       const Spacer(),
+                      // Only the Owner invites, so far all Share list offers (Figma "Share" 4:163).
+                      if (_list?.role == Role.owner)
+                        CesTopBarButton(
+                          icon: CesIcons.share,
+                          tooltip: l10n.shareTitle,
+                          onPressed: () => unawaited(context.push(Routes.shareList(widget.listId))),
+                        ),
                     ],
                   ),
                 ),

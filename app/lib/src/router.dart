@@ -17,6 +17,8 @@ import 'session/reset_password_screen.dart';
 import 'session/session_controller.dart';
 import 'session/splash_screen.dart';
 import 'session/welcome_screen.dart';
+import 'sharing/share_list_screen.dart';
+import 'sharing/sharing.dart';
 import 'sync/sync_engine.dart';
 
 /// Screens a signed-out visitor may see.
@@ -65,6 +67,7 @@ GoRouter buildRouter({
   required AuthGateway auth,
   required ApiClient api,
   required AppDatabase database,
+  required Sharing sharing,
   String? initialLocation,
 }) => GoRouter(
   initialLocation: initialLocation ?? Routes.home,
@@ -97,7 +100,7 @@ GoRouter buildRouter({
     ),
     GoRoute(
       path: Routes.home,
-      builder: (_, _) => ListsScreen(session: session, lists: lists),
+      builder: (_, _) => ListsScreen(session: session, lists: lists, sharing: sharing),
     ),
     GoRoute(
       path: Routes.recentlyDeleted,
@@ -112,6 +115,11 @@ GoRouter buildRouter({
           path: 'add',
           builder: (_, state) =>
               AddItemsScreen(listId: state.pathParameters['listId']!, session: session, lists: lists, items: items),
+        ),
+        GoRoute(
+          path: 'share',
+          builder: (_, state) =>
+              ShareListScreen(listId: state.pathParameters['listId']!, lists: lists, sharing: sharing),
         ),
       ],
     ),
