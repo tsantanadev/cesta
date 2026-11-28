@@ -26,6 +26,7 @@ All secrets live in Secret Manager, replicated only in `southamerica-east1`. Not
 | --- | --- | --- |
 | `neon-api-key` | hand | Terraform (Neon provider) |
 | `otel-exporter-otlp-headers` | hand | backend (Grafana Cloud auth) |
+| `resend-api-key` | hand | backend (`RESEND_API_KEY`: sends Invitation emails through Resend) |
 | `database-url` | Terraform | backend (Neon pooled endpoint, `pool_max_conns=5`) |
 | `database-url-direct` | Terraform | migrations job (goose needs a session-level lock) |
 
@@ -71,7 +72,13 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
    #   Authorization=Basic%20<base64 of "INSTANCE_ID:TOKEN">
    printf '%s' "$OTLP_HEADERS" | gcloud secrets create otel-exporter-otlp-headers --project=$PROJECT \
      --replication-policy=user-managed --locations=southamerica-east1 --data-file=-
+   # Resend: verify the sending domain of EMAIL_FROM (default convites@cesta.tsantana.dev,
+   # the module's email_from), then API Keys → create one with "Sending access" for that domain.
+   printf '%s' "$RESEND_API_KEY" | gcloud secrets create resend-api-key --project=$PROJECT \
+     --replication-policy=user-managed --locations=southamerica-east1 --data-file=-
    ```
+
+   An environment set up before Invitations needs `resend-api-key` created the same way before its next `terraform apply`: the plan fails until it exists.
 
 4. **Settings.** In `terraform/envs/<env>/`, check `terraform.tfvars` and `backend.hcl`, and copy `private.auto.tfvars.example` to `private.auto.tfvars` with the billing account ID and alert email. That file is gitignored because the repo is public. `budget_currency`, `budget_amount` and `kill_switch_limit` are in the billing account's currency (check it with `gcloud billing accounts describe`). Ours bills in BRL. The OTLP endpoint is shown on the same Grafana Cloud page as the token; pick the `sa-east-1` stack.
 
@@ -117,7 +124,7 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
 
 ## Cost
 
-Idle, each environment sits inside the free tiers: Cloud Run and the function scale to zero, Neon's free plan has no overage, and Artifact Registry keeps at most 10 images. Two small exceptions: Secret Manager's 6 free secret versions are per billing account (both environments use 8, about US$0.12/month), and Cloud Storage in São Paulo has no free tier (the state and function buckets hold a few KB, so it rounds to $0).
+Idle, each environment sits inside the free tiers: Cloud Run and the function scale to zero, Neon's free plan has no overage, and Artifact Registry keeps at most 10 images. Two small exceptions: Secret Manager's 6 free secret versions are per billing account (both environments use 10, about US$0.24/month), and Cloud Storage in São Paulo has no free tier (the state and function buckets hold a few KB, so it rounds to $0).
 
 ## Known risks
 
