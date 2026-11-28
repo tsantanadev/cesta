@@ -364,7 +364,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get itemOpen => 'Abrir';
 
   @override
-  String get addItemsMatches => 'Resultados';
+  String get addItemsMatches => 'Correspondências';
 
   @override
   String get addItemsBoughtBefore => 'Comprados antes';
