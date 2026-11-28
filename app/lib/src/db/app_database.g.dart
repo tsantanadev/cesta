@@ -2684,6 +2684,159 @@ class SyncCursorCompanion extends UpdateCompanion<SyncCursorData> {
   }
 }
 
+class $PendingDeepLinkTable extends PendingDeepLink with TableInfo<$PendingDeepLinkTable, PendingDeepLinkData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingDeepLinkTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta('location');
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, location];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_deep_link';
+  @override
+  VerificationContext validateIntegrity(Insertable<PendingDeepLinkData> instance, {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('location')) {
+      context.handle(_locationMeta, location.isAcceptableOrUnknown(data['location']!, _locationMeta));
+    } else if (isInserting) {
+      context.missing(_locationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PendingDeepLinkData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingDeepLinkData(
+      id: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      location: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}location'])!,
+    );
+  }
+
+  @override
+  $PendingDeepLinkTable createAlias(String alias) {
+    return $PendingDeepLinkTable(attachedDatabase, alias);
+  }
+}
+
+class PendingDeepLinkData extends DataClass implements Insertable<PendingDeepLinkData> {
+  final int id;
+  final String location;
+  const PendingDeepLinkData({required this.id, required this.location});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['location'] = Variable<String>(location);
+    return map;
+  }
+
+  PendingDeepLinkCompanion toCompanion(bool nullToAbsent) {
+    return PendingDeepLinkCompanion(id: Value(id), location: Value(location));
+  }
+
+  factory PendingDeepLinkData.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingDeepLinkData(
+      id: serializer.fromJson<int>(json['id']),
+      location: serializer.fromJson<String>(json['location']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{'id': serializer.toJson<int>(id), 'location': serializer.toJson<String>(location)};
+  }
+
+  PendingDeepLinkData copyWith({int? id, String? location}) =>
+      PendingDeepLinkData(id: id ?? this.id, location: location ?? this.location);
+  PendingDeepLinkData copyWithCompanion(PendingDeepLinkCompanion data) {
+    return PendingDeepLinkData(
+      id: data.id.present ? data.id.value : this.id,
+      location: data.location.present ? data.location.value : this.location,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingDeepLinkData(')
+          ..write('id: $id, ')
+          ..write('location: $location')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, location);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingDeepLinkData && other.id == this.id && other.location == this.location);
+}
+
+class PendingDeepLinkCompanion extends UpdateCompanion<PendingDeepLinkData> {
+  final Value<int> id;
+  final Value<String> location;
+  const PendingDeepLinkCompanion({this.id = const Value.absent(), this.location = const Value.absent()});
+  PendingDeepLinkCompanion.insert({this.id = const Value.absent(), required String location})
+    : location = Value(location);
+  static Insertable<PendingDeepLinkData> custom({Expression<int>? id, Expression<String>? location}) {
+    return RawValuesInsertable({if (id != null) 'id': id, if (location != null) 'location': location});
+  }
+
+  PendingDeepLinkCompanion copyWith({Value<int>? id, Value<String>? location}) {
+    return PendingDeepLinkCompanion(id: id ?? this.id, location: location ?? this.location);
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingDeepLinkCompanion(')
+          ..write('id: $id, ')
+          ..write('location: $location')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2694,6 +2847,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SyncedHistoryTable syncedHistory = $SyncedHistoryTable(this);
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncCursorTable syncCursor = $SyncCursorTable(this);
+  late final $PendingDeepLinkTable pendingDeepLink = $PendingDeepLinkTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables => allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
@@ -2705,6 +2859,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     syncedHistory,
     outbox,
     syncCursor,
+    pendingDeepLink,
   ];
 }
 
@@ -3999,6 +4154,112 @@ typedef $$SyncCursorTableProcessedTableManager =
       SyncCursorData,
       PrefetchHooks Function()
     >;
+typedef $$PendingDeepLinkTableCreateCompanionBuilder = PendingDeepLinkCompanion Function({
+  Value<int> id,
+  required String location,
+});
+typedef $$PendingDeepLinkTableUpdateCompanionBuilder = PendingDeepLinkCompanion Function({
+  Value<int> id,
+  Value<String> location,
+});
+
+class $$PendingDeepLinkTableFilterComposer extends Composer<_$AppDatabase, $PendingDeepLinkTable> {
+  $$PendingDeepLinkTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => ColumnFilters(column));
+}
+
+class $$PendingDeepLinkTableOrderingComposer extends Composer<_$AppDatabase, $PendingDeepLinkTable> {
+  $$PendingDeepLinkTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => ColumnOrderings(column));
+}
+
+class $$PendingDeepLinkTableAnnotationComposer extends Composer<_$AppDatabase, $PendingDeepLinkTable> {
+  $$PendingDeepLinkTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id => $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get location => $composableBuilder(column: $table.location, builder: (column) => column);
+}
+
+class $$PendingDeepLinkTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PendingDeepLinkTable,
+          PendingDeepLinkData,
+          $$PendingDeepLinkTableFilterComposer,
+          $$PendingDeepLinkTableOrderingComposer,
+          $$PendingDeepLinkTableAnnotationComposer,
+          $$PendingDeepLinkTableCreateCompanionBuilder,
+          $$PendingDeepLinkTableUpdateCompanionBuilder,
+          (PendingDeepLinkData, BaseReferences<_$AppDatabase, $PendingDeepLinkTable, PendingDeepLinkData>),
+          PendingDeepLinkData,
+          PrefetchHooks Function()
+        > {
+  $$PendingDeepLinkTableTableManager(_$AppDatabase db, $PendingDeepLinkTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () => $$PendingDeepLinkTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () => $$PendingDeepLinkTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () => $$PendingDeepLinkTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> location = const Value.absent(),
+          }) => PendingDeepLinkCompanion(id: id, location: location),
+          createCompanionCallback: ({Value<int> id = const Value.absent(), required String location}) =>
+              PendingDeepLinkCompanion.insert(id: id, location: location),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$PendingDeepLinkTable, PendingDeepLinkData>(table),
+                  BaseReferences<_$AppDatabase, $PendingDeepLinkTable, PendingDeepLinkData>(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingDeepLinkTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PendingDeepLinkTable,
+      PendingDeepLinkData,
+      $$PendingDeepLinkTableFilterComposer,
+      $$PendingDeepLinkTableOrderingComposer,
+      $$PendingDeepLinkTableAnnotationComposer,
+      $$PendingDeepLinkTableCreateCompanionBuilder,
+      $$PendingDeepLinkTableUpdateCompanionBuilder,
+      (PendingDeepLinkData, BaseReferences<_$AppDatabase, $PendingDeepLinkTable, PendingDeepLinkData>),
+      PendingDeepLinkData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4010,4 +4271,6 @@ class $AppDatabaseManager {
   $$SyncedHistoryTableTableManager get syncedHistory => $$SyncedHistoryTableTableManager(_db, _db.syncedHistory);
   $$OutboxTableTableManager get outbox => $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncCursorTableTableManager get syncCursor => $$SyncCursorTableTableManager(_db, _db.syncCursor);
+  $$PendingDeepLinkTableTableManager get pendingDeepLink =>
+      $$PendingDeepLinkTableTableManager(_db, _db.pendingDeepLink);
 }

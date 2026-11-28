@@ -14,6 +14,22 @@ abstract final class Routes {
 
   /// Add items (05) for a List.
   static String addItems(String listId) => '/lists/$listId/add';
+
+  /// Share list (06) for a List.
+  static String shareList(String listId) => '/lists/$listId/share';
+
+  /// The accept screen an Invitation's deep link opens
+  /// (`https://cesta.tsantana.dev/invite/<token>`).
+  static String invitation(String token) => '/invite/$token';
+
+  /// Share links (`https://cesta.tsantana.dev/join/<code>`, #10). The app
+  /// is already associated with them; until #10 builds them they open the
+  /// Lists.
+  static const shareLinkPattern = '/join/:code';
+
+  /// Whether [path] is one a link from outside the app opens, which is kept
+  /// through sign-in.
+  static bool isDeepLink(String path) => path.startsWith('/invite/');
   static const changeDisplayName = '/me/name';
   static const serverStatus = '/server-status';
 }

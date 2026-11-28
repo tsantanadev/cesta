@@ -177,6 +177,10 @@ class ListsController extends ChangeNotifier {
     };
   });
 
+  /// The User became a Member of [list] (e.g. by accepting an Invitation), so
+  /// it shows on the Lists screen at once.
+  Future<void> joined(ListSummary list) => _keep(list);
+
   /// The Lists the User deleted and can still restore, newest deletion first.
   /// Null when they couldn't be loaded, with why.
   Future<(List<DeletedList>?, ListFailure?)> recentlyDeleted() async {

@@ -27,7 +27,7 @@ The Role that can add, edit, remove, check and uncheck Items on a List, and leav
 _Avoid_: Contributor, collaborator
 
 **Invitation**:
-A pending offer, addressed to an email address, to become an Editor of a List; it takes effect only when the recipient accepts it.
+A pending offer, addressed to an email address, to become an Editor of a List; it takes effect only when the recipient accepts it. It expires 14 days after it is sent. The Owner still sees an expired one, so they know who never joined, until they cancel it or invite that address again.
 _Avoid_: Invite request, share request
 
 **Share link**:

@@ -58,3 +58,10 @@ data "google_secret_manager_secret" "otel_headers" {
   project   = var.project_id
   secret_id = "otel-exporter-otlp-headers"
 }
+
+# Created by hand (infra/README.md): the Resend API key the backend sends
+# Invitation emails with.
+data "google_secret_manager_secret" "resend_api_key" {
+  project   = var.project_id
+  secret_id = "resend-api-key"
+}

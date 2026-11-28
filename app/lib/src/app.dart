@@ -10,8 +10,10 @@ import 'db/app_database.dart';
 import 'items/item_limit_sheet.dart';
 import 'items/items_store.dart';
 import 'lists/lists_controller.dart';
+import 'pending_link.dart';
 import 'router.dart';
 import 'session/session_controller.dart';
+import 'sharing/sharing.dart';
 import 'sync/network_status.dart';
 import 'sync/outbox.dart';
 import 'sync/sync_engine.dart';
@@ -72,6 +74,8 @@ class _CestaAppState extends State<CestaApp> {
       ..addListener(_followSession);
     _rejections = _sync.rejections.listen(_tellRejected);
     _listsChanged = _sync.listsChanged.listen((c) => _lists.changed(gone: c.gone, toBuy: c.toBuy));
+    final pending = PendingLink(widget.database);
+    unawaited(pending.restore());
     _router = buildRouter(
       session: _session,
       lists: _lists,
@@ -80,6 +84,8 @@ class _CestaAppState extends State<CestaApp> {
       auth: widget.auth,
       api: widget.api,
       database: widget.database,
+      pending: pending,
+      sharing: Sharing(api: widget.api),
       initialLocation: widget.initialLocation,
     );
   }

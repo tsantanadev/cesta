@@ -16,6 +16,8 @@
 //	PORT                         HTTP port (default 8080)
 //	LOG_LEVEL                    debug, info, warn or error (default info)
 //	PUBLIC_HOST                  custom domain served by Firebase Hosting; other requests get 404 (off when unset)
+//	RESEND_API_KEY               Resend API key for Invitation emails (unset: emails are only logged, for local dev)
+//	EMAIL_FROM                   sender of emails (default "Cesta <convites@cesta.tsantana.dev>")
 //	OTEL_EXPORTER_OTLP_ENDPOINT  enables OTLP/HTTP export of traces and metrics (off when unset)
 package main
 
@@ -35,6 +37,7 @@ import (
 	"github.com/tsantanadev/cesta/backend/internal/app"
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth/firebase"
 	"github.com/tsantanadev/cesta/backend/internal/platform/db"
+	"github.com/tsantanadev/cesta/backend/internal/platform/email"
 	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
 	"github.com/tsantanadev/cesta/backend/internal/platform/telemetry"
 	"github.com/tsantanadev/cesta/backend/migrations"
@@ -171,6 +174,10 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	sender, err := emailSender(logger)
+	if err != nil {
+		return err
+	}
 	publicHost := os.Getenv("PUBLIC_HOST")
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -201,6 +208,7 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 			DB:               pool,
 			Logger:           logger,
 			TokenVerifier:    firebase.NewVerifier(projectID),
+			EmailSender:      sender,
 			TrustedProxyHops: hops,
 			RateLimits:       limits,
 			PublicHost:       publicHost,
@@ -224,6 +232,29 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// defaultEmailFrom is the sender of emails when EMAIL_FROM is unset.
+const defaultEmailFrom = "Cesta <convites@cesta.tsantana.dev>"
+
+// emailSender returns Resend when RESEND_API_KEY is set. Without it, the
+// backend only starts when EMAIL_LOG_ONLY is "true" (local dev), and then
+// emails are logged, not sent: a deployment missing its key must not make
+// Invitations look sent when no email left.
+func emailSender(logger *slog.Logger) (email.Sender, error) {
+	key := os.Getenv("RESEND_API_KEY")
+	if key == "" {
+		if os.Getenv("EMAIL_LOG_ONLY") != "true" {
+			return nil, errors.New(`RESEND_API_KEY is not set (set EMAIL_LOG_ONLY="true" to only log emails, for local dev)`)
+		}
+		logger.Warn("RESEND_API_KEY is not set and EMAIL_LOG_ONLY is true: emails will be logged, not sent")
+		return email.Log{Logger: logger}, nil
+	}
+	from := os.Getenv("EMAIL_FROM")
+	if from == "" {
+		from = defaultEmailFrom
+	}
+	return email.NewResend(key, from), nil
 }
 
 // positiveEnv returns the positive integer in environment variable name, or 0 when it is unset.

@@ -446,6 +446,36 @@ abstract class AppLocalizations {
   /// **'That name can\'t be used. Try another.'**
   String get errorDisplayNameInvalid;
 
+  /// Title of the screen an Invitation's deep link opens (provisional, #44).
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation'**
+  String get invitationTitle;
+
+  /// Heading of the Invitation screen: the Owner who invited the User, and the List.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} invited you to join {list}'**
+  String invitationHeading(String name, String list);
+
+  /// What accepting an Invitation lets the User do.
+  ///
+  /// In en, this message translates to:
+  /// **'As an Editor, you can add, check and remove items on this list with everyone on it.'**
+  String get invitationExplanation;
+
+  /// Shown when the signed-in User's email isn't the one the Invitation was sent to; they can still accept it.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation was sent to {invited}. You\'ll join as {me}.'**
+  String invitationSentTo(String invited, String me);
+
+  /// Leaves the Invitation screen for the Lists screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to your lists'**
+  String get invitationGoToLists;
+
   /// Title of the Lists screen (the home screen), which lists the User's Lists.
   ///
   /// In en, this message translates to:
@@ -1003,6 +1033,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A list can hold up to {max} items. Clear checked items, or remove ones you no longer need, to make room.'**
   String itemLimitBodyClearChecked(int max);
+
+  /// Title of the Share list screen (Figma 06), and the tooltip of the button on a List that opens it.
+  ///
+  /// In en, this message translates to:
+  /// **'Share list'**
+  String get shareTitle;
+
+  /// Text on the Share list card, under the List's name (provisional until the Share link lands).
+  ///
+  /// In en, this message translates to:
+  /// **'Invite people to add and check off items with you.'**
+  String get shareInviteExplanation;
+
+  /// Button on Share list that opens the Invite by email sheet, and that sheet's title.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite by email'**
+  String get shareInviteByEmail;
+
+  /// Explanation on the Invite by email sheet; list is the List's name, days how long an Invitation can be accepted (invitationLifetimeDays).
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll email them a link to join {list} as an Editor. The link works for {days} days.'**
+  String shareInviteFormExplanation(String list, int days);
+
+  /// Button on the Invite by email sheet that sends the Invitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Send invitation'**
+  String get shareSendInvitation;
+
+  /// Toast after an Invitation is sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation sent to {email}'**
+  String shareInvitationSent(String email);
+
+  /// Heading of the List's unanswered Invitations on Share list: pending ones, and expired ones (marked so).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to join'**
+  String get sharePendingHeading;
+
+  /// Tooltip of the button that cancels a pending Invitation on Share list.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel invitation to {email}'**
+  String shareCancelInvitation(String email);
+
+  /// Under an expired Invitation on Share list: nobody accepted it in time.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired, never joined'**
+  String get shareInvitationExpired;
+
+  /// Toast after the Owner cancels a pending Invitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation to {email} cancelled'**
+  String shareInvitationCancelled(String email);
+
+  /// Sending an Invitation failed because the User reached the daily limit (limit).
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve sent {limit} invitations in the last 24 hours, the most allowed. Try again tomorrow.'**
+  String errorInvitationLimit(int limit);
+
+  /// Sending an Invitation failed because of the daily limit, when the server did not report the number.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve sent the most invitations allowed in 24 hours. Try again tomorrow.'**
+  String get errorInvitationLimitGeneric;
+
+  /// The Invitation was already accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation was already accepted.'**
+  String get errorInvitationAccepted;
+
+  /// The Invitation was declined by the invitee.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation was declined.'**
+  String get errorInvitationDeclined;
+
+  /// The Invitation is unknown, cancelled or expired.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation is no longer available.'**
+  String get errorInvitationGone;
+
+  /// Server: the invited address belongs to a Member of the List, the Owner included.
+  ///
+  /// In en, this message translates to:
+  /// **'That person is already on this list.'**
+  String get errorAlreadyMember;
+
+  /// Server: the email provider couldn't send the Invitation's email, so no Invitation was made.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t send the invitation email. Try again in a moment.'**
+  String get errorInvitationNotSent;
+
+  /// Subtitle of an Invitation addressed to the User on the Lists screen; name is who sent it.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} invited you'**
+  String invitationFrom(String name);
+
+  /// Accepts an Invitation on the Lists screen, making the User an Editor of its List.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get invitationJoin;
+
+  /// Declines an Invitation on the Lists screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get invitationDecline;
+
+  /// Toast after the User accepts an Invitation; list is the List's name.
+  ///
+  /// In en, this message translates to:
+  /// **'You joined {list}'**
+  String invitationJoined(String list);
+
+  /// Toast after the User declines an Invitation; list is the List's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation to {list} declined'**
+  String invitationDeclined(String list);
+
+  /// The Owner cancelled the Invitation.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation was cancelled. Ask for a new one.'**
+  String get errorInvitationCancelled;
+
+  /// The Invitation is older than its lifetime (invitationLifetimeDays).
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation expired. Ask for a new one.'**
+  String get errorInvitationExpired;
+
+  /// Joining failed because the List already has 20 Members.
+  ///
+  /// In en, this message translates to:
+  /// **'This list already has the most members allowed.'**
+  String get errorListFull;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

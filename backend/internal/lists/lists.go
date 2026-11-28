@@ -150,7 +150,7 @@ func (s *Service) Create(ctx context.Context, owner, id uuid.UUID, name string) 
 	if err != nil {
 		return Summary{}, false, wrap("create", err)
 	}
-	sum, err = s.summary(ctx, id, owner)
+	sum, err = s.Get(ctx, owner, id)
 	return sum, created, err
 }
 
@@ -210,7 +210,7 @@ func (s *Service) Rename(ctx context.Context, userID, listID uuid.UUID, name str
 	if err != nil {
 		return Summary{}, wrap("rename", err)
 	}
-	return s.summary(ctx, listID, userID)
+	return s.Get(ctx, userID, listID)
 }
 
 // Delete deletes a List userID owns, for every Member at once. The Owner can
@@ -269,7 +269,7 @@ func (s *Service) Restore(ctx context.Context, userID, listID uuid.UUID) (Summar
 	if err != nil {
 		return Summary{}, wrap("restore", err)
 	}
-	return s.summary(ctx, listID, userID)
+	return s.Get(ctx, userID, listID)
 }
 
 // lockOwner takes a transaction-scoped advisory lock for owner. Every change
@@ -340,11 +340,23 @@ type listRow struct {
 	deletedAt *time.Time
 }
 
-// lockOwned locks listID until tx ends and returns it if userID owns it, so
-// the caller's change can't race a delete or the purge. It returns ErrNotFound
-// if userID is not a Member or the List is gone (purged, or deleted longer than
-// RestoreWindow ago), and ErrNotOwner for any other Member.
+// The two ways the access checks read a List's row: as a plain read, or
+// locked until the transaction ends, so the caller's change can't race a
+// delete or the purge.
+const (
+	readList = "SELECT name, deleted_at FROM lists WHERE id = $1"
+	lockList = readList + " FOR UPDATE"
+)
+
+// lockOwned locks listID until tx ends and returns it if userID owns it. It
+// returns ErrNotFound if userID is not a Member or the List is gone (purged, or
+// deleted longer than RestoreWindow ago), and ErrNotOwner for any other Member.
 func (s *Service) lockOwned(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (listRow, error) {
+	return s.owned(ctx, tx, lockList, userID, listID)
+}
+
+// owned is lockOwned, reading the List's row with query (readList or lockList).
+func (s *Service) owned(ctx context.Context, tx pgx.Tx, query string, userID, listID uuid.UUID) (listRow, error) {
 	role, err := s.members.RoleIn(ctx, tx, listID, userID)
 	if errors.Is(err, membership.ErrNotAMember) {
 		return listRow{}, ErrNotFound
@@ -352,9 +364,22 @@ func (s *Service) lockOwned(ctx context.Context, tx pgx.Tx, userID, listID uuid.
 	if err != nil {
 		return listRow{}, err
 	}
+	l, err := s.existing(ctx, tx, query, listID)
+	if err != nil {
+		return listRow{}, err
+	}
+	if role != membership.Owner {
+		return listRow{}, ErrNotOwner
+	}
+	return l, nil
+}
+
+// existing reads listID with query (readList or lockList), whoever asks. It
+// returns ErrNotFound if the List is gone: purged, or deleted longer than
+// RestoreWindow ago.
+func (s *Service) existing(ctx context.Context, tx pgx.Tx, query string, listID uuid.UUID) (listRow, error) {
 	var l listRow
-	err = tx.QueryRow(ctx, "SELECT name, deleted_at FROM lists WHERE id = $1 FOR UPDATE", listID).
-		Scan(&l.name, &l.deletedAt)
+	err := tx.QueryRow(ctx, query, listID).Scan(&l.name, &l.deletedAt)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return listRow{}, ErrNotFound
@@ -362,8 +387,6 @@ func (s *Service) lockOwned(ctx context.Context, tx pgx.Tx, userID, listID uuid.
 		return listRow{}, err
 	case l.deletedAt != nil && !s.restorable(*l.deletedAt):
 		return listRow{}, ErrNotFound
-	case role != membership.Owner:
-		return listRow{}, ErrNotOwner
 	}
 	return l, nil
 }
@@ -373,9 +396,9 @@ func (s *Service) restorable(deletedAt time.Time) bool {
 	return s.clock.Now().Before(deletedAt.Add(RestoreWindow))
 }
 
-// summary returns listID as userID sees it, or ErrNotFound if it was purged
-// (or userID removed) since the caller's change committed.
-func (s *Service) summary(ctx context.Context, listID, userID uuid.UUID) (Summary, error) {
+// Get returns listID as userID sees it, or ErrNotFound if userID is not a
+// Member (or it was purged since the caller's change committed).
+func (s *Service) Get(ctx context.Context, userID, listID uuid.UUID) (Summary, error) {
 	role, err := s.members.RoleOf(ctx, listID, userID)
 	if errors.Is(err, membership.ErrNotAMember) {
 		return Summary{}, ErrNotFound
@@ -418,4 +441,54 @@ func wrap(what string, err error) error {
 // normalizeName trims name and reports whether it is acceptable.
 func normalizeName(name string) (string, bool) {
 	return names.Normalize(name, MaxNameLength)
+}
+
+// LockOwnedLive locks listID until tx ends and returns its name, if userID
+// owns it and it is not deleted. It returns ErrNotFound, ErrNotOwner or
+// ErrDeleted otherwise. Package sharing calls it before an Owner-only change.
+func (s *Service) LockOwnedLive(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (string, error) {
+	return live(s.owned(ctx, tx, lockList, userID, listID))
+}
+
+// OwnedLive is LockOwnedLive without the lock, for a read: package sharing
+// calls it before showing the Owner a List's open Invitations.
+func (s *Service) OwnedLive(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (string, error) {
+	return live(s.owned(ctx, tx, readList, userID, listID))
+}
+
+// LockLive locks listID until tx ends and returns its name, whoever asks. It
+// returns ErrNotFound if the List is gone and ErrDeleted if it is deleted.
+// Package sharing calls it before someone joins the List.
+func (s *Service) LockLive(ctx context.Context, tx pgx.Tx, listID uuid.UUID) (string, error) {
+	return live(s.existing(ctx, tx, lockList, listID))
+}
+
+// live returns the name of the List read into l, or ErrDeleted if it is deleted.
+func live(l listRow, err error) (string, error) {
+	switch {
+	case err != nil:
+		return "", wrap("lock", err)
+	case l.deletedAt != nil:
+		return "", ErrDeleted
+	}
+	return l.name, nil
+}
+
+// LiveNamesIn returns the name of each of listIDs that exists and is not
+// deleted, read inside the caller's transaction tx.
+func (s *Service) LiveNamesIn(ctx context.Context, tx pgx.Tx, listIDs []uuid.UUID) (map[uuid.UUID]string, error) {
+	rows, err := tx.Query(ctx, "SELECT id, name FROM lists WHERE id = ANY($1) AND deleted_at IS NULL", listIDs)
+	if err != nil {
+		return nil, wrap("names", err)
+	}
+	out := make(map[uuid.UUID]string, len(listIDs))
+	var id uuid.UUID
+	var name string
+	if _, err := pgx.ForEachRow(rows, []any{&id, &name}, func() error {
+		out[id] = name
+		return nil
+	}); err != nil {
+		return nil, wrap("names", err)
+	}
+	return out, nil
 }

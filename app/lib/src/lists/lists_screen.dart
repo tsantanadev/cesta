@@ -7,17 +7,21 @@ import '../../l10n/app_localizations.dart';
 import '../api/generated/cesta_api.dart';
 import '../routes.dart';
 import '../session/session_controller.dart';
+import '../sharing/invitation_messages.dart';
+import '../sharing/sharing.dart';
 import '../ui/components.dart';
 import 'list_messages.dart';
 import 'list_name_form.dart';
 import 'lists_controller.dart';
 
-/// Home: the Lists the User owns or was shared, and the User menu.
+/// Home: the Invitations addressed to the User, the Lists the User owns or
+/// was shared, and the User menu.
 class ListsScreen extends StatefulWidget {
-  const ListsScreen({super.key, required this.session, required this.lists});
+  const ListsScreen({super.key, required this.session, required this.lists, required this.sharing});
 
   final SessionController session;
   final ListsController lists;
+  final Sharing sharing;
 
   @override
   State<ListsScreen> createState() => _ListsScreenState();
@@ -26,11 +30,58 @@ class ListsScreen extends StatefulWidget {
 class _ListsScreenState extends State<ListsScreen> {
   ListsController get _lists => widget.lists;
 
+  /// The pending Invitations addressed to the User, newest first. They need
+  /// the network, so offline there are none to show.
+  List<Invitation> _invitations = const [];
+
+  /// The Invitation being joined or declined, if one is.
+  String? _answering;
+
   @override
   void initState() {
     super.initState();
     unawaited(_refresh());
+    unawaited(_loadInvitations());
   }
+
+  Future<void> _loadInvitations() async {
+    if (await widget.sharing.mine() case InvitationDone(value: final invitations) when mounted) {
+      setState(() => _invitations = invitations);
+    }
+  }
+
+  /// Joins or declines [invitation] through [answer], then takes it off the
+  /// screen unless that failed for a reason worth retrying.
+  Future<void> _answer(Invitation invitation, Future<InvitationFailure?> Function() answer, String done) async {
+    setState(() => _answering = invitation.id);
+    final failure = await answer();
+    if (!mounted) return;
+    final retry = failure is InvitationOffline || failure is InvitationRateLimited || failure is InvitationFailed;
+    setState(() {
+      _answering = null;
+      if (!retry) _invitations = _invitations.where((i) => i.id != invitation.id).toList();
+    });
+    showCesToast(
+      context,
+      message: failure == null ? done : invitationFailureMessage(AppLocalizations.of(context), failure),
+    );
+  }
+
+  Future<void> _join(Invitation invitation) => _answer(invitation, () async {
+    switch (await widget.sharing.accept(invitation)) {
+      case InvitationDone():
+        await _lists.refresh();
+        return null;
+      case final InvitationFailure failure:
+        return failure;
+    }
+  }, AppLocalizations.of(context).invitationJoined(invitation.listName));
+
+  Future<void> _decline(Invitation invitation) => _answer(
+    invitation,
+    () => widget.sharing.decline(invitation),
+    AppLocalizations.of(context).invitationDeclined(invitation.listName),
+  );
 
   /// Reloads the Lists. Offline the cached ones just stay; any other failure
   /// is shown, as the session's own requests do.
@@ -181,6 +232,23 @@ class _ListsScreenState extends State<ListsScreen> {
             ? CesEmptyState(icon: CesIcons.basket, title: l10n.listsEmptyTitle, body: l10n.listsEmptyBody)
             : const SizedBox.shrink(),
         items: [
+          for (final invitation in _invitations)
+            CesInvitationCard(
+              key: ValueKey(invitation.id),
+              name: invitation.listName,
+              subtitle: l10n.invitationFrom(invitation.invitedBy.displayName),
+              actions: [
+                CesButton(
+                  label: l10n.invitationJoin,
+                  busy: _answering == invitation.id,
+                  onPressed: _answering == null ? () => unawaited(_join(invitation)) : null,
+                ),
+                CesButton.outline(
+                  label: l10n.invitationDecline,
+                  onPressed: _answering == null ? () => unawaited(_decline(invitation)) : null,
+                ),
+              ],
+            ),
           for (final list in _lists.lists)
             CesListCard(
               key: ValueKey(list.id),

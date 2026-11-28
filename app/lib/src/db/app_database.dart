@@ -135,6 +135,17 @@ class SyncCursor extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// The deep link opened while signed out (single row, id 1), so it is still
+/// opened after the User signs in even if the app restarted meanwhile. See
+/// `PendingLink`.
+class PendingDeepLink extends Table {
+  IntColumn get id => integer()();
+  TextColumn get location => text()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Stores [Role] by its API wire value.
 class _RoleConverter extends TypeConverter<Role, String> {
   const _RoleConverter();
@@ -202,12 +213,14 @@ class _HealthDatabaseConverter extends TypeConverter<HealthDatabase, String> {
 ///
 /// Production opens it with `driftDatabase(name: 'cesta')`; tests pass
 /// `NativeDatabase.memory()`.
-@DriftDatabase(tables: [KnownHealth, SignedInUser, KnownLists, SyncedItems, SyncedHistory, Outbox, SyncCursor])
+@DriftDatabase(
+  tables: [KnownHealth, SignedInUser, KnownLists, SyncedItems, SyncedHistory, Outbox, SyncCursor, PendingDeepLink],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -225,8 +238,18 @@ class AppDatabase extends _$AppDatabase {
         // table existed comes too.
         await delete(syncCursor).go();
       }
+      if (from < 6) await m.createTable(pendingDeepLink);
     },
   );
+
+  /// Keeps [location] as the deep link to open after sign-in, or forgets it when null.
+  Future<void> savePendingLink(String? location) => location == null
+      ? delete(pendingDeepLink).go()
+      : into(pendingDeepLink)
+            .insertOnConflictUpdate(PendingDeepLinkCompanion.insert(id: const Value(1), location: location));
+
+  Future<String?> readPendingLink() async =>
+      (await (select(pendingDeepLink)..where((t) => t.id.equals(1))).getSingleOrNull())?.location;
 
   /// Forgets every Item, the Item history, pending changes and the pull
   /// cursor (sign out, or another User signing in).

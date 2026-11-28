@@ -295,6 +295,214 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "429":
           $ref: "#/components/responses/RateLimited"
+  /api/lists/{listId}/invitations:
+    parameters:
+      - $ref: "#/components/parameters/ListId"
+    get:
+      operationId: listListInvitations
+      summary: The List's open Invitations (Owner only)
+      description: >-
+        Invitations not yet accepted, declined or cancelled: pending ones, and expired
+        ones (status expired), so the Owner sees who never joined. Cancelling an
+        expired Invitation removes it from here. Newest first.
+      responses:
+        "200":
+          description: The List's open Invitations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitations"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      operationId: createInvitation
+      summary: Invite an email address to the List as an Editor (Owner only)
+      description: >-
+        Sends one email, in the given language, with the Invitation's deep link
+        (https://cesta.tsantana.dev/invite/<token>). The token is single-use and only
+        its hash is stored; the Invitation expires 14 days after it is created. A User
+        can send at most 20 Invitations in any 24 hours; the next is rejected with
+        limit_exceeded. An address that already belongs to a Member of the List (the
+        Owner included) is rejected with already_member, and doesn't count toward the
+        limit. If the email can't be sent, no Invitation is made and the request fails
+        with email_not_sent (502); it can be retried.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationCreate"
+      responses:
+        "201":
+          description: The new Invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "502":
+          $ref: "#/components/responses/EmailNotSent"
+  /api/lists/{listId}/invitations/{invitationId}:
+    parameters:
+      - $ref: "#/components/parameters/ListId"
+      - $ref: "#/components/parameters/InvitationId"
+    delete:
+      operationId: cancelInvitation
+      summary: Cancel a pending Invitation (Owner only)
+      description: >-
+        Its link stops working. Cancelling an Invitation already cancelled, or expired,
+        returns it cancelled; one already accepted or declined is rejected with
+        invitation_accepted or invitation_declined.
+      responses:
+        "200":
+          description: The cancelled Invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/invitations:
+    get:
+      operationId: listMyInvitations
+      summary: Pending Invitations addressed to the signed-in User's email
+      description: Newest first. Accept or decline one by its id.
+      responses:
+        "200":
+          description: The User's pending Invitations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitations"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/invitations/lookup:
+    post:
+      operationId: lookupInvitation
+      summary: The Invitation a token belongs to, whatever its status
+      description: >-
+        For the accept screen opened from the deep link. Identified as in
+        acceptInvitation; the token goes in the body so it stays out of URLs and logs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationRef"
+      responses:
+        "200":
+          description: The Invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/invitations/accept:
+    post:
+      operationId: acceptInvitation
+      summary: Accept an Invitation, becoming an Editor of its List
+      description: >-
+        Identify the Invitation by its token (from the deep link; the signed-in User's
+        email need not match the invited one) or by its id (only for an Invitation
+        addressed to the signed-in User's email). A cancelled, declined or expired
+        Invitation is rejected with a code saying which, and one whose List was deleted
+        with list_deleted. The token is single-use: once accepted, only a retry by the
+        same User succeeds (and changes nothing). A List has at most 20 Members; joining
+        a full List is rejected with list_full.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationRef"
+      responses:
+        "200":
+          description: The List the User is now a Member of
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/invitations/decline:
+    post:
+      operationId: declineInvitation
+      summary: Decline an Invitation
+      description: >-
+        Identified as in acceptInvitation. Its link stops working. Declining twice
+        returns it declined; a cancelled, expired or accepted Invitation is rejected
+        with a code saying which.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationRef"
+      responses:
+        "200":
+          description: The declined Invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitation"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 components:
   parameters:
     ListId:
@@ -302,6 +510,14 @@ components:
       in: path
       required: true
       description: The List's ID (a UUID chosen by the client that created it).
+      schema:
+        type: string
+        format: uuid
+    InvitationId:
+      name: invitationId
+      in: path
+      required: true
+      description: The Invitation's ID.
       schema:
         type: string
         format: uuid
@@ -343,13 +559,21 @@ components:
           schema:
             $ref: "#/components/schemas/ApiError"
     NotFound:
-      description: No such List, or the signed-in User is not a Member of it
+      description: >-
+        No such List, or the signed-in User is not a Member of it; or no such
+        Invitation (see code)
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiError"
     Conflict:
       description: The request conflicts with the List's state or a limit (see code)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    EmailNotSent:
+      description: The email provider couldn't send the email (code email_not_sent); nothing was made
       content:
         application/json:
           schema:
@@ -377,6 +601,15 @@ components:
             - item_not_found
             - item_deleted
             - item_not_checked
+            - invalid_email
+            - invitation_not_found
+            - invitation_cancelled
+            - invitation_declined
+            - invitation_expired
+            - invitation_accepted
+            - list_full
+            - already_member
+            - email_not_sent
             - internal
         message:
           type: string
@@ -384,7 +617,9 @@ components:
         limit:
           type: integer
           minimum: 1
-          description: "Present when code is limit_exceeded: the configured maximum the User has reached."
+          description: >-
+            Present when code is limit_exceeded or list_full: the maximum reached (Lists
+            the User owns, Invitations they sent in 24 hours, or Members of the List).
     User:
       type: object
       required: [id, email, displayName, displayNameConfirmed]
@@ -499,6 +734,66 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DeletedList"
+    InvitationCreate:
+      type: object
+      required: [email, language]
+      properties:
+        email:
+          type: string
+          maxLength: 254
+          description: The address to invite. Trimmed and lowercased.
+        language:
+          type: string
+          enum: [en, pt-BR]
+          description: The language of the email (the Owner's app language).
+    InvitationRef:
+      type: object
+      description: Exactly one of token or id.
+      properties:
+        token:
+          type: string
+          description: The token from the Invitation's deep link.
+        id:
+          type: string
+          format: uuid
+          description: The Invitation's ID; only for one addressed to the signed-in User's email.
+    InvitationStatus:
+      type: string
+      enum: [pending, accepted, declined, cancelled, expired]
+    Invitation:
+      type: object
+      required: [id, listId, listName, email, invitedBy, status, createdAt, expiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        listId:
+          type: string
+          format: uuid
+        listName:
+          type: string
+        email:
+          type: string
+          description: The invited address.
+        invitedBy:
+          $ref: "#/components/schemas/UserRef"
+        status:
+          $ref: "#/components/schemas/InvitationStatus"
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: 14 days after createdAt.
+    Invitations:
+      type: object
+      required: [invitations]
+      properties:
+        invitations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invitation"
     UserRef:
       type: object
       required: [id, displayName]

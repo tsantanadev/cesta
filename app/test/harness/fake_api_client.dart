@@ -652,6 +652,294 @@ class FakeApiClient implements ApiClient {
     return answer;
   }
 
+  // ---- Invitations --------------------------------------------------------
+
+  /// How many Invitations a User may send in any 24 hours, like the server's 20.
+  int invitationLimit = 20;
+
+  /// Every Invitation the fake backend knows, in creation order.
+  final _invitations = <_FakeInvitation>[];
+  int _nextInvitationId = 1;
+
+  /// When set, the email provider is down: creating an Invitation fails with
+  /// email_not_sent and makes nothing.
+  bool invitationEmailsFail = false;
+
+  /// The emails, in the language they were sent in, one per Invitation sent.
+  final sentInvitationEmails = <({String to, InvitationCreateLanguage language})>[];
+
+  /// The addresses invited to List [listId] and still pending, newest first.
+  List<String> pendingInvitationEmails(String listId) => [
+    for (final i in _invitations.reversed)
+      if (i.listId == listId && i.status == InvitationStatus.pending) i.email,
+  ];
+
+  /// Stores a pending Invitation to List [listId] for [email], sent by [by]
+  /// (the List's Owner unless given) as if earlier today.
+  String addInvitation(String listId, {required String email, FakeIdentity? by}) {
+    final list = _lists[listId]!;
+    return _invite(list, email: email, byUid: by?.uid ?? list.ownerUid).id;
+  }
+
+  /// The token in the deep link of Invitation [invitationId].
+  String invitationToken(String invitationId) => _invitationById(invitationId).token;
+
+  /// The status of Invitation [invitationId].
+  InvitationStatus invitationStatus(String invitationId) => _invitationById(invitationId).status;
+
+  /// Invitation [invitationId] changes behind the app's back, e.g. it expires.
+  void setInvitationStatus(String invitationId, InvitationStatus status) =>
+      _invitationById(invitationId).status = status;
+
+  _FakeInvitation _invitationById(String id) => _invitations.firstWhere((i) => i.id == id);
+
+  /// [by] sends [count] Invitations today to Lists of theirs other than these.
+  void sendInvitationsToday(FakeIdentity by, int count) {
+    final elsewhere = addList(by, name: 'Elsewhere');
+    for (var n = 0; n < count; n++) {
+      addInvitation(elsewhere, email: 'someone$n@example.com', by: by);
+    }
+  }
+
+  _FakeInvitation _invite(_FakeList list, {required String email, required String byUid}) {
+    final invitation = _FakeInvitation(
+      id: '00000000-0000-4000-a000-${(_nextInvitationId++).toString().padLeft(12, '0')}',
+      listId: list.id,
+      email: email,
+      invitedByUid: byUid,
+      createdAt: DateTime.now().toUtc(),
+    );
+    _invitations.add(invitation);
+    return invitation;
+  }
+
+  Invitation _toInvitation(_FakeInvitation i) => Invitation(
+    id: i.id,
+    listId: i.listId,
+    listName: _lists[i.listId]!.name,
+    email: i.email,
+    invitedBy: UserRef(id: _userIdOf(i.invitedByUid), displayName: _displayNameOf(i.invitedByUid)),
+    status: i.status,
+    createdAt: i.createdAt,
+    expiresAt: i.createdAt.add(const Duration(days: 14)),
+  );
+
+  /// List [listId] when [uid] owns it and it isn't deleted; otherwise the
+  /// error the server answers with, as (status, error).
+  (_FakeList?, int, ApiError?) _owned(String listId, String uid) {
+    final l = _visible(listId, uid);
+    if (l == null) return (null, 404, _error(ApiErrorCode.listNotFound));
+    if (l.ownerUid != uid) return (null, 403, _error(ApiErrorCode.notListOwner));
+    if (l.deletedAt != null) return (null, 409, _error(ApiErrorCode.listDeleted));
+    return (l, 200, null);
+  }
+
+  @override
+  Future<CreateInvitationResult> createInvitation({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required String listId,
+    required InvitationCreate body,
+  }) async {
+    _failIfOffline('/api/lists/$listId/invitations');
+    final identity = auth.current;
+    if (identity == null) return const CreateInvitation401(_unauthenticated);
+    final (list, status, error) = _owned(listId, identity.uid);
+    switch (status) {
+      case 404:
+        return CreateInvitation404(error!);
+      case 403:
+        return CreateInvitation403(error!);
+      case 409:
+        return CreateInvitation409(error!);
+    }
+    final email = body.email.trim().toLowerCase();
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      return CreateInvitation400(_error(ApiErrorCode.invalidEmail));
+    }
+    if (list!.members.any((uid) => _users[uid]?.email.toLowerCase() == email)) {
+      return CreateInvitation409(_error(ApiErrorCode.alreadyMember));
+    }
+    final dayAgo = DateTime.now().toUtc().subtract(const Duration(days: 1));
+    final sentToday = _invitations.where((i) => i.invitedByUid == identity.uid && i.createdAt.isAfter(dayAgo));
+    if (sentToday.length >= invitationLimit) {
+      return CreateInvitation409(_error(ApiErrorCode.limitExceeded, limit: invitationLimit));
+    }
+    if (invitationEmailsFail) return CreateInvitation502(_error(ApiErrorCode.emailNotSent));
+    final invitation = _invite(list, email: email, byUid: identity.uid);
+    sentInvitationEmails.add((to: email, language: body.language));
+    return CreateInvitation201(_toInvitation(invitation));
+  }
+
+  @override
+  Future<ListListInvitationsResult> listListInvitations({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required String listId,
+  }) async {
+    _failIfOffline('/api/lists/$listId/invitations');
+    final identity = auth.current;
+    if (identity == null) return const ListListInvitations401(_unauthenticated);
+    final (_, status, error) = _owned(listId, identity.uid);
+    switch (status) {
+      case 404:
+        return ListListInvitations404(error!);
+      case 403:
+        return ListListInvitations403(error!);
+      case 409:
+        return ListListInvitations409(error!);
+    }
+    return ListListInvitations200(
+      Invitations(
+        invitations: [
+          for (final i in _invitations.reversed)
+            if (i.listId == listId && (i.status == InvitationStatus.pending || i.status == InvitationStatus.expired))
+              _toInvitation(i),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Future<CancelInvitationResult> cancelInvitation({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required String listId,
+    required String invitationId,
+  }) async {
+    _failIfOffline('/api/lists/$listId/invitations/$invitationId');
+    final identity = auth.current;
+    if (identity == null) return const CancelInvitation401(_unauthenticated);
+    final (_, status, error) = _owned(listId, identity.uid);
+    switch (status) {
+      case 404:
+        return CancelInvitation404(error!);
+      case 403:
+        return CancelInvitation403(error!);
+      case 409:
+        return CancelInvitation409(error!);
+    }
+    final invitation = _invitations.where((i) => i.id == invitationId && i.listId == listId).firstOrNull;
+    if (invitation == null) return CancelInvitation404(_error(ApiErrorCode.invitationNotFound));
+    switch (invitation.status) {
+      case InvitationStatus.accepted:
+        return CancelInvitation409(_error(ApiErrorCode.invitationAccepted));
+      case InvitationStatus.declined:
+        return CancelInvitation409(_error(ApiErrorCode.invitationDeclined));
+      case _:
+        invitation.status = InvitationStatus.cancelled;
+        return CancelInvitation200(_toInvitation(invitation));
+    }
+  }
+
+  /// How many Members a List may have, like the server's 20.
+  int memberLimit = 20;
+
+  @override
+  Future<ListMyInvitationsResult> listMyInvitations({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+  }) async {
+    _failIfOffline('/api/invitations');
+    final identity = auth.current;
+    if (identity == null) return const ListMyInvitations401(_unauthenticated);
+    return ListMyInvitations200(
+      Invitations(
+        invitations: [
+          for (final i in _invitations.reversed)
+            if (i.email == identity.email.toLowerCase() &&
+                i.status == InvitationStatus.pending &&
+                _lists[i.listId]?.deletedAt == null)
+              _toInvitation(i),
+        ],
+      ),
+    );
+  }
+
+  /// The Invitation [ref] names for [identity]: by its deep link's token
+  /// whoever they are, or by id only when addressed to their email.
+  _FakeInvitation? _referenced(InvitationRef ref, FakeIdentity identity) => ref.token != null
+      ? _invitations.where((i) => i.token == ref.token).firstOrNull
+      : _invitations.where((i) => i.id == ref.id && i.email == identity.email.toLowerCase()).firstOrNull;
+
+  @override
+  Future<LookupInvitationResult> lookupInvitation({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required InvitationRef body,
+  }) async {
+    _failIfOffline('/api/invitations/lookup');
+    final identity = auth.current;
+    if (identity == null) return const LookupInvitation401(_unauthenticated);
+    final invitation = _referenced(body, identity);
+    if (invitation == null) return LookupInvitation404(_error(ApiErrorCode.invitationNotFound));
+    return LookupInvitation200(_toInvitation(invitation));
+  }
+
+  /// Why [i] can't be accepted or declined any more, if it can't.
+  ApiErrorCode? _noLongerValid(_FakeInvitation i) => switch (i.status) {
+    InvitationStatus.cancelled => ApiErrorCode.invitationCancelled,
+    InvitationStatus.declined => ApiErrorCode.invitationDeclined,
+    InvitationStatus.accepted => ApiErrorCode.invitationAccepted,
+    InvitationStatus.expired => ApiErrorCode.invitationExpired,
+    InvitationStatus.pending => null,
+  };
+
+  @override
+  Future<AcceptInvitationResult> acceptInvitation({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required InvitationRef body,
+  }) async {
+    _failIfOffline('/api/invitations/accept');
+    final identity = auth.current;
+    if (identity == null) return const AcceptInvitation401(_unauthenticated);
+    final invitation = _referenced(body, identity);
+    if (invitation == null) return AcceptInvitation404(_error(ApiErrorCode.invitationNotFound));
+    final list = _lists[invitation.listId]!;
+    // Only a retry by whoever accepted it succeeds, and changes nothing.
+    if (invitation.acceptedByUid == identity.uid) return AcceptInvitation200(_summary(list, identity.uid));
+    if (_noLongerValid(invitation) case final code?) return AcceptInvitation409(_error(code));
+    if (list.deletedAt != null) return AcceptInvitation409(_error(ApiErrorCode.listDeleted));
+    if (list.members.length >= memberLimit) {
+      return AcceptInvitation409(_error(ApiErrorCode.listFull, limit: memberLimit));
+    }
+    invitation
+      ..status = InvitationStatus.accepted
+      ..acceptedByUid = identity.uid;
+    list.members.add(identity.uid);
+    return AcceptInvitation200(_summary(list, identity.uid));
+  }
+
+  @override
+  Future<DeclineInvitationResult> declineInvitation({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required InvitationRef body,
+  }) async {
+    _failIfOffline('/api/invitations/decline');
+    final identity = auth.current;
+    if (identity == null) return const DeclineInvitation401(_unauthenticated);
+    final invitation = _referenced(body, identity);
+    if (invitation == null) return DeclineInvitation404(_error(ApiErrorCode.invitationNotFound));
+    if (_noLongerValid(invitation) case final code? when code != ApiErrorCode.invitationDeclined) {
+      return DeclineInvitation409(_error(code));
+    }
+    invitation.status = InvitationStatus.declined;
+    return DeclineInvitation200(_toInvitation(invitation));
+  }
+
+  /// The Owner cancels the Invitation sent to [email] behind the app's back.
+  void cancelInvitationNow(String email) =>
+      _invitations.lastWhere((i) => i.email == email).status = InvitationStatus.cancelled;
+
   static const _unauthenticated = ApiError(code: ApiErrorCode.unauthenticated, message: 'no valid token');
 
   /// [json] as it arrives after a trip over the wire.
@@ -741,6 +1029,30 @@ class _FakeItem {
 
   /// The server's change sequence when this Item last changed: the pull cursor.
   int seq;
+}
+
+/// An Invitation as the fake backend stores it.
+class _FakeInvitation {
+  _FakeInvitation({
+    required this.id,
+    required this.listId,
+    required this.email,
+    required this.invitedByUid,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String listId;
+  final String email;
+  final String invitedByUid;
+  final DateTime createdAt;
+  InvitationStatus status = InvitationStatus.pending;
+
+  /// The single-use token in its deep link (only its hash is on the server).
+  String get token => 'token-$id';
+
+  /// Who accepted it, so their retry succeeds.
+  String? acceptedByUid;
 }
 
 /// An Item history entry as the fake backend stores it.

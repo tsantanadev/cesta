@@ -7,6 +7,7 @@ import 'package:cesta/src/sync/outbox.dart';
 import 'package:cesta/src/ui/components.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart' show MethodCall, SystemChannels;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -111,6 +112,19 @@ class Harness {
   /// Starts signed in as a User with a confirmed display name.
   FakeIdentity signedIn({String email = 'ana@example.com', String displayName = 'Ana Souza'}) =>
       existingUser(email: email, password: 'irrelevant', displayName: displayName, signedIn: true);
+
+  /// Opens [url] in the running app, as the OS does when the User taps a
+  /// universal link or App Link to Cesta.
+  Future<void> openLink(String url) async {
+    await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      SystemChannels.navigation.name,
+      SystemChannels.navigation.codec.encodeMethodCall(
+        MethodCall('pushRouteInformation', {'location': url, 'state': null}),
+      ),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+  }
 
   /// Creates a List named [name] from the Lists screen.
   Future<void> createList(String name) async {
@@ -309,6 +323,18 @@ class Harness {
         }
       })
       .then((h) => h!);
+
+  /// From a List's screen, opens Share list (06).
+  Future<void> openShareList() => tap(find.byTooltip('Share list'));
+
+  /// From a List's screen, invites [email] through Share list and Invite by
+  /// email; stays on Share list.
+  Future<void> inviteByEmail(String email) async {
+    if (find.text('Invite by email').evaluate().isEmpty) await openShareList();
+    await tap(find.widgetWithText(CesButton, 'Invite by email'));
+    await tester.enterText(field('Email'), email);
+    await tap(find.widgetWithText(CesButton, 'Send invitation'));
+  }
 
   /// The text in the field labelled [label].
   String textInField(String label) => fieldController(tester, label).text;

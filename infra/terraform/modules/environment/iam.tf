@@ -24,8 +24,9 @@ resource "google_service_account" "deployer" {
 
 resource "google_secret_manager_secret_iam_member" "backend" {
   for_each = {
-    database-url = google_secret_manager_secret.database["database-url"].id
-    otel-headers = data.google_secret_manager_secret.otel_headers.id
+    database-url   = google_secret_manager_secret.database["database-url"].id
+    otel-headers   = data.google_secret_manager_secret.otel_headers.id
+    resend-api-key = data.google_secret_manager_secret.resend_api_key.id
   }
 
   secret_id = each.value

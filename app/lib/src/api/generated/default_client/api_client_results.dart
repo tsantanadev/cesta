@@ -4,6 +4,8 @@ import 'models/api_error.dart' as models show ApiError;
 import 'models/deleted_list.dart' as models show DeletedList;
 import 'models/deleted_lists.dart' as models show DeletedLists;
 import 'models/health.dart' as models show Health;
+import 'models/invitation.dart' as models show Invitation;
+import 'models/invitations.dart' as models show Invitations;
 import 'models/list_summaries.dart' as models show ListSummaries;
 import 'models/list_summary.dart' as models show ListSummary;
 import 'models/pull_response.dart' as models show PullResponse;
@@ -328,6 +330,272 @@ final class PullChanges401 implements PullChangesResult {
 
 final class PullChanges429 implements PullChangesResult {
   const PullChanges429(this.value);
+
+  final models.ApiError value;
+}
+
+sealed class ListListInvitationsResult {}
+
+final class ListListInvitations200 implements ListListInvitationsResult {
+  const ListListInvitations200(this.value);
+
+  final models.Invitations value;
+}
+
+final class ListListInvitations400 implements ListListInvitationsResult {
+  const ListListInvitations400(this.value);
+
+  final models.ApiError value;
+}
+
+final class ListListInvitations401 implements ListListInvitationsResult {
+  const ListListInvitations401(this.value);
+
+  final models.ApiError value;
+}
+
+final class ListListInvitations403 implements ListListInvitationsResult {
+  const ListListInvitations403(this.value);
+
+  final models.ApiError value;
+}
+
+final class ListListInvitations404 implements ListListInvitationsResult {
+  const ListListInvitations404(this.value);
+
+  final models.ApiError value;
+}
+
+final class ListListInvitations409 implements ListListInvitationsResult {
+  const ListListInvitations409(this.value);
+
+  final models.ApiError value;
+}
+
+final class ListListInvitations429 implements ListListInvitationsResult {
+  const ListListInvitations429(this.value);
+
+  final models.ApiError value;
+}
+
+sealed class CreateInvitationResult {}
+
+final class CreateInvitation201 implements CreateInvitationResult {
+  const CreateInvitation201(this.value);
+
+  final models.Invitation value;
+}
+
+final class CreateInvitation400 implements CreateInvitationResult {
+  const CreateInvitation400(this.value);
+
+  final models.ApiError value;
+}
+
+final class CreateInvitation401 implements CreateInvitationResult {
+  const CreateInvitation401(this.value);
+
+  final models.ApiError value;
+}
+
+final class CreateInvitation403 implements CreateInvitationResult {
+  const CreateInvitation403(this.value);
+
+  final models.ApiError value;
+}
+
+final class CreateInvitation404 implements CreateInvitationResult {
+  const CreateInvitation404(this.value);
+
+  final models.ApiError value;
+}
+
+final class CreateInvitation409 implements CreateInvitationResult {
+  const CreateInvitation409(this.value);
+
+  final models.ApiError value;
+}
+
+final class CreateInvitation429 implements CreateInvitationResult {
+  const CreateInvitation429(this.value);
+
+  final models.ApiError value;
+}
+
+final class CreateInvitation502 implements CreateInvitationResult {
+  const CreateInvitation502(this.value);
+
+  final models.ApiError value;
+}
+
+sealed class CancelInvitationResult {}
+
+final class CancelInvitation200 implements CancelInvitationResult {
+  const CancelInvitation200(this.value);
+
+  final models.Invitation value;
+}
+
+final class CancelInvitation400 implements CancelInvitationResult {
+  const CancelInvitation400(this.value);
+
+  final models.ApiError value;
+}
+
+final class CancelInvitation401 implements CancelInvitationResult {
+  const CancelInvitation401(this.value);
+
+  final models.ApiError value;
+}
+
+final class CancelInvitation403 implements CancelInvitationResult {
+  const CancelInvitation403(this.value);
+
+  final models.ApiError value;
+}
+
+final class CancelInvitation404 implements CancelInvitationResult {
+  const CancelInvitation404(this.value);
+
+  final models.ApiError value;
+}
+
+final class CancelInvitation409 implements CancelInvitationResult {
+  const CancelInvitation409(this.value);
+
+  final models.ApiError value;
+}
+
+final class CancelInvitation429 implements CancelInvitationResult {
+  const CancelInvitation429(this.value);
+
+  final models.ApiError value;
+}
+
+sealed class ListMyInvitationsResult {}
+
+final class ListMyInvitations200 implements ListMyInvitationsResult {
+  const ListMyInvitations200(this.value);
+
+  final models.Invitations value;
+}
+
+final class ListMyInvitations401 implements ListMyInvitationsResult {
+  const ListMyInvitations401(this.value);
+
+  final models.ApiError value;
+}
+
+final class ListMyInvitations429 implements ListMyInvitationsResult {
+  const ListMyInvitations429(this.value);
+
+  final models.ApiError value;
+}
+
+sealed class LookupInvitationResult {}
+
+final class LookupInvitation200 implements LookupInvitationResult {
+  const LookupInvitation200(this.value);
+
+  final models.Invitation value;
+}
+
+final class LookupInvitation400 implements LookupInvitationResult {
+  const LookupInvitation400(this.value);
+
+  final models.ApiError value;
+}
+
+final class LookupInvitation401 implements LookupInvitationResult {
+  const LookupInvitation401(this.value);
+
+  final models.ApiError value;
+}
+
+final class LookupInvitation404 implements LookupInvitationResult {
+  const LookupInvitation404(this.value);
+
+  final models.ApiError value;
+}
+
+final class LookupInvitation429 implements LookupInvitationResult {
+  const LookupInvitation429(this.value);
+
+  final models.ApiError value;
+}
+
+sealed class AcceptInvitationResult {}
+
+final class AcceptInvitation200 implements AcceptInvitationResult {
+  const AcceptInvitation200(this.value);
+
+  final models.ListSummary value;
+}
+
+final class AcceptInvitation400 implements AcceptInvitationResult {
+  const AcceptInvitation400(this.value);
+
+  final models.ApiError value;
+}
+
+final class AcceptInvitation401 implements AcceptInvitationResult {
+  const AcceptInvitation401(this.value);
+
+  final models.ApiError value;
+}
+
+final class AcceptInvitation404 implements AcceptInvitationResult {
+  const AcceptInvitation404(this.value);
+
+  final models.ApiError value;
+}
+
+final class AcceptInvitation409 implements AcceptInvitationResult {
+  const AcceptInvitation409(this.value);
+
+  final models.ApiError value;
+}
+
+final class AcceptInvitation429 implements AcceptInvitationResult {
+  const AcceptInvitation429(this.value);
+
+  final models.ApiError value;
+}
+
+sealed class DeclineInvitationResult {}
+
+final class DeclineInvitation200 implements DeclineInvitationResult {
+  const DeclineInvitation200(this.value);
+
+  final models.Invitation value;
+}
+
+final class DeclineInvitation400 implements DeclineInvitationResult {
+  const DeclineInvitation400(this.value);
+
+  final models.ApiError value;
+}
+
+final class DeclineInvitation401 implements DeclineInvitationResult {
+  const DeclineInvitation401(this.value);
+
+  final models.ApiError value;
+}
+
+final class DeclineInvitation404 implements DeclineInvitationResult {
+  const DeclineInvitation404(this.value);
+
+  final models.ApiError value;
+}
+
+final class DeclineInvitation409 implements DeclineInvitationResult {
+  const DeclineInvitation409(this.value);
+
+  final models.ApiError value;
+}
+
+final class DeclineInvitation429 implements DeclineInvitationResult {
+  const DeclineInvitation429(this.value);
 
   final models.ApiError value;
 }

@@ -189,6 +189,26 @@ class AppLocalizationsPt extends AppLocalizations {
   String get errorDisplayNameInvalid => 'Esse nome não pode ser usado. Tente outro.';
 
   @override
+  String get invitationTitle => 'Convite';
+
+  @override
+  String invitationHeading(String name, String list) {
+    return '$name convidou você para a lista $list';
+  }
+
+  @override
+  String get invitationExplanation =>
+      'Como editor, você pode adicionar, marcar e remover itens desta lista com todos que fazem parte dela.';
+
+  @override
+  String invitationSentTo(String invited, String me) {
+    return 'Este convite foi enviado para $invited. Você vai entrar como $me.';
+  }
+
+  @override
+  String get invitationGoToLists => 'Ir para suas listas';
+
+  @override
   String get listsTitle => 'Suas listas';
 
   @override
@@ -529,4 +549,96 @@ class AppLocalizationsPt extends AppLocalizations {
   String itemLimitBodyClearChecked(int max) {
     return 'Uma lista pode ter até $max itens. Limpe os itens marcados ou remova os que você não precisa mais para abrir espaço.';
   }
+
+  @override
+  String get shareTitle => 'Compartilhar lista';
+
+  @override
+  String get shareInviteExplanation => 'Convide pessoas para adicionar e marcar itens com você.';
+
+  @override
+  String get shareInviteByEmail => 'Convidar por e-mail';
+
+  @override
+  String shareInviteFormExplanation(String list, int days) {
+    return 'Vamos enviar por e-mail um link para entrar em $list como editor. O link vale por $days dias.';
+  }
+
+  @override
+  String get shareSendInvitation => 'Enviar convite';
+
+  @override
+  String shareInvitationSent(String email) {
+    return 'Convite enviado para $email';
+  }
+
+  @override
+  String get sharePendingHeading => 'Aguardando resposta';
+
+  @override
+  String shareCancelInvitation(String email) {
+    return 'Cancelar convite para $email';
+  }
+
+  @override
+  String get shareInvitationExpired => 'Expirou sem resposta';
+
+  @override
+  String shareInvitationCancelled(String email) {
+    return 'Convite para $email cancelado';
+  }
+
+  @override
+  String errorInvitationLimit(int limit) {
+    return 'Você enviou $limit convites nas últimas 24 horas, o máximo permitido. Tente de novo amanhã.';
+  }
+
+  @override
+  String get errorInvitationLimitGeneric =>
+      'Você enviou o máximo de convites permitido em 24 horas. Tente de novo amanhã.';
+
+  @override
+  String get errorInvitationAccepted => 'Este convite já foi aceito.';
+
+  @override
+  String get errorInvitationDeclined => 'Este convite foi recusado.';
+
+  @override
+  String get errorInvitationGone => 'Este convite não está mais disponível.';
+
+  @override
+  String get errorAlreadyMember => 'Essa pessoa já está nesta lista.';
+
+  @override
+  String get errorInvitationNotSent => 'Não conseguimos enviar o e-mail do convite. Tente de novo daqui a pouco.';
+
+  @override
+  String invitationFrom(String name) {
+    return '$name convidou você';
+  }
+
+  @override
+  String get invitationJoin => 'Entrar';
+
+  @override
+  String get invitationDecline => 'Recusar';
+
+  @override
+  String invitationJoined(String list) {
+    return 'Você entrou em $list';
+  }
+
+  @override
+  String invitationDeclined(String list) {
+    return 'Convite para $list recusado';
+  }
+
+  @override
+  String get errorInvitationCancelled => 'Este convite foi cancelado. Peça um novo.';
+
+  @override
+  String get errorInvitationExpired => 'Este convite expirou. Peça um novo.';
+
+  @override
+  String get errorListFull => 'Esta lista já tem o máximo de membros permitido.';
 }

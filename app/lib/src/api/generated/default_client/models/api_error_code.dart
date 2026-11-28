@@ -16,6 +16,15 @@ enum ApiErrorCode {
   itemNotFound("item_not_found"),
   itemDeleted("item_deleted"),
   itemNotChecked("item_not_checked"),
+  invalidEmail("invalid_email"),
+  invitationNotFound("invitation_not_found"),
+  invitationCancelled("invitation_cancelled"),
+  invitationDeclined("invitation_declined"),
+  invitationExpired("invitation_expired"),
+  invitationAccepted("invitation_accepted"),
+  listFull("list_full"),
+  alreadyMember("already_member"),
+  emailNotSent("email_not_sent"),
   internal("internal");
 
   const ApiErrorCode(this.value);
