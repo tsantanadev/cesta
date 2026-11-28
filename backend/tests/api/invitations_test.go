@@ -37,7 +37,7 @@ func decodeInvitation(t *testing.T, res *testkit.Response) invitation {
 
 const carlaEmail = "carla@example.com"
 
-var inviteLink = regexp.MustCompile(`https://cesta\.tsantana\.dev/invite/([A-Za-z0-9_-]+)`)
+var invitationLink = regexp.MustCompile(`https://cesta\.tsantana\.dev/invite/([A-Za-z0-9_-]+)`)
 
 // invite has c invite address to listID in English and returns the Invitation.
 func invite(t *testing.T, c *testkit.Client, listID, address string) invitation {
@@ -54,7 +54,7 @@ func inviteToken(t *testing.T, srv *testkit.Server, address string) string {
 	if len(sent) == 0 {
 		t.Fatalf("no email sent to %s", address)
 	}
-	m := inviteLink.FindStringSubmatch(sent[len(sent)-1].Text)
+	m := invitationLink.FindStringSubmatch(sent[len(sent)-1].Text)
 	if m == nil {
 		t.Fatalf("email to %s has no Invitation link:\n%s", address, sent[len(sent)-1].Text)
 	}
@@ -88,7 +88,7 @@ func TestAnInvitationSendsOneEmailWithItsDeepLink(t *testing.T) {
 	if !strings.Contains(m.Subject, "Ana Souza") || !strings.Contains(m.Subject, "Groceries") {
 		t.Fatalf("subject = %q, want it to name Ana Souza and Groceries", m.Subject)
 	}
-	text := inviteLink.FindStringSubmatch(m.Text)
+	text := invitationLink.FindStringSubmatch(m.Text)
 	if text == nil || len(text[1]) < 43 {
 		t.Fatalf("email text has no Invitation link with a high-entropy token:\n%s", m.Text)
 	}
@@ -109,7 +109,7 @@ func TestTheInvitationEmailCanBeInBrazilianPortuguese(t *testing.T) {
 	if m.Subject != "Ana Souza convidou você para a lista Feira no Cesta" {
 		t.Fatalf("subject = %q, want it in Portuguese", m.Subject)
 	}
-	if !strings.Contains(m.Text, "expira em 16/03/2026") || !inviteLink.MatchString(m.Text) {
+	if !strings.Contains(m.Text, "expira em 16/03/2026") || !invitationLink.MatchString(m.Text) {
 		t.Fatalf("text = %q, want the link and the expiry date in Portuguese", m.Text)
 	}
 }
