@@ -26,7 +26,7 @@ All secrets live in Secret Manager, replicated only in `southamerica-east1`. Not
 | --- | --- | --- |
 | `neon-api-key` | hand | Terraform (Neon provider) |
 | `otel-exporter-otlp-headers` | hand | backend (Grafana Cloud auth) |
-| `resend-api-key` | hand | backend (`RESEND_API_KEY`: sends Invitation emails through Resend) |
+| `resend-api-key` | hand | backend (`RESEND_API_KEY`: sends Invitation emails through Resend, ADR-0006; the backend won't start without it) |
 | `database-url` | Terraform | backend (Neon pooled endpoint, `pool_max_conns=5`) |
 | `database-url-direct` | Terraform | migrations job (goose needs a session-level lock) |
 
@@ -72,8 +72,9 @@ Tools: `gcloud`, Terraform 1.17.2. Replace `$PROJECT` with the environment's pro
    #   Authorization=Basic%20<base64 of "INSTANCE_ID:TOKEN">
    printf '%s' "$OTLP_HEADERS" | gcloud secrets create otel-exporter-otlp-headers --project=$PROJECT \
      --replication-policy=user-managed --locations=southamerica-east1 --data-file=-
-   # Resend: verify the sending domain of EMAIL_FROM (default convites@cesta.tsantana.dev,
-   # the module's email_from), then API Keys → create one with "Sending access" for that domain.
+   # Resend: add the sending domain of EMAIL_FROM (default convites@cesta.tsantana.dev,
+   # the module's email_from) in the São Paulo region (sa-east-1, ADR-0006) and verify it,
+   # then API Keys → create one with "Sending access" for that domain.
    printf '%s' "$RESEND_API_KEY" | gcloud secrets create resend-api-key --project=$PROJECT \
      --replication-policy=user-managed --locations=southamerica-east1 --data-file=-
    ```
