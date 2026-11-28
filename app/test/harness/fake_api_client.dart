@@ -351,6 +351,123 @@ class FakeApiClient implements ApiClient {
     return ListDeletedLists200(DeletedLists(lists: [for (final l in deleted) _deleted(l)]));
   }
 
+  // ---- Invitation deep links ----------------------------------------------
+
+  /// How many Members a List may have, like the server's 20.
+  int memberLimit = 20;
+
+  /// Invitations by the token in their deep link.
+  final _invitationsByToken = <String, _FakeInvitation>{};
+  int _nextInvitationId = 1;
+
+  /// Stores an Invitation from List [listId]'s Owner [from] to [email], as if
+  /// sent earlier; returns the token in its deep link.
+  String addInvitation(
+    String listId, {
+    required FakeIdentity from,
+    required String email,
+    InvitationStatus status = InvitationStatus.pending,
+  }) {
+    final n = _nextInvitationId++;
+    final token = 'token-$n';
+    final createdAt = DateTime.now().toUtc();
+    _invitationsByToken[token] = _FakeInvitation(
+      id: '00000000-0000-4000-a000-${n.toString().padLeft(12, '0')}',
+      listId: listId,
+      email: email,
+      invitedBy: UserRef(id: 'user-${from.uid}', displayName: _users[from.uid]?.displayName ?? from.email),
+      createdAt: createdAt,
+      status: status,
+    );
+    return token;
+  }
+
+  /// The status of the Invitation whose deep link carries [token].
+  InvitationStatus invitationStatus(String token) => _invitationsByToken[token]!.status;
+
+  /// The Invitation whose deep link carries [token] changes behind the app's
+  /// back, e.g. the Owner cancels it.
+  void setInvitationStatus(String token, InvitationStatus status) => _invitationsByToken[token]!.status = status;
+
+  Invitation _invitation(_FakeInvitation i) => Invitation(
+    id: i.id,
+    listId: i.listId,
+    listName: _lists[i.listId]!.name,
+    email: i.email,
+    invitedBy: i.invitedBy,
+    status: i.status,
+    createdAt: i.createdAt,
+    expiresAt: i.createdAt.add(const Duration(days: 14)),
+  );
+
+  static ApiErrorCode? _closed(InvitationStatus status) => switch (status) {
+    InvitationStatus.pending => null,
+    InvitationStatus.accepted => ApiErrorCode.invitationAccepted,
+    InvitationStatus.declined => ApiErrorCode.invitationDeclined,
+    InvitationStatus.cancelled => ApiErrorCode.invitationCancelled,
+    InvitationStatus.expired => ApiErrorCode.invitationExpired,
+  };
+
+  @override
+  Future<LookupInvitationResult> lookupInvitation({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required InvitationRef body,
+  }) async {
+    _failIfOffline('/api/invitations/lookup');
+    if (auth.current == null) return const LookupInvitation401(_unauthenticated);
+    final invitation = _invitationsByToken[body.token];
+    if (invitation == null) return LookupInvitation404(_error(ApiErrorCode.invitationNotFound));
+    return LookupInvitation200(_invitation(invitation));
+  }
+
+  @override
+  Future<AcceptInvitationResult> acceptInvitation({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required InvitationRef body,
+  }) async {
+    _failIfOffline('/api/invitations/accept');
+    final identity = auth.current;
+    if (identity == null) return const AcceptInvitation401(_unauthenticated);
+    final invitation = _invitationsByToken[body.token];
+    if (invitation == null) return AcceptInvitation404(_error(ApiErrorCode.invitationNotFound));
+    final list = _lists[invitation.listId]!;
+    final retry = invitation.status == InvitationStatus.accepted && invitation.acceptedByUid == identity.uid;
+    if (!retry) {
+      if (_closed(invitation.status) case final code?) return AcceptInvitation409(_error(code));
+      if (list.deletedAt != null) return AcceptInvitation409(_error(ApiErrorCode.listDeleted));
+      if (!list.members.contains(identity.uid) && list.members.length >= memberLimit) {
+        return AcceptInvitation409(_error(ApiErrorCode.listFull, limit: memberLimit));
+      }
+      list.members.add(identity.uid);
+      invitation
+        ..status = InvitationStatus.accepted
+        ..acceptedByUid = identity.uid;
+    }
+    return AcceptInvitation200(_summary(list, identity.uid));
+  }
+
+  @override
+  Future<DeclineInvitationResult> declineInvitation({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required InvitationRef body,
+  }) async {
+    _failIfOffline('/api/invitations/decline');
+    if (auth.current == null) return const DeclineInvitation401(_unauthenticated);
+    final invitation = _invitationsByToken[body.token];
+    if (invitation == null) return DeclineInvitation404(_error(ApiErrorCode.invitationNotFound));
+    if (invitation.status != InvitationStatus.declined) {
+      if (_closed(invitation.status) case final code?) return DeclineInvitation409(_error(code));
+      invitation.status = InvitationStatus.declined;
+    }
+    return DeclineInvitation200(_invitation(invitation));
+  }
+
   // ---- Items and sync ---------------------------------------------------
 
   /// How many Items a List may hold, like the server's 500.
@@ -706,6 +823,28 @@ class _FakeList {
   int? deletedSeq;
   final int uncheckedItemCount;
   DateTime? deletedAt;
+}
+
+/// An Invitation as the fake backend stores it.
+class _FakeInvitation {
+  _FakeInvitation({
+    required this.id,
+    required this.listId,
+    required this.email,
+    required this.invitedBy,
+    required this.createdAt,
+    required this.status,
+  });
+
+  final String id;
+  final String listId;
+  final String email;
+  final UserRef invitedBy;
+  final DateTime createdAt;
+  InvitationStatus status;
+
+  /// Who accepted it, so their retry succeeds.
+  String? acceptedByUid;
 }
 
 /// An Item as the fake backend stores it.

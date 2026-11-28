@@ -4,12 +4,14 @@ import 'api/generated/cesta_api.dart';
 import 'auth/auth_gateway.dart';
 import 'db/app_database.dart';
 import 'health/health_screen.dart';
+import 'invitations/invitation_screen.dart';
 import 'items/add_items_screen.dart';
 import 'items/items_store.dart';
 import 'items/list_screen.dart';
 import 'lists/lists_controller.dart';
 import 'lists/lists_screen.dart';
 import 'lists/recently_deleted_screen.dart';
+import 'pending_link.dart';
 import 'routes.dart';
 import 'session/display_name_screen.dart';
 import 'session/email_auth_screen.dart';
@@ -29,10 +31,11 @@ const _signedOutRoutes = {Routes.welcome, Routes.signIn, Routes.signUp, Routes.r
 ///   (`/splash?from=...`) and goes there once the User is known. If the User
 ///   can't be loaded (offline, nothing cached) it says so and offers to retry
 ///   or sign out.
-/// - Signed out: the welcome flow only.
+/// - Signed out: the welcome flow only. A deep link opened meanwhile is kept
+///   in [pending] and opened once the User is signed in.
 /// - Signed in with a display name not yet confirmed: the display name screen.
 /// - Signed in otherwise: anywhere but the signed-out flow.
-String? sessionRedirect(SessionController session, Uri uri) {
+String? sessionRedirect(SessionController session, Uri uri, PendingLink pending) {
   final location = uri.path;
   final atSplash = location == Routes.splash;
   String? splash() => atSplash ? null : Uri(path: Routes.splash, queryParameters: {'from': uri.toString()}).toString();
@@ -40,6 +43,7 @@ String? sessionRedirect(SessionController session, Uri uri) {
     case SessionStatus.starting:
       return splash();
     case SessionStatus.signedOut:
+      pending.keep(atSplash ? Uri.tryParse(uri.queryParameters['from'] ?? '') ?? uri : uri);
       return _signedOutRoutes.contains(location) ? null : Routes.welcome;
     case SessionStatus.signedIn:
       final user = session.user;
@@ -50,9 +54,11 @@ String? sessionRedirect(SessionController session, Uri uri) {
       if (atSplash) {
         final from = Uri.tryParse(uri.queryParameters['from'] ?? '');
         final resumable = from != null && !_signedOutRoutes.contains(from.path) && from.path != Routes.splash;
-        return resumable ? from.toString() : Routes.home;
+        return resumable ? from.toString() : pending.location ?? Routes.home;
       }
-      if (_signedOutRoutes.contains(location) || location == Routes.onboardingName) return Routes.home;
+      if (_signedOutRoutes.contains(location) || location == Routes.onboardingName) {
+        return pending.location ?? Routes.home;
+      }
       return null;
   }
 }
@@ -65,11 +71,12 @@ GoRouter buildRouter({
   required AuthGateway auth,
   required ApiClient api,
   required AppDatabase database,
+  required PendingLink pending,
   String? initialLocation,
 }) => GoRouter(
   initialLocation: initialLocation ?? Routes.home,
   refreshListenable: session,
-  redirect: (context, state) => sessionRedirect(session, state.uri),
+  redirect: (context, state) => sessionRedirect(session, state.uri, pending),
   routes: [
     GoRoute(
       path: Routes.splash,
@@ -114,6 +121,13 @@ GoRouter buildRouter({
               AddItemsScreen(listId: state.pathParameters['listId']!, session: session, lists: lists, items: items),
         ),
       ],
+    ),
+    GoRoute(
+      path: Routes.invitation(':token'),
+      builder: (_, state) {
+        pending.opened(state.uri.path);
+        return InvitationScreen(token: state.pathParameters['token']!, session: session, lists: lists, api: api);
+      },
     ),
     GoRoute(
       path: Routes.changeDisplayName,

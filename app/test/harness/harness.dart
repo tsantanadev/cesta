@@ -7,6 +7,7 @@ import 'package:cesta/src/sync/outbox.dart';
 import 'package:cesta/src/ui/components.dart';
 import 'package:drift/drift.dart' show DatabaseConnection;
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart' show MethodCall, SystemChannels;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -111,6 +112,19 @@ class Harness {
   /// Starts signed in as a User with a confirmed display name.
   FakeIdentity signedIn({String email = 'ana@example.com', String displayName = 'Ana Souza'}) =>
       existingUser(email: email, password: 'irrelevant', displayName: displayName, signedIn: true);
+
+  /// Opens [url] in the running app, as the OS does when the User taps a
+  /// universal link or App Link to Cesta.
+  Future<void> openLink(String url) async {
+    await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+      SystemChannels.navigation.name,
+      SystemChannels.navigation.codec.encodeMethodCall(
+        MethodCall('pushRouteInformation', {'location': url, 'state': null}),
+      ),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+  }
 
   /// Creates a List named [name] from the Lists screen.
   Future<void> createList(String name) async {

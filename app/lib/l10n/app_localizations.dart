@@ -446,6 +446,96 @@ abstract class AppLocalizations {
   /// **'That name can\'t be used. Try another.'**
   String get errorDisplayNameInvalid;
 
+  /// Title of the screen an Invitation's deep link opens (provisional, #44).
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation'**
+  String get invitationTitle;
+
+  /// Heading of the Invitation screen: the Owner who invited the User, and the List.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} invited you to join {list}'**
+  String invitationHeading(String name, String list);
+
+  /// What accepting an Invitation lets the User do.
+  ///
+  /// In en, this message translates to:
+  /// **'As an Editor, you can add, check and remove items on this list with everyone on it.'**
+  String get invitationExplanation;
+
+  /// Shown when the signed-in User's email isn't the one the Invitation was sent to; they can still accept it.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation was sent to {invited}. You\'ll join as {me}.'**
+  String invitationSentTo(String invited, String me);
+
+  /// Accepts the Invitation: the User becomes an Editor and the List opens.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get invitationAccept;
+
+  /// Declines the Invitation; its link stops working.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get invitationDecline;
+
+  /// Toast after declining an Invitation.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation declined'**
+  String get invitationDeclinedToast;
+
+  /// Leaves the Invitation screen for the Lists screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to your lists'**
+  String get invitationGoToLists;
+
+  /// The deep link's token matches no Invitation.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation link doesn\'t work. Check that you opened the whole link from the email.'**
+  String get invitationNotFound;
+
+  /// The Invitation was accepted before (its link is single-use).
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation has already been accepted.'**
+  String get invitationAlreadyAccepted;
+
+  /// The Invitation was declined, so it can't be accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation was declined.'**
+  String get invitationAlreadyDeclined;
+
+  /// The Owner cancelled the Invitation.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation was cancelled. Ask the list\'s owner to send a new one.'**
+  String get invitationCancelled;
+
+  /// The Invitation is more than 14 days old.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation has expired. Ask the list\'s owner to send a new one.'**
+  String get invitationExpired;
+
+  /// The Invitation's List was deleted, so it can't be joined.
+  ///
+  /// In en, this message translates to:
+  /// **'This list was deleted.'**
+  String get invitationListDeleted;
+
+  /// Joining was refused because the List already has 20 Members.
+  ///
+  /// In en, this message translates to:
+  /// **'This list already has as many members as a list can have.'**
+  String get invitationListFull;
+
   /// Title of the Lists screen (the home screen), which lists the User's Lists.
   ///
   /// In en, this message translates to:

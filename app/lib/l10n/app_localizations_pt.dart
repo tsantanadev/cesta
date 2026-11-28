@@ -189,6 +189,57 @@ class AppLocalizationsPt extends AppLocalizations {
   String get errorDisplayNameInvalid => 'Esse nome não pode ser usado. Tente outro.';
 
   @override
+  String get invitationTitle => 'Convite';
+
+  @override
+  String invitationHeading(String name, String list) {
+    return '$name convidou você para a lista $list';
+  }
+
+  @override
+  String get invitationExplanation =>
+      'Como editor, você pode adicionar, marcar e remover itens desta lista com todos que fazem parte dela.';
+
+  @override
+  String invitationSentTo(String invited, String me) {
+    return 'Este convite foi enviado para $invited. Você vai entrar como $me.';
+  }
+
+  @override
+  String get invitationAccept => 'Aceitar';
+
+  @override
+  String get invitationDecline => 'Recusar';
+
+  @override
+  String get invitationDeclinedToast => 'Convite recusado';
+
+  @override
+  String get invitationGoToLists => 'Ir para suas listas';
+
+  @override
+  String get invitationNotFound =>
+      'Este link de convite não funciona. Confira se você abriu o link completo do e-mail.';
+
+  @override
+  String get invitationAlreadyAccepted => 'Este convite já foi aceito.';
+
+  @override
+  String get invitationAlreadyDeclined => 'Este convite foi recusado.';
+
+  @override
+  String get invitationCancelled => 'Este convite foi cancelado. Peça ao dono da lista para enviar um novo.';
+
+  @override
+  String get invitationExpired => 'Este convite expirou. Peça ao dono da lista para enviar um novo.';
+
+  @override
+  String get invitationListDeleted => 'Esta lista foi excluída.';
+
+  @override
+  String get invitationListFull => 'Esta lista já tem o máximo de membros que uma lista pode ter.';
+
+  @override
   String get listsTitle => 'Suas listas';
 
   @override

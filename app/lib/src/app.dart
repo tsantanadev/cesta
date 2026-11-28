@@ -10,6 +10,7 @@ import 'db/app_database.dart';
 import 'items/item_limit_sheet.dart';
 import 'items/items_store.dart';
 import 'lists/lists_controller.dart';
+import 'pending_link.dart';
 import 'router.dart';
 import 'session/session_controller.dart';
 import 'sync/network_status.dart';
@@ -80,6 +81,7 @@ class _CestaAppState extends State<CestaApp> {
       auth: widget.auth,
       api: widget.api,
       database: widget.database,
+      pending: PendingLink(),
       initialLocation: widget.initialLocation,
     );
   }

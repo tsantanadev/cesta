@@ -191,6 +191,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorDisplayNameInvalid => 'That name can\'t be used. Try another.';
 
   @override
+  String get invitationTitle => 'Invitation';
+
+  @override
+  String invitationHeading(String name, String list) {
+    return '$name invited you to join $list';
+  }
+
+  @override
+  String get invitationExplanation =>
+      'As an Editor, you can add, check and remove items on this list with everyone on it.';
+
+  @override
+  String invitationSentTo(String invited, String me) {
+    return 'This invitation was sent to $invited. You\'ll join as $me.';
+  }
+
+  @override
+  String get invitationAccept => 'Accept';
+
+  @override
+  String get invitationDecline => 'Decline';
+
+  @override
+  String get invitationDeclinedToast => 'Invitation declined';
+
+  @override
+  String get invitationGoToLists => 'Go to your lists';
+
+  @override
+  String get invitationNotFound =>
+      'This invitation link doesn\'t work. Check that you opened the whole link from the email.';
+
+  @override
+  String get invitationAlreadyAccepted => 'This invitation has already been accepted.';
+
+  @override
+  String get invitationAlreadyDeclined => 'This invitation was declined.';
+
+  @override
+  String get invitationCancelled => 'This invitation was cancelled. Ask the list\'s owner to send a new one.';
+
+  @override
+  String get invitationExpired => 'This invitation has expired. Ask the list\'s owner to send a new one.';
+
+  @override
+  String get invitationListDeleted => 'This list was deleted.';
+
+  @override
+  String get invitationListFull => 'This list already has as many members as a list can have.';
+
+  @override
   String get listsTitle => 'Your Lists';
 
   @override
