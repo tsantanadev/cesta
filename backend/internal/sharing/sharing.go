@@ -266,7 +266,7 @@ func (s *Service) Accept(ctx context.Context, who Invitee, ref Ref) (uuid.UUID, 
 			return statusError(inv.Status)
 		}
 		now := s.clock.Now()
-		if _, err := s.members.Join(ctx, tx, listID, who.ID, now, membership.DefaultMaxPerList); err != nil {
+		if _, err := s.members.Join(ctx, tx, listID, who.ID, now); err != nil {
 			return err
 		}
 		return s.respond(ctx, tx, inv.ID, Accepted, who.ID, now)
