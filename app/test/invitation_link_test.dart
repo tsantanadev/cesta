@@ -7,7 +7,7 @@ const password = 'correct horse battery';
 const brunoEmail = 'bruno@example.com';
 
 /// The Invitation deep link for [token], as the email carries it.
-String inviteLink(String token) => 'https://cesta.tsantana.dev/invite/$token';
+String invitationLink(String token) => 'https://cesta.tsantana.dev/invite/$token';
 
 /// Ana owns a List named Casa and invited [email] to it; returns the token
 /// in the Invitation's deep link.
@@ -32,7 +32,7 @@ void main() {
       h.existingUser(email: brunoEmail, password: password, displayName: 'Bruno');
       await h.pumpApp();
 
-      await h.openLink(inviteLink(token));
+      await h.openLink(invitationLink(token));
       expect(find.text('Continue with email'), findsOneWidget);
       await h.signInWithEmail(brunoEmail, password);
 
@@ -45,11 +45,24 @@ void main() {
       final h = Harness(tester);
       final token = anaInvites(h);
 
-      await h.pumpApp(initialLocation: Uri.parse(inviteLink(token)).path);
+      await h.pumpApp(initialLocation: Uri.parse(invitationLink(token)).path);
       await h.signUpWithEmail(brunoEmail, password);
       expect(find.text('What should we call you?'), findsOneWidget);
       await tester.tap(find.widgetWithText(CesButton, 'Continue'));
       await tester.pumpAndSettle();
+
+      expect(find.text('Ana Souza invited you to join Casa'), findsOneWidget);
+    });
+
+    testWidgets('is kept when the app restarts before the User signs in', (tester) async {
+      final h = Harness(tester);
+      final token = anaInvites(h);
+      h.existingUser(email: brunoEmail, password: password, displayName: 'Bruno');
+      await h.pumpApp();
+      await h.openLink(invitationLink(token));
+
+      await h.pumpApp();
+      await h.signInWithEmail(brunoEmail, password);
 
       expect(find.text('Ana Souza invited you to join Casa'), findsOneWidget);
     });
@@ -59,7 +72,7 @@ void main() {
       final token = anaInvites(h);
       h.existingUser(email: brunoEmail, password: password, displayName: 'Bruno');
       await h.pumpApp();
-      await h.openLink(inviteLink(token));
+      await h.openLink(invitationLink(token));
       await h.signInWithEmail(brunoEmail, password);
       await h.tap(decline);
 
@@ -78,7 +91,7 @@ void main() {
       final token = anaInvites(h);
       final bruno = h.signedIn(email: brunoEmail, displayName: 'Bruno');
       await h.pumpApp();
-      await h.openLink(inviteLink(token));
+      await h.openLink(invitationLink(token));
 
       await h.tap(accept);
 
@@ -99,7 +112,7 @@ void main() {
       final token = anaInvites(h);
       final bruno = h.signedIn(email: brunoEmail, displayName: 'Bruno');
       await h.pumpApp();
-      await h.openLink(inviteLink(token));
+      await h.openLink(invitationLink(token));
 
       await h.tap(decline);
 
@@ -114,7 +127,7 @@ void main() {
       final token = anaInvites(h, email: 'bruno.lima@work.example.com');
       final bruno = h.signedIn(email: brunoEmail, displayName: 'Bruno');
       await h.pumpApp();
-      await h.openLink(inviteLink(token));
+      await h.openLink(invitationLink(token));
 
       expect(
         find.text("This invitation was sent to bruno.lima@work.example.com. You'll join as bruno@example.com."),
@@ -136,7 +149,7 @@ void main() {
         h.signedIn(email: brunoEmail, displayName: 'Bruno');
         await h.pumpApp();
 
-        await h.openLink(inviteLink(token));
+        await h.openLink(invitationLink(token));
 
         expect(find.text(message), findsOneWidget);
         expect(accept, findsNothing);
@@ -150,7 +163,7 @@ void main() {
       h.signedIn(email: brunoEmail, displayName: 'Bruno');
       await h.pumpApp();
 
-      await h.openLink(inviteLink('not-a-token'));
+      await h.openLink(invitationLink('not-a-token'));
 
       expect(find.text('This invitation is no longer available.'), findsOneWidget);
       expect(accept, findsNothing);
@@ -161,7 +174,7 @@ void main() {
       final token = anaInvites(h);
       h.signedIn(email: brunoEmail, displayName: 'Bruno');
       await h.pumpApp();
-      await h.openLink(inviteLink(token));
+      await h.openLink(invitationLink(token));
       h.api.setInvitationStatus(invitationOf(token), InvitationStatus.cancelled);
 
       await h.tap(accept);
@@ -177,7 +190,7 @@ void main() {
       await h.pumpApp();
       h.goOffline();
 
-      await h.openLink(inviteLink(token));
+      await h.openLink(invitationLink(token));
       expect(find.text("You're offline. Connect to the internet and try again."), findsOneWidget);
       await h.goOnline();
       await h.tap(find.widgetWithText(CesButton, 'Try again'));
@@ -192,7 +205,7 @@ void main() {
       h.signedIn(email: brunoEmail, displayName: 'Bruno');
       await h.pumpApp(locale: brazilianPortuguese);
 
-      await h.openLink(inviteLink(token));
+      await h.openLink(invitationLink(token));
 
       expect(find.text('Ana Souza convidou você para a lista Casa'), findsOneWidget);
       expect(find.widgetWithText(CesButton, 'Entrar'), findsOneWidget);

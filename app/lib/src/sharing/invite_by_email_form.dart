@@ -61,7 +61,7 @@ class _InviteByEmailFormState extends State<InviteByEmailForm> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CesSheetText(l10n.shareInviteFormExplanation(widget.listName)),
+          CesSheetText(l10n.shareInviteFormExplanation(widget.listName, invitationLifetimeDays)),
           const CesGap.md(),
           CesTextField(
             label: l10n.fieldEmail,

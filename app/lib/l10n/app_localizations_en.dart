@@ -562,8 +562,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareInviteByEmail => 'Invite by email';
 
   @override
-  String shareInviteFormExplanation(String list) {
-    return 'We\'ll email them a link to join $list as an Editor. The link works for 14 days.';
+  String shareInviteFormExplanation(String list, int days) {
+    return 'We\'ll email them a link to join $list as an Editor. The link works for $days days.';
   }
 
   @override

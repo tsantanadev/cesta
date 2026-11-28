@@ -208,7 +208,7 @@ func invitationError(err error) (status int, apiErr ApiError, ok bool) {
 			Limit:   &limit,
 		}, true
 	case errors.Is(err, membership.ErrListFull):
-		limit := membership.DefaultMaxPerList
+		limit := membership.MaxPerList
 		return http.StatusConflict, ApiError{
 			Code:    ApiErrorCodeListFull,
 			Message: fmt.Sprintf("the List already has the limit of %d Members", limit),

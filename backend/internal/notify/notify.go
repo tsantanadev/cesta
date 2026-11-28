@@ -1,7 +1,8 @@
 // Package notify tells people about things by email: for now, that they were
-// sent an Invitation. It writes each message in the recipient's language
-// (English or Brazilian Portuguese) and hands it to an email.Sender (Resend in
-// production, a fake in tests).
+// sent an Invitation. It writes each message in the language the sender chose
+// (the Owner's app language: English or Brazilian Portuguese), since the
+// recipient may not have the app yet, and hands it to an email.Sender (Resend
+// in production, a fake in tests).
 package notify
 
 import (
@@ -14,13 +15,13 @@ import (
 	"github.com/tsantanadev/cesta/backend/internal/platform/email"
 )
 
-// InviteLinkBase is where an Invitation's deep link points; the token follows it.
+// InvitationLinkBase is where an Invitation's deep link points; the token follows it.
 // The app opens these links (iOS Associated Domains, Android App Links), and
 // Firebase Hosting serves a fallback page for a browser without the app.
-const InviteLinkBase = "https://cesta.tsantana.dev/invite/"
+const InvitationLinkBase = "https://cesta.tsantana.dev/invite/"
 
-// InviteLink returns the deep link for an Invitation's token.
-func InviteLink(token string) string { return InviteLinkBase + token }
+// InvitationLink returns the deep link for an Invitation's token.
+func InvitationLink(token string) string { return InvitationLinkBase + token }
 
 // Language is a language an email can be written in.
 type Language string
@@ -98,7 +99,7 @@ func invitationMessage(inv Invitation) (email.Message, error) {
 	if !ok {
 		return email.Message{}, fmt.Errorf("notify: no copy in language %q", inv.Language)
 	}
-	link := InviteLink(inv.Token)
+	link := InvitationLink(inv.Token)
 	intro := fmt.Sprintf(c.intro, inv.InviterName, inv.ListName)
 	expiry := fmt.Sprintf(c.expiry, inv.ExpiresAt.UTC().Format(c.dateLayout))
 	var html bytes.Buffer

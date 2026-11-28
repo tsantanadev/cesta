@@ -162,14 +162,21 @@ func (s *Service) Create(ctx context.Context, inviter, listID uuid.UUID, address
 			return err
 		}
 		inv.InviterName = names[inviter]
-		// Sent before commit: if the email can't go out, no Invitation is left
-		// behind that nobody received.
-		return s.notifier.Invited(ctx, notify.Invitation{
-			To: address, InviterName: inv.InviterName, ListName: inv.ListName,
-			Token: token, ExpiresAt: inv.ExpiresAt, Language: lang,
-		})
+		return nil
 	})
 	if err != nil {
+		return Invitation{}, wrap("create", err)
+	}
+	// Sent after commit, so no lock is held through the call to the email
+	// provider. If the email can't go out, the Invitation is removed: none is
+	// left behind that nobody received. Nobody else has its token meanwhile.
+	if err := s.notifier.Invited(ctx, notify.Invitation{
+		To: address, InviterName: inv.InviterName, ListName: inv.ListName,
+		Token: token, ExpiresAt: inv.ExpiresAt, Language: lang,
+	}); err != nil {
+		if _, delErr := s.db.Exec(context.WithoutCancel(ctx), "DELETE FROM invitations WHERE id = $1", inv.ID); delErr != nil {
+			err = errors.Join(err, fmt.Errorf("remove unsent invitation: %w", delErr))
+		}
 		return Invitation{}, wrap("create", err)
 	}
 	return inv, nil
@@ -180,7 +187,7 @@ func (s *Service) Create(ctx context.Context, inviter, listID uuid.UUID, address
 func (s *Service) ForList(ctx context.Context, owner, listID uuid.UUID) ([]Invitation, error) {
 	var out []Invitation
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		if _, err := s.lists.LockOwnedLive(ctx, tx, owner, listID); err != nil {
+		if _, err := s.lists.OwnedLive(ctx, tx, owner, listID); err != nil {
 			return err
 		}
 		var err error
@@ -199,8 +206,8 @@ func (s *Service) ForUser(ctx context.Context, who Invitee) ([]Invitation, error
 	var out []Invitation
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		var err error
-		out, err = s.query(ctx, tx, "email = lower($1) AND status = 'pending' AND expires_at > $2",
-			strings.TrimSpace(who.Email), s.clock.Now())
+		out, err = s.query(ctx, tx, "email = $1 AND status = 'pending' AND expires_at > $2",
+			canonicalEmail(who.Email), s.clock.Now())
 		return err
 	})
 	if err != nil {
@@ -259,7 +266,7 @@ func (s *Service) Accept(ctx context.Context, who Invitee, ref Ref) (uuid.UUID, 
 			return statusError(inv.Status)
 		}
 		now := s.clock.Now()
-		if _, err := s.members.Join(ctx, tx, listID, who.ID, now, membership.DefaultMaxPerList); err != nil {
+		if _, err := s.members.Join(ctx, tx, listID, who.ID, now); err != nil {
 			return err
 		}
 		return s.respond(ctx, tx, inv.ID, Accepted, who.ID, now)
@@ -364,12 +371,13 @@ func (s *Service) query(ctx context.Context, tx pgx.Tx, where string, args ...an
 	for _, r := range found {
 		invs = append(invs, r.inv)
 	}
-	return s.complete(ctx, tx, invs)
+	return s.complete(ctx, tx, invs, false)
 }
 
-// complete fills in List and inviter names and the expired Status, dropping
-// Invitations whose List is deleted.
-func (s *Service) complete(ctx context.Context, tx pgx.Tx, invs []Invitation) ([]Invitation, error) {
+// complete fills in List and inviter names and the expired Status. Invitations
+// whose List is deleted are dropped, or with keepDeleted kept with an empty
+// List name (a live List's name is never empty).
+func (s *Service) complete(ctx context.Context, tx pgx.Tx, invs []Invitation, keepDeleted bool) ([]Invitation, error) {
 	listIDs := make([]uuid.UUID, 0, len(invs))
 	userIDs := make([]uuid.UUID, 0, len(invs))
 	for _, inv := range invs {
@@ -388,60 +396,59 @@ func (s *Service) complete(ctx context.Context, tx pgx.Tx, invs []Invitation) ([
 	now := s.clock.Now()
 	for _, inv := range invs {
 		name, live := listNames[inv.ListID]
-		if !live {
+		if !live && !keepDeleted {
 			continue
 		}
 		inv.ListName, inv.InviterName = name, userNames[inv.InvitedBy]
-		if inv.Status == Pending && !now.Before(inv.ExpiresAt) {
-			inv.Status = Expired
-		}
+		inv.Status = inv.statusAt(now)
 		out = append(out, inv)
 	}
 	return out, nil
+}
+
+// statusAt is inv's Status at now: a pending Invitation is expired from its
+// ExpiresAt on.
+func (inv Invitation) statusAt(now time.Time) Status {
+	if inv.Status == Pending && !now.Before(inv.ExpiresAt) {
+		return Expired
+	}
+	return inv.Status
 }
 
 // find returns the Invitation ref identifies for who: the one with ref.Token,
 // or the one with ref.ID addressed to who's email. With anyList it is found
 // even if its List is deleted (its List name is then empty).
 func (s *Service) find(ctx context.Context, tx pgx.Tx, who Invitee, ref Ref, anyList bool) (Invitation, error) {
-	var rows pgx.Rows
+	var inv Invitation
 	var err error
 	switch {
 	case ref.Token != "" && ref.ID == uuid.Nil:
-		rows, err = tx.Query(ctx, "SELECT "+invitationColumns+" FROM invitations WHERE token_hash = $1",
-			hashToken(ref.Token))
+		inv, _, err = s.one(ctx, tx, false, "token_hash = $1", hashToken(ref.Token))
 	case ref.Token == "" && ref.ID != uuid.Nil:
-		rows, err = tx.Query(ctx, "SELECT "+invitationColumns+" FROM invitations WHERE id = $1 AND email = lower($2)",
-			ref.ID, strings.TrimSpace(who.Email))
+		inv, _, err = s.one(ctx, tx, false, "id = $1 AND email = $2", ref.ID, canonicalEmail(who.Email))
 	default:
 		return Invitation{}, ErrNotFound
 	}
-	if err != nil {
-		return Invitation{}, err
-	}
-	r, err := pgx.CollectExactlyOneRow(rows, scanRow)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if err == nil && inv.ListName == "" && !anyList {
 		return Invitation{}, ErrNotFound
 	}
-	if err != nil {
-		return Invitation{}, err
-	}
-	invs, err := s.complete(ctx, tx, []Invitation{r.inv})
-	switch {
-	case err != nil:
-		return Invitation{}, err
-	case len(invs) == 1:
-		return invs[0], nil
-	case anyList:
-		return r.inv, nil
-	default:
-		return Invitation{}, ErrNotFound
-	}
+	return inv, err
 }
 
 // lock locks invitationID until tx ends and returns it, with who responded to it.
 func (s *Service) lock(ctx context.Context, tx pgx.Tx, invitationID uuid.UUID) (Invitation, *uuid.UUID, error) {
-	rows, err := tx.Query(ctx, "SELECT "+invitationColumns+" FROM invitations WHERE id = $1 FOR UPDATE", invitationID)
+	return s.one(ctx, tx, true, "id = $1", invitationID)
+}
+
+// one returns the Invitation matching where, completed (its List name empty
+// if the List is deleted), with who responded to it, locked until tx ends
+// when forUpdate is set. It returns ErrNotFound if there is none.
+func (s *Service) one(ctx context.Context, tx pgx.Tx, forUpdate bool, where string, args ...any) (Invitation, *uuid.UUID, error) {
+	query := "SELECT " + invitationColumns + " FROM invitations WHERE " + where
+	if forUpdate {
+		query += " FOR UPDATE"
+	}
+	rows, err := tx.Query(ctx, query, args...)
 	if err != nil {
 		return Invitation{}, nil, err
 	}
@@ -452,17 +459,11 @@ func (s *Service) lock(ctx context.Context, tx pgx.Tx, invitationID uuid.UUID) (
 	if err != nil {
 		return Invitation{}, nil, err
 	}
-	invs, err := s.complete(ctx, tx, []Invitation{r.inv})
+	invs, err := s.complete(ctx, tx, []Invitation{r.inv}, true)
 	if err != nil {
 		return Invitation{}, nil, err
 	}
-	inv := r.inv
-	if len(invs) == 1 {
-		inv = invs[0]
-	} else if inv.Status == Pending && !s.clock.Now().Before(inv.ExpiresAt) {
-		inv.Status = Expired
-	}
-	return inv, r.respondedBy, nil
+	return invs[0], r.respondedBy, nil
 }
 
 func (s *Service) respond(ctx context.Context, tx pgx.Tx, id uuid.UUID, status Status, by uuid.UUID, at time.Time) error {
@@ -503,10 +504,16 @@ func hashToken(token string) []byte {
 	return h[:]
 }
 
-// normalizeEmail trims and lowercases address and reports whether it is a
-// plain email address (no display name), at most MaxEmailLength long.
+// canonicalEmail is the one form an email address is stored and compared in:
+// trimmed and lowercased. The app compares addresses the same way.
+func canonicalEmail(address string) string {
+	return strings.ToLower(strings.TrimSpace(address))
+}
+
+// normalizeEmail returns address in canonical form and reports whether it is
+// a plain email address (no display name), at most MaxEmailLength long.
 func normalizeEmail(address string) (string, bool) {
-	address = strings.ToLower(strings.TrimSpace(address))
+	address = canonicalEmail(address)
 	if address == "" || len(address) > MaxEmailLength {
 		return "", false
 	}

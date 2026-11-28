@@ -161,7 +161,7 @@
   "shareTitle": "Compartilhar lista",
   "shareInviteExplanation": "Convide pessoas para adicionar e marcar itens com você.",
   "shareInviteByEmail": "Convidar por e-mail",
-  "shareInviteFormExplanation": "Vamos enviar por e-mail um link para entrar em {list} como editor. O link vale por 14 dias.",
+  "shareInviteFormExplanation": "Vamos enviar por e-mail um link para entrar em {list} como editor. O link vale por {days} dias.",
   "shareSendInvitation": "Enviar convite",
   "shareInvitationSent": "Convite enviado para {email}",
   "sharePendingHeading": "Aguardando resposta",

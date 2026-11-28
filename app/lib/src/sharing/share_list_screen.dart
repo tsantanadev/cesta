@@ -83,7 +83,7 @@ class _ShareListScreenState extends State<ShareListScreen> {
     setState(() {
       _cancelling = null;
       // Accepted or declined meanwhile: it isn't pending any more either way.
-      if (failure == null || failure is InvitationNoLongerValid) {
+      if (failure == null || failure is InvitationUnanswerable) {
         _pending = _pending?.where((i) => i.id != invitation.id).toList();
       }
     });

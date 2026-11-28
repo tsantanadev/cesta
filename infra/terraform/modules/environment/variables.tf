@@ -66,6 +66,12 @@ variable "otel_exporter_otlp_endpoint" {
   type        = string
 }
 
+variable "email_from" {
+  description = "Backend EMAIL_FROM: the sender of Invitation emails. Its domain must be verified in Resend."
+  type        = string
+  default     = "Cesta <convites@cesta.tsantana.dev>"
+}
+
 variable "log_level" {
   description = "Backend LOG_LEVEL."
   type        = string

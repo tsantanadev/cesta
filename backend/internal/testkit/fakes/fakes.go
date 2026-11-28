@@ -75,14 +75,26 @@ func (v *TokenVerifier) Verify(_ context.Context, token string) (auth.Identity, 
 type EmailSender struct {
 	mu   sync.Mutex
 	sent []email.Message
+	fail error
 }
 
-// Send records msg.
+// Send records msg, or returns the error set with FailWith without recording it.
 func (s *EmailSender) Send(_ context.Context, msg email.Message) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.fail != nil {
+		return s.fail
+	}
 	s.sent = append(s.sent, msg)
 	return nil
+}
+
+// FailWith makes every later Send return err, as if the provider rejected
+// it; nil makes Send succeed again.
+func (s *EmailSender) FailWith(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fail = err
 }
 
 // SentTo returns the messages sent to the given address, oldest first.

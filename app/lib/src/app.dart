@@ -74,6 +74,8 @@ class _CestaAppState extends State<CestaApp> {
       ..addListener(_followSession);
     _rejections = _sync.rejections.listen(_tellRejected);
     _listsChanged = _sync.listsChanged.listen((c) => _lists.changed(gone: c.gone, toBuy: c.toBuy));
+    final pending = PendingLink(widget.database);
+    unawaited(pending.restore());
     _router = buildRouter(
       session: _session,
       lists: _lists,
@@ -82,7 +84,7 @@ class _CestaAppState extends State<CestaApp> {
       auth: widget.auth,
       api: widget.api,
       database: widget.database,
-      pending: PendingLink(),
+      pending: pending,
       sharing: Sharing(api: widget.api),
       initialLocation: widget.initialLocation,
     );

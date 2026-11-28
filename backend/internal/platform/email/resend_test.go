@@ -1,10 +1,13 @@
 package email_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/tsantanadev/cesta/backend/internal/platform/email"
@@ -50,5 +53,24 @@ func TestResendReportsARejectedMessage(t *testing.T) {
 
 	if err := r.Send(context.Background(), email.Message{To: "x"}); err == nil {
 		t.Fatal("Send succeeded, want an error for status 422")
+	}
+}
+
+func TestLogNeverLogsAnInvitationLink(t *testing.T) {
+	var out bytes.Buffer
+	l := email.Log{Logger: slog.New(slog.NewTextHandler(&out, &slog.HandlerOptions{Level: slog.LevelDebug}))}
+	link := "https://cesta.tsantana.dev/invite/secret-token-abc"
+
+	err := l.Send(context.Background(), email.Message{
+		To: "carla@example.com", Subject: "Ana invited you", Text: "Open " + link, HTML: `<a href="` + link + `">open</a>`,
+	})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if !strings.Contains(out.String(), "Ana invited you") {
+		t.Fatalf("log = %q, want the subject", out.String())
+	}
+	if strings.Contains(out.String(), "secret-token-abc") {
+		t.Fatalf("log = %q, want no Invitation token", out.String())
 	}
 }
