@@ -14,6 +14,9 @@ abstract final class Routes {
 
   /// Add items (05) for a List.
   static String addItems(String listId) => '/lists/$listId/add';
+
+  /// Share list (06) for a List.
+  static String shareList(String listId) => '/lists/$listId/share';
   static const changeDisplayName = '/me/name';
   static const serverStatus = '/server-status';
 }

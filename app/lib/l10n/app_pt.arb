@@ -152,5 +152,19 @@
   "itemRejected": "Não foi possível salvar “{name}”.",
   "itemLimitTitle": "Esta lista está cheia",
   "itemLimitBody": "Uma lista pode ter até {max} itens. Remova os que você não precisa mais para abrir espaço.",
-  "itemLimitBodyClearChecked": "Uma lista pode ter até {max} itens. Limpe os itens marcados ou remova os que você não precisa mais para abrir espaço."
+  "itemLimitBodyClearChecked": "Uma lista pode ter até {max} itens. Limpe os itens marcados ou remova os que você não precisa mais para abrir espaço.",
+  "shareTitle": "Compartilhar lista",
+  "shareInviteExplanation": "Convide pessoas para adicionar e marcar itens com você.",
+  "shareInviteByEmail": "Convidar por e-mail",
+  "shareInviteFormExplanation": "Vamos enviar por e-mail um link para entrar em {list} como editor. O link vale por 14 dias.",
+  "shareSendInvitation": "Enviar convite",
+  "shareInvitationSent": "Convite enviado para {email}",
+  "sharePendingHeading": "Aguardando resposta",
+  "shareCancelInvitation": "Cancelar convite para {email}",
+  "shareInvitationCancelled": "Convite para {email} cancelado",
+  "errorInvitationLimit": "Você enviou {limit} convites nas últimas 24 horas, o máximo permitido. Tente de novo amanhã.",
+  "errorInvitationLimitGeneric": "Você enviou o máximo de convites permitido em 24 horas. Tente de novo amanhã.",
+  "errorInvitationAccepted": "Este convite já foi aceito.",
+  "errorInvitationDeclined": "Este convite foi recusado.",
+  "errorInvitationGone": "Este convite não está mais disponível."
 }

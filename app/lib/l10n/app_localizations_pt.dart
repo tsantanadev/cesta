@@ -529,4 +529,57 @@ class AppLocalizationsPt extends AppLocalizations {
   String itemLimitBodyClearChecked(int max) {
     return 'Uma lista pode ter até $max itens. Limpe os itens marcados ou remova os que você não precisa mais para abrir espaço.';
   }
+
+  @override
+  String get shareTitle => 'Compartilhar lista';
+
+  @override
+  String get shareInviteExplanation => 'Convide pessoas para adicionar e marcar itens com você.';
+
+  @override
+  String get shareInviteByEmail => 'Convidar por e-mail';
+
+  @override
+  String shareInviteFormExplanation(String list) {
+    return 'Vamos enviar por e-mail um link para entrar em $list como editor. O link vale por 14 dias.';
+  }
+
+  @override
+  String get shareSendInvitation => 'Enviar convite';
+
+  @override
+  String shareInvitationSent(String email) {
+    return 'Convite enviado para $email';
+  }
+
+  @override
+  String get sharePendingHeading => 'Aguardando resposta';
+
+  @override
+  String shareCancelInvitation(String email) {
+    return 'Cancelar convite para $email';
+  }
+
+  @override
+  String shareInvitationCancelled(String email) {
+    return 'Convite para $email cancelado';
+  }
+
+  @override
+  String errorInvitationLimit(int limit) {
+    return 'Você enviou $limit convites nas últimas 24 horas, o máximo permitido. Tente de novo amanhã.';
+  }
+
+  @override
+  String get errorInvitationLimitGeneric =>
+      'Você enviou o máximo de convites permitido em 24 horas. Tente de novo amanhã.';
+
+  @override
+  String get errorInvitationAccepted => 'Este convite já foi aceito.';
+
+  @override
+  String get errorInvitationDeclined => 'Este convite foi recusado.';
+
+  @override
+  String get errorInvitationGone => 'Este convite não está mais disponível.';
 }
