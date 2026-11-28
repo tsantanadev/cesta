@@ -22,19 +22,37 @@ const (
 	ItemRemoved
 	// ListDeleted is a List that was deleted; its Items go with it.
 	ListDeleted
+	// HistoryRecorded is an Item history entry that was recorded, or that
+	// arrives with its List becoming visible.
+	HistoryRecorded
 )
+
+// HistoryEntry is an Item that was bought on a List: checked, then cleared
+// (Clear checked). It keeps the Item's ID and what it was when cleared.
+type HistoryEntry struct {
+	ItemID    uuid.UUID
+	ListID    uuid.UUID
+	Name      string
+	Quantity  *string
+	Unit      *string
+	Note      *string
+	ClearedBy uuid.UUID
+	ClearedAt time.Time
+}
 
 // Change is one change a Member should see, at a place in the ordered
 // stream of changes (package changeseq): its number Seq, then its ID to break
 // ties (a List that becomes visible brings all its Items at one number).
 type Change struct {
 	Kind ChangeKind
-	// ID is the Item's, or for ListDeleted the List's.
+	// ID is the Item's (also for HistoryRecorded), or for ListDeleted the List's.
 	ID     uuid.UUID
 	ListID uuid.UUID
 	Seq    int64
 	// Item is set for ItemChanged.
 	Item *Item
+	// History is set for HistoryRecorded.
+	History *HistoryEntry
 }
 
 // changesQuery lists, in order, every change past a position ($2, $3) to the
@@ -43,6 +61,8 @@ type Change struct {
 //     and the List becoming visible to them (joining it, or it being
 //     restored), so a newly visible List arrives whole;
 //   - a removed Item, at its removal;
+//   - an Item history entry of a List that is not deleted, at the later of
+//     its recording and the List becoming visible to them;
 //   - a deleted List, at its deletion.
 const changesQuery = `
 WITH joined AS (
@@ -56,13 +76,18 @@ WITH joined AS (
 		CASE WHEN i.deleted_at IS NULL THEN GREATEST(i.seq, v.vseq) ELSE i.seq END AS pos
 	FROM items i JOIN vis v ON v.id = i.list_id AND NOT v.deleted
 	UNION ALL
+	SELECT 'history', h.item_id, h.list_id, GREATEST(h.seq, v.vseq)
+	FROM item_history h JOIN vis v ON v.id = h.list_id AND NOT v.deleted
+	UNION ALL
 	SELECT 'list', v.id, v.id, v.visible_seq FROM vis v WHERE v.deleted
 )
 SELECT c.kind, c.id, c.list_id, c.pos, i.deleted_at IS NOT NULL,
 	i.name, trim_scale(i.quantity)::text, i.unit, i.note,
-	i.added_by, i.added_at, i.checked_by, i.checked_at, i.updated_at
+	i.added_by, i.added_at, i.checked_by, i.checked_at, i.updated_at,
+	h.name, trim_scale(h.quantity)::text, h.unit, h.note, h.cleared_by, h.cleared_at
 FROM changes c
 LEFT JOIN items i ON c.kind = 'item' AND i.id = c.id
+LEFT JOIN item_history h ON c.kind = 'history' AND h.item_id = c.id
 WHERE (c.pos, c.id) > ($2, $3)
 ORDER BY c.pos, c.id
 LIMIT $5`
@@ -87,24 +112,35 @@ func (s *Service) ChangesIn(
 			c                  Change
 			kind               string
 			removed            *bool
-			name               *string
+			itemName           *string
 			it                 Item
 			addedBy            *uuid.UUID
 			addedAt, updatedAt *time.Time
+			// The history entry's columns, all null unless kind is "history".
+			entryName *string
+			entry     HistoryEntry
+			clearedBy *uuid.UUID
+			clearedAt *time.Time
 		)
 		if err := row.Scan(&kind, &c.ID, &c.ListID, &c.Seq, &removed,
-			&name, &it.Quantity, &it.Unit, &it.Note,
-			&addedBy, &addedAt, &it.CheckedBy, &it.CheckedAt, &updatedAt); err != nil {
+			&itemName, &it.Quantity, &it.Unit, &it.Note,
+			&addedBy, &addedAt, &it.CheckedBy, &it.CheckedAt, &updatedAt,
+			&entryName, &entry.Quantity, &entry.Unit, &entry.Note, &clearedBy, &clearedAt); err != nil {
 			return Change{}, err
 		}
 		switch {
 		case kind == "list":
 			c.Kind = ListDeleted
+		case kind == "history":
+			c.Kind = HistoryRecorded
+			entry.ItemID, entry.ListID, entry.Name = c.ID, c.ListID, deref(entryName)
+			entry.ClearedBy, entry.ClearedAt = deref(clearedBy), deref(clearedAt).UTC()
+			c.History = &entry
 		case removed != nil && *removed:
 			c.Kind = ItemRemoved
 		default:
 			c.Kind = ItemChanged
-			it.ID, it.ListID, it.Name = c.ID, c.ListID, deref(name)
+			it.ID, it.ListID, it.Name = c.ID, c.ListID, deref(itemName)
 			it.AddedBy, it.AddedAt, it.UpdatedAt = deref(addedBy), deref(addedAt).UTC(), deref(updatedAt).UTC()
 			if it.CheckedAt != nil {
 				at := it.CheckedAt.UTC()

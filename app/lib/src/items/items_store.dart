@@ -1,6 +1,6 @@
 import 'package:uuid/uuid.dart';
 
-import '../api/generated/cesta_api.dart';
+import '../api/generated/cesta_api.dart' hide HistoryEntry;
 import '../db/app_database.dart';
 import '../sync/outbox.dart';
 
@@ -109,6 +109,23 @@ final class ShownItem {
   }
 }
 
+/// An entry of a List's Item history: an Item that was bought (checked, then
+/// cleared with Clear checked), as it was when cleared.
+final class HistoryEntry {
+  const HistoryEntry({required this.itemId, required this.details, required this.clearedAt, required this.clearedBy});
+
+  /// The cleared Item's ID.
+  final String itemId;
+  final ItemDetails details;
+  final DateTime clearedAt;
+  final Actor clearedBy;
+
+  String get name => details.name;
+  String? get quantity => details.quantity;
+  ItemUnit? get unit => details.unit;
+  String? get note => details.note;
+}
+
 /// The two generated unit types the API's schemas give the same values.
 ItemUnit? _unit(ItemFieldsUnit? u) => u == null ? null : ItemUnit.fromJson(u.toJson());
 ItemFieldsUnit? _fieldsUnit(ItemUnit? u) => u == null ? null : ItemFieldsUnit.fromJson(u.toJson());
@@ -134,6 +151,48 @@ class ItemsStore {
   Future<List<ShownItem>> readList(String listId) => _db.transaction(() async {
     final synced = await (_db.select(_db.syncedItems)..where((t) => t.listId.equals(listId))).get();
     return showItems(synced, await _outbox.forList(listId));
+  });
+
+  /// The Item history of List [listId], most recent first: what the server
+  /// reported, with the Items this device cleared and the server hasn't
+  /// confirmed yet on top, so it is searchable offline. Emits again
+  /// whenever it changes.
+  Stream<List<HistoryEntry>> watchHistory(String listId) => _db
+      .customSelect('SELECT 1', readsFrom: {_db.syncedHistory, _db.syncedItems, _db.outbox})
+      .watch()
+      .asyncMap((_) => readHistory(listId));
+
+  /// The Item history of List [listId], most recent first (see [watchHistory]).
+  Future<List<HistoryEntry>> readHistory(String listId) => _db.transaction(() async {
+    final rows = await (_db.select(_db.syncedHistory)..where((t) => t.listId.equals(listId))).get();
+    final history = <String, HistoryEntry>{for (final r in rows) r.itemId: _fromHistoryRow(r)};
+    final pending = await _outbox.forList(listId);
+    final clears = pending.where((m) => m.type == MutationType.itemClear && !history.containsKey(m.itemId)).toList();
+    if (clears.isNotEmpty) {
+      // Each Item as shown just before it was cleared.
+      final synced = await (_db.select(_db.syncedItems)..where((t) => t.listId.equals(listId))).get();
+      final beforeClears = {
+        for (final i in showItems(synced, [
+          for (final m in pending)
+            if (m.type != MutationType.itemClear) m,
+        ]))
+          i.id: i,
+      };
+      for (final m in clears) {
+        final item = beforeClears[m.itemId];
+        if (item == null) continue;
+        history[m.itemId] = HistoryEntry(
+          itemId: m.itemId,
+          details: item.details,
+          clearedAt: DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true),
+          clearedBy: (id: m.byId, displayName: m.byName),
+        );
+      }
+    }
+    return history.values.toList()..sort((a, b) {
+      final byTime = b.clearedAt.compareTo(a.clearedAt);
+      return byTime != 0 ? byTime : a.itemId.compareTo(b.itemId);
+    });
   });
 
   /// How many Items of List [listId] are to buy, as shown.
@@ -170,9 +229,35 @@ class ItemsStore {
   /// Removes Item [itemId] from List [listId]. An Item added on this device
   /// that hasn't reached the server yet just goes, with its changes, so
   /// nothing is left waiting to sync.
-  Future<void> remove({required String itemId, required String listId, required Actor by}) async {
+  ///
+  /// With [undoableUntil] (the Undo window), the removal waits to be pushed
+  /// until it completes, so [restore] meanwhile just drops it.
+  Future<void> remove({
+    required String itemId,
+    required String listId,
+    required Actor by,
+    Future<void>? undoableUntil,
+  }) async {
     if (await _outbox.dropPendingCreate(itemId)) return;
+    if (undoableUntil != null) {
+      return _outbox.enqueueHeldRemoval(itemId: itemId, listId: listId, by: by, until: undoableUntil);
+    }
     await _outbox.enqueue(MutationType.itemDelete, itemId: itemId, listId: listId, by: by, fields: const ItemFields());
+  }
+
+  /// Clears the Checked Items of List [listId] as shown (Clear checked):
+  /// each goes into the List's Item history once the server confirms it.
+  Future<void> clearChecked({required String listId, required Actor by}) async {
+    for (final item in await readList(listId)) {
+      if (!item.checked) continue;
+      await _outbox.enqueue(
+        MutationType.itemClear,
+        itemId: item.id,
+        listId: listId,
+        by: by,
+        fields: const ItemFields(),
+      );
+    }
   }
 
   /// Undoes the removal of [item]: drops the removal while it is still
@@ -193,6 +278,13 @@ class ItemsStore {
   }
 }
 
+/// What a change does to its Item.
+extension ItemChange on MutationType {
+  /// A remove or a clear: the Item leaves the List, and the change carries
+  /// nothing but the Item.
+  bool get removesItem => this == MutationType.itemDelete || this == MutationType.itemClear;
+}
+
 /// [synced] Items with the [pending] outbox changes (oldest first) applied on top.
 List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
   final items = <String, ShownItem>{for (final r in synced) r.id: _fromRow(r)};
@@ -200,27 +292,26 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
     final fields = m.fields;
     final at = DateTime.fromMicrosecondsSinceEpoch(m.clientTimestampMicros, isUtc: true);
     final by = (id: m.byId, displayName: m.byName);
-    switch (m.type) {
-      case MutationType.itemCreate:
-        items.putIfAbsent(
-          m.itemId,
-          () => ShownItem(
-            id: m.itemId,
-            listId: m.listId,
-            details: ItemDetails(
-              name: fields.name ?? '',
-              quantity: fields.quantity?.value,
-              unit: _unit(fields.unit?.value),
-              note: fields.note?.value,
-            ),
-            addedAt: at,
-            addedBy: by,
+    if (m.type.removesItem) {
+      items.remove(m.itemId);
+    } else if (m.type == MutationType.itemCreate) {
+      items.putIfAbsent(
+        m.itemId,
+        () => ShownItem(
+          id: m.itemId,
+          listId: m.listId,
+          details: ItemDetails(
+            name: fields.name ?? '',
+            quantity: fields.quantity?.value,
+            unit: _unit(fields.unit?.value),
+            note: fields.note?.value,
           ),
-        );
-      case MutationType.itemUpdate:
-        if (items[m.itemId] case final item?) items[m.itemId] = item._updated(fields, at: at, by: by);
-      case MutationType.itemDelete:
-        items.remove(m.itemId);
+          addedAt: at,
+          addedBy: by,
+        ),
+      );
+    } else if (items[m.itemId] case final item?) {
+      items[m.itemId] = item._updated(fields, at: at, by: by);
     }
   }
   return items.values.toList()..sort((a, b) {
@@ -228,6 +319,18 @@ List<ShownItem> showItems(List<SyncedItem> synced, List<OutboxData> pending) {
     return byTime != 0 ? byTime : a.id.compareTo(b.id);
   });
 }
+
+HistoryEntry _fromHistoryRow(SyncedHistoryData r) => HistoryEntry(
+  itemId: r.itemId,
+  details: ItemDetails(
+    name: r.name,
+    quantity: r.quantity,
+    unit: r.unit == null ? null : ItemUnit.fromJson(r.unit),
+    note: r.note,
+  ),
+  clearedAt: DateTime.fromMicrosecondsSinceEpoch(r.clearedAtMicros, isUtc: true),
+  clearedBy: (id: r.clearedById, displayName: r.clearedByName),
+);
 
 ShownItem _fromRow(SyncedItem r) => ShownItem(
   id: r.id,

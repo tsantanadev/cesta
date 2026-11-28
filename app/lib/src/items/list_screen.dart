@@ -10,10 +10,10 @@ import '../routes.dart';
 import '../session/session_controller.dart';
 import '../sync/sync_engine.dart';
 import '../ui/components.dart';
-import 'item_form.dart';
 import 'item_limit_sheet.dart';
 import 'item_text.dart';
 import 'items_store.dart';
+import 'opened_item.dart';
 
 /// A List's screen (Figma "04 List" 4:148): its Items to buy as tags, then
 /// the Checked Items In the basket, and the bar that adds Items.
@@ -72,60 +72,22 @@ class _ListScreenState extends State<ListScreen> {
 
   ListSummary? get _list => widget.lists.lists.where((l) => l.id == widget.listId).firstOrNull;
 
-  Actor? get _me => switch (widget.session.user) {
-    final user? => (id: user.id, displayName: user.displayName),
-    null => null,
-  };
+  void _setChecked(ShownItem item, bool checked) =>
+      widget.session.asMe((me) => unawaited(widget.items.setChecked(item, checked: checked, by: me)));
 
-  void _setChecked(ShownItem item, bool checked) {
-    final me = _me;
-    if (me == null) return;
-    unawaited(widget.items.setChecked(item, checked: checked, by: me));
-  }
+  /// Clears every Checked Item into the List's Item history.
+  void _clearChecked() =>
+      widget.session.asMe((me) => unawaited(widget.items.clearChecked(listId: widget.listId, by: me)));
 
   /// Opens [item] to edit or remove it (Figma "12 Opened item" 38:2519).
-  void _openItem(ShownItem item) {
-    final me = _me;
-    if (me == null) return;
-    final l10n = AppLocalizations.of(context);
-    unawaited(
-      showCesItemSheet(
-        context,
-        title: l10n.itemEditTitle,
-        closeTooltip: l10n.sheetClose,
-        child: ItemForm(
-          submitLabel: l10n.itemSave,
-          initial: item.details,
-          details: [
-            item.addedBy.id == me.id ? l10n.itemAddedByYou : l10n.itemAddedBy(item.addedBy.displayName),
-            if (item.checkedBy case final checkedBy?)
-              checkedBy.id == me.id ? l10n.itemCheckedByYou : l10n.itemCheckedBy(checkedBy.displayName),
-          ],
-          onSubmit: (draft) => unawaited(widget.items.update(item, by: me, details: draft)),
-          onRemove: () => unawaited(_remove(item, me)),
-        ),
-      ),
-    );
-  }
-
-  /// Removes [item], with Undo (Figma "12b Item removed" 38:2667).
-  Future<void> _remove(ShownItem item, Actor me) async {
-    await widget.items.remove(itemId: item.id, listId: item.listId, by: me);
-    if (!mounted) return;
-    final l10n = AppLocalizations.of(context);
-    showCesToast(
-      context,
-      message: l10n.itemRemoved(item.name),
-      actionLabel: l10n.itemUndo,
-      onAction: () => unawaited(widget.items.restore(item, by: me)),
-    );
-  }
+  void _openItem(ShownItem item) =>
+      widget.session.asMe((me) => showOpenedItem(context, items: widget.items, item: item, me: me));
 
   /// Opens Add items, unless the List is already full (Figma "14 Item limit").
   void _addItems() {
     final limit = widget.sync.itemLimit.value;
     if (_shown.length >= limit) {
-      unawaited(showItemLimitSheet(context, limit: limit));
+      unawaited(showItemLimitSheet(context, limit: limit, items: _shown, onClearChecked: _clearChecked));
       return;
     }
     unawaited(context.push(Routes.addItems(widget.listId)));
@@ -219,9 +181,15 @@ class _ListScreenState extends State<ListScreen> {
                           padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
                           sliver: SliverList.list(
                             children: [
+                              // The heading, with Clear checked (Figma 4:245) on its right.
                               Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: CesSectionHeading(l10n.listInTheBasket),
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Row(
+                                  children: [
+                                    Expanded(child: CesSectionHeading(l10n.listInTheBasket)),
+                                    CesBarAction(label: l10n.listClearChecked, onPressed: _clearChecked),
+                                  ],
+                                ),
                               ),
                               for (final item in inBasket)
                                 Padding(

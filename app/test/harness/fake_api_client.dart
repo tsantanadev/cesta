@@ -368,6 +368,10 @@ class FakeApiClient implements ApiClient {
   /// User was removed from the List meanwhile.
   ApiErrorCode? rejectMutations;
 
+  /// When set, only mutations of these types are rejected by
+  /// [rejectMutations]; the others are applied as usual.
+  Set<MutationType>? rejectOnly;
+
   /// Every Item the fake backend knows, removed or not, in creation order.
   final _items = <String, _FakeItem>{};
   final _mutationResults = <String, MutationResult>{};
@@ -409,10 +413,58 @@ class FakeApiClient implements ApiClient {
     ..checkedAt = DateTime.now().toUtc()
     ..seq = ++_changeSeq;
 
+  /// [by] puts the Item named [name] back to buy behind the app's back.
+  void uncheckItemNow(String name, {required FakeIdentity by}) => _liveItems.firstWhere((i) => i.name == name)
+    ..checkedByUid = null
+    ..checkedAt = null
+    ..seq = ++_changeSeq;
+
   /// Someone removes the Item named [name] behind the app's back.
   void removeItemNow(String name) => _liveItems.firstWhere((i) => i.name == name)
     ..deleted = true
     ..seq = ++_changeSeq;
+
+  /// [by] clears the Checked Items of List [listId] behind the app's back,
+  /// e.g. on another phone.
+  void clearCheckedNow(String listId, {required FakeIdentity by}) {
+    for (final i in _liveItems.where((i) => i.listId == listId && i.checkedAt != null).toList()) {
+      _clear(i, by: by.uid);
+    }
+  }
+
+  /// Tombstones [item] and records it in its List's Item history, each with
+  /// its own change number, as the server does.
+  void _clear(_FakeItem item, {required String by}) {
+    item
+      ..deleted = true
+      ..cleared = true
+      ..seq = ++_changeSeq;
+    _history.add(
+      _FakeHistoryEntry(
+        HistoryEntry(
+          itemId: item.id,
+          listId: item.listId,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit == null ? null : HistoryEntryUnit.fromJson(item.unit),
+          note: item.note,
+          clearedAt: _clearedAt(),
+          clearedBy: UserRef(id: _userIdOf(by), displayName: _displayNameOf(by)),
+        ),
+        seq: ++_changeSeq,
+      ),
+    );
+  }
+
+  /// The Item history of every List, in the order the Items were cleared.
+  final _history = <_FakeHistoryEntry>[];
+
+  /// Now, but after every clear before it, so history order is clear-cut.
+  DateTime _clearedAt() {
+    final now = DateTime.now().toUtc();
+    final last = _history.lastOrNull?.entry.clearedAt;
+    return last == null || now.isAfter(last) ? now : last.add(const Duration(microseconds: 1));
+  }
 
   Iterable<_FakeItem> get _liveItems => _items.values.where((i) => !i.deleted);
 
@@ -494,7 +546,7 @@ class FakeApiClient implements ApiClient {
       reason: _error(code, limit: limit),
     );
     final applied = MutationResult(mutationId: m.id, status: MutationResultStatus.applied);
-    if (rejectMutations case final code?) return rejected(code);
+    if (rejectMutations case final code? when rejectOnly?.contains(m.type) ?? true) return rejected(code);
     final fields = m.fields ?? const ItemFields();
     switch (m.type) {
       case MutationType.itemCreate:
@@ -539,6 +591,14 @@ class FakeApiClient implements ApiClient {
         }
         item.seq = ++_changeSeq;
         return applied;
+      case MutationType.itemClear:
+        final item = _items[m.entityId];
+        if (item == null || _visible(item.listId, identity.uid) == null) return rejected(ApiErrorCode.itemNotFound);
+        if (item.cleared) return applied; // cleared already, e.g. on another phone: nothing more to record
+        if (item.deleted) return rejected(ApiErrorCode.itemDeleted);
+        if (item.checkedAt == null) return rejected(ApiErrorCode.itemNotChecked);
+        _clear(item, by: identity.uid);
+        return applied;
     }
   }
 
@@ -554,11 +614,20 @@ class FakeApiClient implements ApiClient {
     final identity = auth.current;
     if (identity == null) return const PullChanges401(_unauthenticated);
     final since = cursor == null ? 0 : int.parse(cursor);
-    final changed = _items.values.where((i) {
-      final list = _lists[i.listId];
-      return i.seq > since && list != null && list.deletedAt == null && list.members.contains(identity.uid);
-    }).toList()..sort((a, b) => a.seq.compareTo(b.seq));
+    bool visible(String listId) {
+      final list = _lists[listId];
+      return list != null && list.deletedAt == null && list.members.contains(identity.uid);
+    }
+
+    // Items and history entries share one stream of change numbers.
+    final changed = <({int seq, _FakeItem? item, HistoryEntry? entry})>[
+      for (final i in _items.values)
+        if (i.seq > since && visible(i.listId)) (seq: i.seq, item: i, entry: null),
+      for (final h in _history)
+        if (h.seq > since && visible(h.entry.listId)) (seq: h.seq, item: null, entry: h.entry),
+    ]..sort((a, b) => a.seq.compareTo(b.seq));
     final page = changed.take(limit ?? 500).toList();
+    final items = [for (final c in page) ?c.item];
     // Lists deleted since, sent with the last page.
     final deleted = page.length < changed.length
         ? const <_FakeList>[]
@@ -568,9 +637,11 @@ class FakeApiClient implements ApiClient {
     final last = [if (page.isNotEmpty) page.last.seq, for (final l in deleted) l.deletedSeq!, since].reduce(math.max);
     final answer = PullChanges200(
       _pullResponse(
-        items: [for (final i in page.where((i) => !i.deleted)) _toItem(i)],
+        items: [for (final i in items.where((i) => !i.deleted)) _toItem(i)],
+        history: [for (final c in page) ?c.entry],
         tombstones: [
-          for (final i in page.where((i) => i.deleted)) Tombstone(type: TombstoneType.item, id: i.id, listId: i.listId),
+          for (final i in items.where((i) => i.deleted))
+            Tombstone(type: TombstoneType.item, id: i.id, listId: i.listId),
           for (final l in deleted) Tombstone(type: TombstoneType.list, id: l.id),
         ],
         cursor: '$last',
@@ -589,11 +660,14 @@ class FakeApiClient implements ApiClient {
   /// A pull response as the app's client decodes it from the wire.
   static PullResponse _pullResponse({
     required List<Item> items,
+    required List<HistoryEntry> history,
     required List<Tombstone> tombstones,
     required String cursor,
     required bool hasMore,
   }) => PullResponse.fromJson(
-    _wire(PullResponse(items: items, tombstones: tombstones, cursor: cursor, hasMore: hasMore).toJson()),
+    _wire(
+      PullResponse(items: items, history: history, tombstones: tombstones, cursor: cursor, hasMore: hasMore).toJson(),
+    ),
   );
 
   void _failIfOffline(String path) {
@@ -662,8 +736,21 @@ class _FakeItem {
   DateTime? checkedAt;
   bool deleted = false;
 
+  /// Removed by Clear checked, so it is in its List's Item history.
+  bool cleared = false;
+
   /// The server's change sequence when this Item last changed: the pull cursor.
   int seq;
+}
+
+/// An Item history entry as the fake backend stores it.
+class _FakeHistoryEntry {
+  _FakeHistoryEntry(this.entry, {required this.seq});
+
+  final HistoryEntry entry;
+
+  /// The server's change sequence when it was recorded: the pull cursor.
+  final int seq;
 }
 
 /// The OS's connectivity report, following [FakeApiClient.offline].

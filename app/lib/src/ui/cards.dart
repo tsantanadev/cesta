@@ -209,7 +209,8 @@ class CesItemTile extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.semanticHint,
-  }) : _blank = false;
+    this.toAdd = false,
+  });
 
   /// An empty white tag (Figma "Item tile" State=Suggestion 3:39, as the empty
   /// List shows it): Branco with a Checked outline and hole.
@@ -220,9 +221,12 @@ class CesItemTile extends StatelessWidget {
       onTap = null,
       onLongPress = null,
       semanticHint = null,
-      _blank = true;
+      toAdd = true;
 
-  final bool _blank;
+  /// A white tag with an outline (Figma "Item tile" State=Suggestion 3:39):
+  /// something to add, such as an entry under Bought before, rather than
+  /// an Item on the List.
+  final bool toAdd;
 
   final String name;
   final IconData? icon;
@@ -249,7 +253,8 @@ class CesItemTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final ink = palette.onToBuy;
+    final scheme = Theme.of(context).colorScheme;
+    final ink = toAdd ? scheme.onSurface : palette.onToBuy;
     final icon = this.icon;
     final quantity = this.quantity;
     final nameText = Text(
@@ -305,11 +310,10 @@ class CesItemTile extends StatelessWidget {
           );
     final radius = BorderRadius.circular(CestaRadii.sign);
     final interactive = onTap != null || onLongPress != null;
-    final scheme = Theme.of(context).colorScheme;
     final outline = BorderSide(color: palette.bought, width: 1.5);
     Widget tile = Material(
-      color: _blank ? scheme.surfaceContainerLow : palette.toBuy,
-      shape: RoundedRectangleBorder(borderRadius: radius, side: _blank ? outline : BorderSide.none),
+      color: toAdd ? scheme.surfaceContainerLow : palette.toBuy,
+      shape: RoundedRectangleBorder(borderRadius: radius, side: toAdd ? outline : BorderSide.none),
       child: InkWell(
         borderRadius: radius,
         onTap: onTap,
@@ -346,7 +350,7 @@ class CesItemTile extends StatelessWidget {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: _blank
+                  decoration: toAdd
                       ? BoxDecoration(border: Border.fromBorderSide(outline), shape: BoxShape.circle)
                       : BoxDecoration(color: scheme.surface, shape: BoxShape.circle),
                 ),

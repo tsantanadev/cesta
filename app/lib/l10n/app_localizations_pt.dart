@@ -346,6 +346,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get listInTheBasket => 'Na cesta';
 
   @override
+  String get listClearChecked => 'Limpar marcados';
+
+  @override
   String get listAddAnItem => 'Adicionar um item';
 
   @override
@@ -356,6 +359,18 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get itemUncheck => 'Desmarcar';
+
+  @override
+  String get itemOpen => 'Abrir';
+
+  @override
+  String get addItemsMatches => 'Correspondências';
+
+  @override
+  String get addItemsBoughtBefore => 'Comprados antes';
+
+  @override
+  String get itemAddAgain => 'Adicionar';
 
   @override
   String get addItemsSearch => 'Buscar itens';
@@ -493,6 +508,11 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String itemRejectedNotChecked(String name) {
+    return 'Não foi possível limpar “$name”. Ele não está mais marcado.';
+  }
+
+  @override
   String itemRejected(String name) {
     return 'Não foi possível salvar “$name”.';
   }
@@ -503,5 +523,10 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String itemLimitBody(int max) {
     return 'Uma lista pode ter até $max itens. Remova os que você não precisa mais para abrir espaço.';
+  }
+
+  @override
+  String itemLimitBodyClearChecked(int max) {
+    return 'Uma lista pode ter até $max itens. Limpe os itens marcados ou remova os que você não precisa mais para abrir espaço.';
   }
 }

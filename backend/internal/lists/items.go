@@ -42,6 +42,8 @@ var (
 	ErrItemDeleted error = listError("item deleted")
 	// ErrItemIDTaken is returned when creating an Item with the id of an Item on another List.
 	ErrItemIDTaken error = listError("item id taken")
+	// ErrItemNotChecked is returned for clearing an Item that is not checked.
+	ErrItemNotChecked error = listError("item not checked")
 )
 
 // InvalidItemError is returned for Item fields that are not acceptable.
@@ -189,6 +191,57 @@ func (s *Service) RemoveItem(ctx context.Context, tx pgx.Tx, userID, id uuid.UUI
 	}
 	_, err = tx.Exec(ctx, "UPDATE items SET deleted_at = $2, updated_at = $2, seq = $3 WHERE id = $1", id, now, seq)
 	return wrap("remove item", err)
+}
+
+// ClearItem clears Checked Item id from its List on behalf of userID, inside
+// tx, at now (Clear checked): the Item is removed, keeping a tombstone, and
+// recorded in the List's Item history as it was. Clearing it again changes
+// nothing.
+//
+// It returns ErrItemNotFound, ErrDeleted for an Item of a deleted List,
+// ErrItemNotChecked, or ErrItemDeleted for an Item removed without being cleared.
+func (s *Service) ClearItem(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID, now time.Time) error {
+	deletedAt, err := s.lockItem(ctx, tx, userID, id)
+	if err != nil {
+		return err
+	}
+	if deletedAt != nil {
+		var cleared bool
+		if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM item_history WHERE item_id = $1)", id).
+			Scan(&cleared); err != nil {
+			return wrap("clear item", err)
+		}
+		if cleared {
+			return nil
+		}
+		return ErrItemDeleted
+	}
+	var checked bool
+	if err := tx.QueryRow(ctx, "SELECT checked_at IS NOT NULL FROM items WHERE id = $1", id).
+		Scan(&checked); err != nil {
+		return wrap("clear item", err)
+	}
+	if !checked {
+		return ErrItemNotChecked
+	}
+	// Two numbers: the tombstone and the history entry share the Item's id,
+	// and a pull cursor tells changes apart by number, then id.
+	removedSeq, err := changeseq.Next(ctx, tx)
+	if err != nil {
+		return err
+	}
+	historySeq, err := changeseq.Next(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO item_history (item_id, list_id, name, quantity, unit, note, cleared_by, cleared_at, seq)
+		SELECT id, list_id, name, quantity, unit, note, $2, $3, $4 FROM items WHERE id = $1`,
+		id, userID, now, historySeq); err != nil {
+		return wrap("clear item", err)
+	}
+	_, err = tx.Exec(ctx, "UPDATE items SET deleted_at = $2, updated_at = $2, seq = $3 WHERE id = $1", id, now, removedSeq)
+	return wrap("clear item", err)
 }
 
 // lockItem locks Item id's List (see lockForItems), then the Item, and

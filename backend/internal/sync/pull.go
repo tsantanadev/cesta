@@ -49,6 +49,19 @@ type Item struct {
 	UpdatedAt time.Time
 }
 
+// HistoryEntry is an Item that was bought on a List: checked, then cleared.
+// ItemID is the cleared Item's.
+type HistoryEntry struct {
+	ItemID    uuid.UUID
+	ListID    uuid.UUID
+	Name      string
+	Quantity  *string
+	Unit      *string
+	Note      *string
+	ClearedAt time.Time
+	ClearedBy UserRef
+}
+
 // TombstoneType says what a Tombstone removes.
 type TombstoneType string
 
@@ -72,6 +85,7 @@ type Tombstone struct {
 // Changes are what changed since a cursor.
 type Changes struct {
 	Items      []Item
+	History    []HistoryEntry
 	Tombstones []Tombstone
 	// Cursor is where the next pull continues.
 	Cursor string
@@ -153,7 +167,7 @@ func (s *Service) pull(ctx context.Context, tx pgx.Tx, userID uuid.UUID, from po
 	if err != nil {
 		return Changes{}, err
 	}
-	out := Changes{Items: []Item{}, Tombstones: []Tombstone{}}
+	out := Changes{Items: []Item{}, History: []HistoryEntry{}, Tombstones: []Tombstone{}}
 	if len(changes) > limit {
 		changes, out.HasMore = changes[:limit], true
 	}
@@ -170,6 +184,13 @@ func (s *Service) pull(ctx context.Context, tx pgx.Tx, userID uuid.UUID, from po
 			out.Tombstones = append(out.Tombstones, Tombstone{Type: TombstoneList, ID: c.ID})
 		case lists.ItemRemoved:
 			out.Tombstones = append(out.Tombstones, Tombstone{Type: TombstoneItem, ID: c.ID, ListID: c.ListID})
+		case lists.HistoryRecorded:
+			h := c.History
+			out.History = append(out.History, HistoryEntry{
+				ItemID: h.ItemID, ListID: h.ListID, Name: h.Name,
+				Quantity: h.Quantity, Unit: h.Unit, Note: h.Note,
+				ClearedAt: h.ClearedAt, ClearedBy: ref(h.ClearedBy),
+			})
 		case lists.ItemChanged:
 			it := c.Item
 			item := Item{
@@ -189,7 +210,8 @@ func (s *Service) pull(ctx context.Context, tx pgx.Tx, userID uuid.UUID, from po
 	return out, nil
 }
 
-// mentioned returns the Users who added or checked the Items in changes.
+// mentioned returns the Users who added or checked the Items in changes, or
+// cleared their history entries.
 func mentioned(changes []lists.Change) []uuid.UUID {
 	seen := map[uuid.UUID]bool{}
 	var ids []uuid.UUID
@@ -200,6 +222,9 @@ func mentioned(changes []lists.Change) []uuid.UUID {
 		}
 	}
 	for _, c := range changes {
+		if c.History != nil {
+			add(c.History.ClearedBy)
+		}
 		if c.Item == nil {
 			continue
 		}

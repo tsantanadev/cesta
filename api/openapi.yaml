@@ -234,7 +234,10 @@ paths:
         A delete wins over concurrent edits: editing a removed Item is rejected with
         item_deleted and does not bring it back. A List holds at most the configured
         limit of Items (default 500); the create past it is rejected with limit_exceeded.
-        One mutation's rejection never fails the batch.
+        item_clear (Clear checked, one per Checked Item) removes the Item from its List
+        and records it in the List's Item history; an Item that is not checked is
+        rejected with item_not_checked, and clearing an Item already cleared is applied
+        and records nothing more. One mutation's rejection never fails the batch.
       requestBody:
         required: true
         content:
@@ -259,10 +262,11 @@ paths:
       operationId: pullChanges
       summary: Changes since a cursor, for Lists the signed-in User is a Member of
       description: >-
-        Returns the current state of every Item changed since the cursor, plus
-        tombstones for Items removed and for Lists the User can no longer see (deleted,
-        or the User stopped being a Member). Omit cursor for a full snapshot. Keep
-        pulling with the returned cursor while hasMore is true.
+        Returns the current state of every Item changed since the cursor, the Item
+        history entries recorded since it (a List that becomes visible brings its whole
+        Item history), plus tombstones for Items removed and for Lists the User can no
+        longer see (deleted, or the User stopped being a Member). Omit cursor for a full
+        snapshot. Keep pulling with the returned cursor while hasMore is true.
       parameters:
         - name: cursor
           in: query
@@ -372,6 +376,7 @@ components:
             - invalid_item
             - item_not_found
             - item_deleted
+            - item_not_checked
             - internal
         message:
           type: string
@@ -542,7 +547,7 @@ components:
           description: Client mutation ID; retrying the same ID is safe.
         type:
           type: string
-          enum: [item_create, item_update, item_delete]
+          enum: [item_create, item_update, item_delete, item_clear]
         entityId:
           type: string
           format: uuid
@@ -634,6 +639,39 @@ components:
         updatedAt:
           type: string
           format: date-time
+    HistoryEntry:
+      type: object
+      description: >-
+        An Item that was bought: checked, then cleared from its List (Clear checked).
+        One per cleared Item, identified by the Item's ID; entries never change.
+      required: [itemId, listId, name, quantity, unit, note, clearedAt, clearedBy]
+      properties:
+        itemId:
+          type: string
+          format: uuid
+          description: The cleared Item's ID.
+        listId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        quantity:
+          type: string
+          pattern: '^[0-9]{1,6}(\.[0-9]{1,3})?$'
+          nullable: true
+        unit:
+          type: string
+          # OpenAPI 3.0.3: a nullable enum must list null for null to be valid.
+          enum: [un, kg, g, L, ml, pack, null]
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        clearedAt:
+          type: string
+          format: date-time
+        clearedBy:
+          $ref: "#/components/schemas/UserRef"
     Tombstone:
       type: object
       required: [type, id]
@@ -651,12 +689,17 @@ components:
           description: Present when type is item.
     PullResponse:
       type: object
-      required: [items, tombstones, cursor, hasMore]
+      required: [items, history, tombstones, cursor, hasMore]
       properties:
         items:
           type: array
           items:
             $ref: "#/components/schemas/Item"
+        history:
+          type: array
+          description: Item history entries recorded since the cursor.
+          items:
+            $ref: "#/components/schemas/HistoryEntry"
         tombstones:
           type: array
           items:

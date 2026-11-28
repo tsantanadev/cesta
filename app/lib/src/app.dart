@@ -67,7 +67,9 @@ class _CestaAppState extends State<CestaApp> {
     _outbox = ChangeOutbox(widget.database);
     _items = ItemsStore(widget.database, _outbox);
     _sync = SyncEngine(api: widget.api, db: widget.database, items: _items, outbox: _outbox, network: widget.network);
-    _session.addListener(_followSession);
+    _session
+      ..beforeSignOut = _beforeSignOut
+      ..addListener(_followSession);
     _rejections = _sync.rejections.listen(_tellRejected);
     _listsChanged = _sync.listsChanged.listen((c) => _lists.changed(gone: c.gone, toBuy: c.toBuy));
     _router = buildRouter(
@@ -82,25 +84,58 @@ class _CestaAppState extends State<CestaApp> {
     );
   }
 
-  /// Syncs while a User is signed in.
+  /// Syncs while a User is signed in; signing out takes away any Toast.
   void _followSession() {
     if (_session.status == SessionStatus.signedIn && _session.user != null) {
       _sync.start();
     } else {
       unawaited(_sync.stop());
+      // An Undo belongs to the session that made the change.
+      _messenger.currentState?.removeCurrentSnackBar();
     }
   }
+
+  /// Takes away the Undo and pushes what's left to sync, so a removal held
+  /// for Undo isn't lost with the session's data.
+  Future<void> _beforeSignOut() async {
+    _messenger.currentState?.removeCurrentSnackBar();
+    await _sync.flush();
+  }
+
+  /// The context of the router's navigator, once it is built.
+  BuildContext? get _routerContext => _router.routerDelegate.navigatorKey.currentContext;
+
+  /// Clears the Checked Items of List [listId] as the signed-in User.
+  void _clearChecked(String listId) => _session.asMe((me) => unawaited(_items.clearChecked(listId: listId, by: me)));
 
   /// Says that a change was rolled back (Figma "13b Change not saved"
   /// 38:2815). A create refused because the List is full opens the Item limit
   /// sheet instead (Figma "14 Item limit").
   void _tellRejected(RejectedChange change) {
-    if (change.reason == ApiErrorCode.limitExceeded) {
-      if (_router.routerDelegate.navigatorKey.currentContext case final context?) {
-        unawaited(showItemLimitSheet(context, limit: change.limit ?? _sync.itemLimit.value));
-        return;
-      }
+    if (change.reason == ApiErrorCode.limitExceeded && _routerContext != null) {
+      unawaited(_showItemLimit(change));
+      return;
     }
+    _toastRejected(change);
+  }
+
+  /// Opens the Item limit sheet for the List [change] was refused on,
+  /// offering Clear checked when it has Checked Items.
+  Future<void> _showItemLimit(RejectedChange change) async {
+    final items = await _items.readList(change.listId);
+    if (_routerContext case final context? when context.mounted) {
+      await showItemLimitSheet(
+        context,
+        limit: change.limit ?? _sync.itemLimit.value,
+        items: items,
+        onClearChecked: () => _clearChecked(change.listId),
+      );
+    } else {
+      _toastRejected(change);
+    }
+  }
+
+  void _toastRejected(RejectedChange change) {
     final messenger = _messenger.currentState;
     if (messenger == null) return;
     final l10n = AppLocalizations.of(messenger.context);
@@ -110,6 +145,7 @@ class _CestaAppState extends State<CestaApp> {
       message: switch (change.reason) {
         ApiErrorCode.itemDeleted || ApiErrorCode.itemNotFound => l10n.itemRejectedRemoved(name),
         ApiErrorCode.listDeleted || ApiErrorCode.listNotFound => l10n.itemRejectedListGone(name),
+        ApiErrorCode.itemNotChecked => l10n.itemRejectedNotChecked(name),
         _ => l10n.itemRejected(name),
       },
     );
