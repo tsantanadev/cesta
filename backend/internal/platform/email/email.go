@@ -1,4 +1,7 @@
-// Package email defines how the backend sends transactional email.
+// Package email defines how the backend sends transactional email: the
+// Sender interface (the EmailSender of package notify), its Resend
+// implementation, and a logging one for local dev. Tests use the fake in
+// package testkit/fakes.
 package email
 
 import "context"

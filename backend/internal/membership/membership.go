@@ -146,3 +146,32 @@ func (s *Service) Count(ctx context.Context, listID uuid.UUID) (int, error) {
 	}
 	return n, nil
 }
+
+// DefaultMaxPerList is how many Members a List can have, including the Owner.
+const DefaultMaxPerList = 20
+
+// ErrListFull is returned by Join when the List already has the most Members allowed.
+var ErrListFull = errors.New("list is full")
+
+// Join makes userID an Editor of listID, as of at, inside the caller's
+// transaction tx, unless they are already a Member (then joined is false and
+// nothing changes). It returns ErrListFull if the List already has maxMembers
+// Members. The caller holds a lock on the List, so two joins can't both take
+// the last place.
+func (s *Service) Join(ctx context.Context, tx pgx.Tx, listID, userID uuid.UUID, at time.Time, maxMembers int) (joined bool, err error) {
+	_, err = roleOf(ctx, tx, listID, userID)
+	switch {
+	case err == nil:
+		return false, nil
+	case !errors.Is(err, ErrNotAMember):
+		return false, err
+	}
+	var n int
+	if err := tx.QueryRow(ctx, "SELECT count(*) FROM list_members WHERE list_id = $1", listID).Scan(&n); err != nil {
+		return false, fmt.Errorf("membership: join: %w", err)
+	}
+	if n >= maxMembers {
+		return false, ErrListFull
+	}
+	return true, s.Grant(ctx, tx, listID, userID, Editor, at)
+}

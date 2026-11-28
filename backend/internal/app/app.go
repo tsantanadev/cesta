@@ -17,10 +17,13 @@ import (
 	"github.com/tsantanadev/cesta/backend/internal/identity"
 	"github.com/tsantanadev/cesta/backend/internal/lists"
 	"github.com/tsantanadev/cesta/backend/internal/membership"
+	"github.com/tsantanadev/cesta/backend/internal/notify"
 	"github.com/tsantanadev/cesta/backend/internal/platform/auth"
 	"github.com/tsantanadev/cesta/backend/internal/platform/clock"
+	"github.com/tsantanadev/cesta/backend/internal/platform/email"
 	"github.com/tsantanadev/cesta/backend/internal/platform/hosting"
 	"github.com/tsantanadev/cesta/backend/internal/platform/ratelimit"
+	"github.com/tsantanadev/cesta/backend/internal/sharing"
 	cestasync "github.com/tsantanadev/cesta/backend/internal/sync"
 )
 
@@ -29,6 +32,8 @@ type Deps struct {
 	DB            *pgxpool.Pool
 	Logger        *slog.Logger
 	TokenVerifier auth.TokenVerifier
+	// EmailSender delivers Invitation emails (Resend in production).
+	EmailSender email.Sender
 	// Clock defaults to the system clock.
 	Clock clock.Clock
 	// RateLimits default to DefaultRateLimits.
@@ -95,6 +100,7 @@ func New(d Deps) http.Handler {
 		Logger:           d.Logger,
 		Identity:         users,
 		Lists:            ls,
+		Sharing:          sharing.NewService(d.DB, c, ls, members, users, notify.New(d.EmailSender)),
 		Sync:             cestasync.NewService(d.DB, c, ls, members, users),
 		PerIP:            ratelimit.New(limits.PerIP, c),
 		TrustedProxyHops: d.TrustedProxyHops,
