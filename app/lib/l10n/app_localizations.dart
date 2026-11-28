@@ -1052,11 +1052,11 @@ abstract class AppLocalizations {
   /// **'Invite by email'**
   String get shareInviteByEmail;
 
-  /// Explanation on the Invite by email sheet; list is the List's name.
+  /// Explanation on the Invite by email sheet; list is the List's name, days how long an Invitation can be accepted (invitationLifetimeDays).
   ///
   /// In en, this message translates to:
-  /// **'We\'ll email them a link to join {list} as an Editor. The link works for 14 days.'**
-  String shareInviteFormExplanation(String list);
+  /// **'We\'ll email them a link to join {list} as an Editor. The link works for {days} days.'**
+  String shareInviteFormExplanation(String list, int days);
 
   /// Button on the Invite by email sheet that sends the Invitation.
   ///
@@ -1154,7 +1154,7 @@ abstract class AppLocalizations {
   /// **'This invitation was cancelled. Ask for a new one.'**
   String get errorInvitationCancelled;
 
-  /// The Invitation is more than 14 days old.
+  /// The Invitation is older than its lifetime (invitationLifetimeDays).
   ///
   /// In en, this message translates to:
   /// **'This invitation expired. Ask for a new one.'**

@@ -55,6 +55,10 @@ final class InvitationFailed extends InvitationFailure {
   const InvitationFailed();
 }
 
+/// How many days an Invitation can be accepted after it is sent (the
+/// backend's sharing.ExpiresAfter).
+const invitationLifetimeDays = 14;
+
 /// The language an Invitation's email is written in: the Owner's app language.
 InvitationCreateLanguage invitationLanguage(String languageCode) =>
     languageCode == 'pt' ? InvitationCreateLanguage.ptBr : InvitationCreateLanguage.en;

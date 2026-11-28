@@ -320,8 +320,8 @@
   "@shareInviteExplanation": {"description": "Text on the Share list card, under the List's name (provisional until the Share link lands)."},
   "shareInviteByEmail": "Invite by email",
   "@shareInviteByEmail": {"description": "Button on Share list that opens the Invite by email sheet, and that sheet's title."},
-  "shareInviteFormExplanation": "We'll email them a link to join {list} as an Editor. The link works for 14 days.",
-  "@shareInviteFormExplanation": {"description": "Explanation on the Invite by email sheet; list is the List's name.", "placeholders": {"list": {"type": "String"}}},
+  "shareInviteFormExplanation": "We'll email them a link to join {list} as an Editor. The link works for {days} days.",
+  "@shareInviteFormExplanation": {"description": "Explanation on the Invite by email sheet; list is the List's name, days how long an Invitation can be accepted (invitationLifetimeDays).", "placeholders": {"list": {"type": "String"}, "days": {"type": "int"}}},
   "shareSendInvitation": "Send invitation",
   "@shareSendInvitation": {"description": "Button on the Invite by email sheet that sends the Invitation."},
   "shareInvitationSent": "Invitation sent to {email}",
@@ -355,7 +355,7 @@
   "errorInvitationCancelled": "This invitation was cancelled. Ask for a new one.",
   "@errorInvitationCancelled": {"description": "The Owner cancelled the Invitation."},
   "errorInvitationExpired": "This invitation expired. Ask for a new one.",
-  "@errorInvitationExpired": {"description": "The Invitation is more than 14 days old."},
+  "@errorInvitationExpired": {"description": "The Invitation is older than its lifetime (invitationLifetimeDays)."},
   "errorListFull": "This list already has the most members allowed.",
   "@errorListFull": {"description": "Joining failed because the List already has 20 Members."}
 }

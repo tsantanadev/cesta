@@ -127,6 +127,7 @@ void main() {
 
     await h.tap(find.byTooltip('Compartilhar lista'));
     await h.tap(find.widgetWithText(CesButton, 'Convidar por e-mail'));
+    expect(find.textContaining('O link vale por 14 dias.'), findsOneWidget);
     await tester.enterText(field('E-mail'), 'rui@example.com');
     await h.tap(find.widgetWithText(CesButton, 'Enviar convite'));
 
