@@ -331,5 +331,21 @@
   "errorInvitationDeclined": "This invitation was declined.",
   "@errorInvitationDeclined": {"description": "The Invitation was declined by the invitee."},
   "errorInvitationGone": "This invitation is no longer available.",
-  "@errorInvitationGone": {"description": "The Invitation is unknown, cancelled or expired."}
+  "@errorInvitationGone": {"description": "The Invitation is unknown, cancelled or expired."},
+  "invitationFrom": "{name} invited you",
+  "@invitationFrom": {"description": "Subtitle of an Invitation addressed to the User on the Lists screen; name is who sent it.", "placeholders": {"name": {"type": "String"}}},
+  "invitationJoin": "Join",
+  "@invitationJoin": {"description": "Accepts an Invitation on the Lists screen, making the User an Editor of its List."},
+  "invitationDecline": "Decline",
+  "@invitationDecline": {"description": "Declines an Invitation on the Lists screen."},
+  "invitationJoined": "You joined {list}",
+  "@invitationJoined": {"description": "Toast after the User accepts an Invitation; list is the List's name.", "placeholders": {"list": {"type": "String"}}},
+  "invitationDeclined": "Invitation to {list} declined",
+  "@invitationDeclined": {"description": "Toast after the User declines an Invitation; list is the List's name.", "placeholders": {"list": {"type": "String"}}},
+  "errorInvitationCancelled": "This invitation was cancelled. Ask for a new one.",
+  "@errorInvitationCancelled": {"description": "The Owner cancelled the Invitation."},
+  "errorInvitationExpired": "This invitation expired. Ask for a new one.",
+  "@errorInvitationExpired": {"description": "The Invitation is more than 14 days old."},
+  "errorListFull": "This list already has the most members allowed.",
+  "@errorListFull": {"description": "Joining failed because the List already has 20 Members."}
 }

@@ -157,3 +157,51 @@ class CesPersonRow extends StatelessWidget {
     );
   }
 }
+
+/// An Invitation addressed to the User, on the Lists screen (provisional
+/// until its frame is designed, #44): a card like a List's, outlined in
+/// Banana, with the List's [name], who invited them ([subtitle]) and the
+/// [actions] to join or decline, side by side.
+class CesInvitationCard extends StatelessWidget {
+  const CesInvitationCard({super.key, required this.name, required this.subtitle, required this.actions});
+
+  final String name;
+  final String subtitle;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(CestaRadii.listCard),
+        border: Border.all(color: context.palette.toBuy, width: 2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(name, style: CestaDisplayType.listName.copyWith(color: scheme.onSurface)),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                for (final (i, action) in actions.indexed) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(child: action),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -1087,6 +1087,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This invitation is no longer available.'**
   String get errorInvitationGone;
+
+  /// Subtitle of an Invitation addressed to the User on the Lists screen; name is who sent it.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} invited you'**
+  String invitationFrom(String name);
+
+  /// Accepts an Invitation on the Lists screen, making the User an Editor of its List.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get invitationJoin;
+
+  /// Declines an Invitation on the Lists screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get invitationDecline;
+
+  /// Toast after the User accepts an Invitation; list is the List's name.
+  ///
+  /// In en, this message translates to:
+  /// **'You joined {list}'**
+  String invitationJoined(String list);
+
+  /// Toast after the User declines an Invitation; list is the List's name.
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation to {list} declined'**
+  String invitationDeclined(String list);
+
+  /// The Owner cancelled the Invitation.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation was cancelled. Ask for a new one.'**
+  String get errorInvitationCancelled;
+
+  /// The Invitation is more than 14 days old.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation expired. Ask for a new one.'**
+  String get errorInvitationExpired;
+
+  /// Joining failed because the List already has 20 Members.
+  ///
+  /// In en, this message translates to:
+  /// **'This list already has the most members allowed.'**
+  String get errorListFull;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

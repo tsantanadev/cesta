@@ -100,7 +100,7 @@ GoRouter buildRouter({
     ),
     GoRoute(
       path: Routes.home,
-      builder: (_, _) => ListsScreen(session: session, lists: lists),
+      builder: (_, _) => ListsScreen(session: session, lists: lists, sharing: sharing),
     ),
     GoRoute(
       path: Routes.recentlyDeleted,

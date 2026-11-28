@@ -120,6 +120,43 @@ class Sharing {
     return failure;
   }
 
+  /// The pending Invitations addressed to the signed-in User's email, newest first.
+  Future<(List<Invitation>?, InvitationFailure?)> mine() => _load(() async {
+    return switch (await _api.listMyInvitations()) {
+      ListMyInvitations200(:final value) => (value.invitations, null),
+      ListMyInvitations429() => (null, InvitationFailure.rateLimited),
+      ListMyInvitations401() => (null, InvitationFailure.failed),
+    };
+  });
+
+  /// Accepts [invitation], making the User an Editor of its List, which it returns.
+  Future<(ListSummary?, InvitationFailure?)> accept(Invitation invitation) => _load(() async {
+    return switch (await _api.acceptInvitation(body: InvitationRef(id: invitation.id))) {
+      AcceptInvitation200(:final value) => (value, null),
+      AcceptInvitation404(:final value) || AcceptInvitation409(:final value) => (null, _noLongerValid(value)),
+      AcceptInvitation429() => (null, InvitationFailure.rateLimited),
+      AcceptInvitation400() || AcceptInvitation401() => (null, InvitationFailure.failed),
+    };
+  });
+
+  /// Declines [invitation], so its link stops working.
+  Future<InvitationFailure?> decline(Invitation invitation) async {
+    final (_, failure) = await _load(() async {
+      return switch (await _api.declineInvitation(body: InvitationRef(id: invitation.id))) {
+        DeclineInvitation200() => (null, null),
+        DeclineInvitation404(:final value) || DeclineInvitation409(:final value) => (null, _noLongerValid(value)),
+        DeclineInvitation429() => (null, InvitationFailure.rateLimited),
+        DeclineInvitation400() || DeclineInvitation401() => (null, InvitationFailure.failed),
+      };
+    });
+    return failure;
+  }
+
+  static InvitationFailure _noLongerValid(ApiError error) => switch (error.code) {
+    ApiErrorCode.listDeleted || ApiErrorCode.listNotFound => InvitationFailure.listGone,
+    final code => InvitationNoLongerValid(code),
+  };
+
   Future<(T?, InvitationFailure?)> _load<T>(Future<(T?, InvitationFailure?)> Function() call) async {
     try {
       return await call();

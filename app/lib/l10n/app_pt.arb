@@ -166,5 +166,13 @@
   "errorInvitationLimitGeneric": "Você enviou o máximo de convites permitido em 24 horas. Tente de novo amanhã.",
   "errorInvitationAccepted": "Este convite já foi aceito.",
   "errorInvitationDeclined": "Este convite foi recusado.",
-  "errorInvitationGone": "Este convite não está mais disponível."
+  "errorInvitationGone": "Este convite não está mais disponível.",
+  "invitationFrom": "{name} convidou você",
+  "invitationJoin": "Entrar",
+  "invitationDecline": "Recusar",
+  "invitationJoined": "Você entrou em {list}",
+  "invitationDeclined": "Convite para {list} recusado",
+  "errorInvitationCancelled": "Este convite foi cancelado. Peça um novo.",
+  "errorInvitationExpired": "Este convite expirou. Peça um novo.",
+  "errorListFull": "Esta lista já tem o máximo de membros permitido."
 }

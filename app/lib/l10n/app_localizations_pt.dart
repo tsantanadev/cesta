@@ -582,4 +582,34 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get errorInvitationGone => 'Este convite não está mais disponível.';
+
+  @override
+  String invitationFrom(String name) {
+    return '$name convidou você';
+  }
+
+  @override
+  String get invitationJoin => 'Entrar';
+
+  @override
+  String get invitationDecline => 'Recusar';
+
+  @override
+  String invitationJoined(String list) {
+    return 'Você entrou em $list';
+  }
+
+  @override
+  String invitationDeclined(String list) {
+    return 'Convite para $list recusado';
+  }
+
+  @override
+  String get errorInvitationCancelled => 'Este convite foi cancelado. Peça um novo.';
+
+  @override
+  String get errorInvitationExpired => 'Este convite expirou. Peça um novo.';
+
+  @override
+  String get errorListFull => 'Esta lista já tem o máximo de membros permitido.';
 }

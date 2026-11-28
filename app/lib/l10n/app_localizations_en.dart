@@ -584,4 +584,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorInvitationGone => 'This invitation is no longer available.';
+
+  @override
+  String invitationFrom(String name) {
+    return '$name invited you';
+  }
+
+  @override
+  String get invitationJoin => 'Join';
+
+  @override
+  String get invitationDecline => 'Decline';
+
+  @override
+  String invitationJoined(String list) {
+    return 'You joined $list';
+  }
+
+  @override
+  String invitationDeclined(String list) {
+    return 'Invitation to $list declined';
+  }
+
+  @override
+  String get errorInvitationCancelled => 'This invitation was cancelled. Ask for a new one.';
+
+  @override
+  String get errorInvitationExpired => 'This invitation expired. Ask for a new one.';
+
+  @override
+  String get errorListFull => 'This list already has the most members allowed.';
 }
