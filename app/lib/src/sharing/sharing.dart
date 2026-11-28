@@ -59,6 +59,10 @@ final class InvitationFailed extends InvitationFailure {
 /// backend's sharing.ExpiresAfter).
 const invitationLifetimeDays = 14;
 
+/// The one form email addresses are compared in: trimmed and lowercased, as
+/// the backend stores an Invitation's address.
+String canonicalEmail(String address) => address.trim().toLowerCase();
+
 /// The language an Invitation's email is written in: the Owner's app language.
 InvitationCreateLanguage invitationLanguage(String languageCode) =>
     languageCode == 'pt' ? InvitationCreateLanguage.ptBr : InvitationCreateLanguage.en;
@@ -89,7 +93,7 @@ class Sharing {
     String email, {
     required InvitationCreateLanguage language,
   }) => _load(() async {
-    final body = InvitationCreate(email: email.trim(), language: language);
+    final body = InvitationCreate(email: canonicalEmail(email), language: language);
     return switch (await _api.createInvitation(listId: listId, body: body)) {
       CreateInvitation201(:final value) => (value, null),
       CreateInvitation400() => (null, InvitationFailure.invalidEmail),

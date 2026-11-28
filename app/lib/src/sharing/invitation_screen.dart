@@ -120,7 +120,7 @@ class _InvitationScreenState extends State<InvitationScreen> {
           const CesGap.md(),
           if (answerable) ...[
             CesText.intro(l10n.invitationExplanation),
-            if (me != null && me.toLowerCase() != invitation.email.toLowerCase()) ...[
+            if (me != null && canonicalEmail(me) != canonicalEmail(invitation.email)) ...[
               const CesGap.md(),
               CesText(l10n.invitationSentTo(invitation.email, me)),
             ],
