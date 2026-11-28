@@ -345,6 +345,11 @@ type listRow struct {
 // if userID is not a Member or the List is gone (purged, or deleted longer than
 // RestoreWindow ago), and ErrNotOwner for any other Member.
 func (s *Service) lockOwned(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (listRow, error) {
+	return s.owned(ctx, tx, userID, listID, true)
+}
+
+// owned is lockOwned, taking the lock only when lock is set.
+func (s *Service) owned(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID, lock bool) (listRow, error) {
 	role, err := s.members.RoleIn(ctx, tx, listID, userID)
 	if errors.Is(err, membership.ErrNotAMember) {
 		return listRow{}, ErrNotFound
@@ -352,9 +357,12 @@ func (s *Service) lockOwned(ctx context.Context, tx pgx.Tx, userID, listID uuid.
 	if err != nil {
 		return listRow{}, err
 	}
+	query := "SELECT name, deleted_at FROM lists WHERE id = $1"
+	if lock {
+		query += " FOR UPDATE"
+	}
 	var l listRow
-	err = tx.QueryRow(ctx, "SELECT name, deleted_at FROM lists WHERE id = $1 FOR UPDATE", listID).
-		Scan(&l.name, &l.deletedAt)
+	err = tx.QueryRow(ctx, query, listID).Scan(&l.name, &l.deletedAt)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return listRow{}, ErrNotFound
@@ -424,7 +432,17 @@ func normalizeName(name string) (string, bool) {
 // owns it and it is not deleted. It returns ErrNotFound, ErrNotOwner or
 // ErrDeleted otherwise. Package sharing calls it before an Owner-only change.
 func (s *Service) LockOwnedLive(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (string, error) {
-	l, err := s.lockOwned(ctx, tx, userID, listID)
+	return s.ownedLive(ctx, tx, userID, listID, true)
+}
+
+// OwnedLive is LockOwnedLive without the lock, for a read: package sharing
+// calls it before showing the Owner a List's pending Invitations.
+func (s *Service) OwnedLive(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID) (string, error) {
+	return s.ownedLive(ctx, tx, userID, listID, false)
+}
+
+func (s *Service) ownedLive(ctx context.Context, tx pgx.Tx, userID, listID uuid.UUID, lock bool) (string, error) {
+	l, err := s.owned(ctx, tx, userID, listID, lock)
 	switch {
 	case err != nil:
 		return "", wrap("lock", err)
