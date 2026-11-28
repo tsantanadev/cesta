@@ -13,7 +13,7 @@ Cloud Run + Neon in São Paulo, Firebase in front (ADR-0003, ADR-0005). Two envi
 | `terraform/modules/environment/` | Everything one environment needs: Cloud Run service, migrations job and daily purge job (Cloud Scheduler), Neon project, secrets, service accounts, CI identity (OIDC), Firebase Hosting and custom domain, budgets, kill switch. |
 | `terraform/envs/{dev,prod}/` | Root modules. `terraform.tfvars` and `backend.hcl` hold the (non-secret) project settings. |
 | `functions/billing-kill-switch/` | Cloud Function that detaches billing when spend reaches the hard limit. |
-| `../hosting/` | `firebase.json` (rewrites `/api/**` and `/health` to Cloud Run) and the static `.well-known` files. |
+| `../hosting/` | `firebase.json` (rewrites `/api/**` and `/health` to Cloud Run, `/invite/**` to the store fallback page), the `.well-known` deep-link files, and `test/` (`node --test hosting/test/`). Values marked `REPLACE_ME_` (Apple team ID, Android signing SHA-256, App Store ID) are filled in once the store accounts exist. |
 | `../.github/workflows/deploy.yml` | Build, migrate, deploy, smoke test. |
 
 Terraform is applied by a person from a laptop. CI never runs Terraform and never sees a database credential: it authenticates through Workload Identity Federation as `cesta-deployer`, which can only push images, update the migrations and purge jobs and the service, and deploy Hosting.
