@@ -9,6 +9,10 @@ import 'models/api_error.dart' as models show ApiError;
 import 'models/deleted_list.dart' as models show DeletedList;
 import 'models/deleted_lists.dart' as models show DeletedLists;
 import 'models/health.dart' as models show Health;
+import 'models/invitation.dart' as models show Invitation;
+import 'models/invitation_create.dart' as models show InvitationCreate;
+import 'models/invitation_ref.dart' as models show InvitationRef;
+import 'models/invitations.dart' as models show Invitations;
 import 'models/list_create.dart' as models show ListCreate;
 import 'models/list_rename.dart' as models show ListRename;
 import 'models/list_summaries.dart' as models show ListSummaries;
@@ -556,6 +560,404 @@ class ApiClient {
       400 => PullChanges400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       401 => PullChanges401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       429 => PullChanges429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// The List's pending Invitations (Owner only)
+  ///
+  /// Invitations not yet accepted, declined, cancelled or expired. Newest first.
+  Future<ListListInvitationsResult> listListInvitations({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+
+    /// The List's ID (a UUID chosen by the client that created it).
+    required String listId,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(listId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _options = (options ?? Options()).copyWith(
+      method: "GET",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      headers: {...?options?.headers, 'Accept': "application/json"},
+      validateStatus: (status) =>
+          status != null &&
+          (status == 200 ||
+              status == 400 ||
+              status == 401 ||
+              status == 403 ||
+              status == 404 ||
+              status == 409 ||
+              status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/lists/" + Uri.encodeComponent(listId) + "/invitations",
+      options: _options,
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => ListListInvitations200(models.Invitations.fromJson(response.data as Map<String, Object?>)),
+      400 => ListListInvitations400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => ListListInvitations401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      403 => ListListInvitations403(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      404 => ListListInvitations404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      409 => ListListInvitations409(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => ListListInvitations429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Invite an email address to the List as an Editor (Owner only)
+  ///
+  /// Sends one email, in the given language, with the Invitation's deep link (https://cesta.tsantana.dev/invite/<token>). The token is single-use and only its hash is stored; the Invitation expires 14 days after it is created. A User can send at most 20 Invitations in any 24 hours; the next is rejected with limit_exceeded.
+  Future<CreateInvitationResult> createInvitation({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+
+    /// The List's ID (a UUID chosen by the client that created it).
+    required String listId,
+    required models.InvitationCreate body,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(listId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _options = (options ?? Options()).copyWith(
+      method: "POST",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      contentType: "application/json",
+      headers: {
+        for (final entry in (options?.headers ?? const <String, Object?>{}).entries)
+          if (entry.key.toLowerCase() != 'content-type') entry.key: entry.value,
+        'Accept': "application/json",
+      },
+      validateStatus: (status) =>
+          status != null &&
+          (status == 201 ||
+              status == 400 ||
+              status == 401 ||
+              status == 403 ||
+              status == 404 ||
+              status == 409 ||
+              status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/lists/" + Uri.encodeComponent(listId) + "/invitations",
+      options: _options,
+      data: convert.jsonEncode(body),
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      201 => CreateInvitation201(models.Invitation.fromJson(response.data as Map<String, Object?>)),
+      400 => CreateInvitation400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => CreateInvitation401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      403 => CreateInvitation403(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      404 => CreateInvitation404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      409 => CreateInvitation409(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => CreateInvitation429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Cancel a pending Invitation (Owner only)
+  ///
+  /// Its link stops working. Cancelling an Invitation already cancelled, or expired, returns it cancelled; one already accepted or declined is rejected with invitation_accepted or invitation_declined.
+  Future<CancelInvitationResult> cancelInvitation({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+
+    /// The List's ID (a UUID chosen by the client that created it).
+    required String listId,
+
+    /// The Invitation's ID.
+    required String invitationId,
+  }) async {
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(listId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    if (const {'', '.', '..'}.contains(Uri.encodeComponent(invitationId))) {
+      throw ArgumentError('Invalid path segment.');
+    }
+    final _options = (options ?? Options()).copyWith(
+      method: "DELETE",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      headers: {...?options?.headers, 'Accept': "application/json"},
+      validateStatus: (status) =>
+          status != null &&
+          (status == 200 ||
+              status == 400 ||
+              status == 401 ||
+              status == 403 ||
+              status == 404 ||
+              status == 409 ||
+              status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/lists/" + Uri.encodeComponent(listId) + "/invitations/" + Uri.encodeComponent(invitationId),
+      options: _options,
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => CancelInvitation200(models.Invitation.fromJson(response.data as Map<String, Object?>)),
+      400 => CancelInvitation400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => CancelInvitation401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      403 => CancelInvitation403(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      404 => CancelInvitation404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      409 => CancelInvitation409(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => CancelInvitation429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Pending Invitations addressed to the signed-in User's email
+  ///
+  /// Newest first. Accept or decline one by its id.
+  Future<ListMyInvitationsResult> listMyInvitations({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+  }) async {
+    final _options = (options ?? Options()).copyWith(
+      method: "GET",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      headers: {...?options?.headers, 'Accept': "application/json"},
+      validateStatus: (status) => status != null && (status == 200 || status == 401 || status == 429),
+    );
+    final response = await _transport.request<dynamic>("/api/invitations", options: _options, cancelToken: cancelToken);
+    return switch (response.statusCode) {
+      200 => ListMyInvitations200(models.Invitations.fromJson(response.data as Map<String, Object?>)),
+      401 => ListMyInvitations401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => ListMyInvitations429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// The Invitation a token belongs to, whatever its status
+  ///
+  /// For the accept screen opened from the deep link. Identified as in acceptInvitation; the token goes in the body so it stays out of URLs and logs.
+  Future<LookupInvitationResult> lookupInvitation({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+    required models.InvitationRef body,
+  }) async {
+    final _options = (options ?? Options()).copyWith(
+      method: "POST",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      contentType: "application/json",
+      headers: {
+        for (final entry in (options?.headers ?? const <String, Object?>{}).entries)
+          if (entry.key.toLowerCase() != 'content-type') entry.key: entry.value,
+        'Accept': "application/json",
+      },
+      validateStatus: (status) =>
+          status != null && (status == 200 || status == 400 || status == 401 || status == 404 || status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/invitations/lookup",
+      options: _options,
+      data: convert.jsonEncode(body),
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => LookupInvitation200(models.Invitation.fromJson(response.data as Map<String, Object?>)),
+      400 => LookupInvitation400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => LookupInvitation401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      404 => LookupInvitation404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => LookupInvitation429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Accept an Invitation, becoming an Editor of its List
+  ///
+  /// Identify the Invitation by its token (from the deep link; the signed-in User's email need not match the invited one) or by its id (only for an Invitation addressed to the signed-in User's email). A cancelled, declined or expired Invitation is rejected with a code saying which, and one whose List was deleted with list_deleted. The token is single-use: once accepted, only a retry by the same User succeeds (and changes nothing). A List has at most 20 Members; joining a full List is rejected with list_full.
+  Future<AcceptInvitationResult> acceptInvitation({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+    required models.InvitationRef body,
+  }) async {
+    final _options = (options ?? Options()).copyWith(
+      method: "POST",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      contentType: "application/json",
+      headers: {
+        for (final entry in (options?.headers ?? const <String, Object?>{}).entries)
+          if (entry.key.toLowerCase() != 'content-type') entry.key: entry.value,
+        'Accept': "application/json",
+      },
+      validateStatus: (status) =>
+          status != null &&
+          (status == 200 || status == 400 || status == 401 || status == 404 || status == 409 || status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/invitations/accept",
+      options: _options,
+      data: convert.jsonEncode(body),
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => AcceptInvitation200(models.ListSummary.fromJson(response.data as Map<String, Object?>)),
+      400 => AcceptInvitation400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => AcceptInvitation401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      404 => AcceptInvitation404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      409 => AcceptInvitation409(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => AcceptInvitation429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      _ => throw StateError('Unexpected response status: ${response.statusCode}'),
+    };
+  }
+
+  /// Decline an Invitation
+  ///
+  /// Identified as in acceptInvitation. Its link stops working. Declining twice returns it declined; a cancelled, expired or accepted Invitation is rejected with a code saying which.
+  Future<DeclineInvitationResult> declineInvitation({
+    Map<String, Object?> extra = const {
+      "openapi.servers": [
+        {"url": "http://localhost:8080"},
+      ],
+      "openapi.security": [
+        {"firebaseIdToken": []},
+      ],
+      "openapi.securitySchemes": {
+        "firebaseIdToken": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "description": "A Firebase ID token for the signed-in User.",
+        },
+      },
+    },
+    CancelToken? cancelToken,
+    Options? options,
+    required models.InvitationRef body,
+  }) async {
+    final _options = (options ?? Options()).copyWith(
+      method: "POST",
+      responseType: ResponseType.json,
+      extra: {...?options?.extra, ...extra},
+      contentType: "application/json",
+      headers: {
+        for (final entry in (options?.headers ?? const <String, Object?>{}).entries)
+          if (entry.key.toLowerCase() != 'content-type') entry.key: entry.value,
+        'Accept': "application/json",
+      },
+      validateStatus: (status) =>
+          status != null &&
+          (status == 200 || status == 400 || status == 401 || status == 404 || status == 409 || status == 429),
+    );
+    final response = await _transport.request<dynamic>(
+      "/api/invitations/decline",
+      options: _options,
+      data: convert.jsonEncode(body),
+      cancelToken: cancelToken,
+    );
+    return switch (response.statusCode) {
+      200 => DeclineInvitation200(models.Invitation.fromJson(response.data as Map<String, Object?>)),
+      400 => DeclineInvitation400(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      401 => DeclineInvitation401(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      404 => DeclineInvitation404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      409 => DeclineInvitation409(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      429 => DeclineInvitation429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       _ => throw StateError('Unexpected response status: ${response.statusCode}'),
     };
   }
