@@ -122,6 +122,13 @@ class _ListScreenState extends State<ListScreen> {
                       // is nothing under it: back goes to the Lists.
                       CesBackButton(onPressed: () => context.canPop() ? context.pop() : context.go(Routes.home)),
                       const Spacer(),
+                      // Only the Owner invites, so far all Share list offers (Figma "Share" 4:163).
+                      if (_list?.role == Role.owner)
+                        CesTopBarButton(
+                          icon: CesIcons.share,
+                          tooltip: l10n.shareTitle,
+                          onPressed: () => unawaited(context.push(Routes.shareList(widget.listId))),
+                        ),
                     ],
                   ),
                 ),

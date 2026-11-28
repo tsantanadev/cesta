@@ -324,6 +324,18 @@ class Harness {
       })
       .then((h) => h!);
 
+  /// From a List's screen, opens Share list (06).
+  Future<void> openShareList() => tap(find.byTooltip('Share list'));
+
+  /// From a List's screen, invites [email] through Share list and Invite by
+  /// email; stays on Share list.
+  Future<void> inviteByEmail(String email) async {
+    if (find.text('Invite by email').evaluate().isEmpty) await openShareList();
+    await tap(find.widgetWithText(CesButton, 'Invite by email'));
+    await tester.enterText(field('Email'), email);
+    await tap(find.widgetWithText(CesButton, 'Send invitation'));
+  }
+
   /// The text in the field labelled [label].
   String textInField(String label) => fieldController(tester, label).text;
 }

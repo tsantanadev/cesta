@@ -15,6 +15,9 @@ abstract final class Routes {
   /// Add items (05) for a List.
   static String addItems(String listId) => '/lists/$listId/add';
 
+  /// Share list (06) for a List.
+  static String shareList(String listId) => '/lists/$listId/share';
+
   /// The accept screen an Invitation's deep link opens
   /// (`https://cesta.tsantana.dev/invite/<token>`).
   static String invitation(String token) => '/invite/$token';

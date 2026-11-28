@@ -4,7 +4,6 @@ import 'api/generated/cesta_api.dart';
 import 'auth/auth_gateway.dart';
 import 'db/app_database.dart';
 import 'health/health_screen.dart';
-import 'invitations/invitation_screen.dart';
 import 'items/add_items_screen.dart';
 import 'items/items_store.dart';
 import 'items/list_screen.dart';
@@ -19,6 +18,9 @@ import 'session/reset_password_screen.dart';
 import 'session/session_controller.dart';
 import 'session/splash_screen.dart';
 import 'session/welcome_screen.dart';
+import 'sharing/invitation_screen.dart';
+import 'sharing/share_list_screen.dart';
+import 'sharing/sharing.dart';
 import 'sync/sync_engine.dart';
 
 /// Screens a signed-out visitor may see.
@@ -71,6 +73,7 @@ GoRouter buildRouter({
   required AuthGateway auth,
   required ApiClient api,
   required AppDatabase database,
+  required Sharing sharing,
   required PendingLink pending,
   String? initialLocation,
 }) => GoRouter(
@@ -104,7 +107,7 @@ GoRouter buildRouter({
     ),
     GoRoute(
       path: Routes.home,
-      builder: (_, _) => ListsScreen(session: session, lists: lists),
+      builder: (_, _) => ListsScreen(session: session, lists: lists, sharing: sharing),
     ),
     GoRoute(
       path: Routes.recentlyDeleted,
@@ -120,13 +123,23 @@ GoRouter buildRouter({
           builder: (_, state) =>
               AddItemsScreen(listId: state.pathParameters['listId']!, session: session, lists: lists, items: items),
         ),
+        GoRoute(
+          path: 'share',
+          builder: (_, state) =>
+              ShareListScreen(listId: state.pathParameters['listId']!, lists: lists, sharing: sharing),
+        ),
       ],
     ),
     GoRoute(
       path: Routes.invitation(':token'),
       builder: (_, state) {
         pending.opened(state.uri.path);
-        return InvitationScreen(token: state.pathParameters['token']!, session: session, lists: lists, api: api);
+        return InvitationScreen(
+          token: state.pathParameters['token']!,
+          session: session,
+          lists: lists,
+          sharing: sharing,
+        );
       },
     ),
     GoRoute(

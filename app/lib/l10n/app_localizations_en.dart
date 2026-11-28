@@ -208,38 +208,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get invitationAccept => 'Accept';
-
-  @override
-  String get invitationDecline => 'Decline';
-
-  @override
-  String get invitationDeclinedToast => 'Invitation declined';
-
-  @override
   String get invitationGoToLists => 'Go to your lists';
-
-  @override
-  String get invitationNotFound =>
-      'This invitation link doesn\'t work. Check that you opened the whole link from the email.';
-
-  @override
-  String get invitationAlreadyAccepted => 'This invitation has already been accepted.';
-
-  @override
-  String get invitationAlreadyDeclined => 'This invitation was declined.';
-
-  @override
-  String get invitationCancelled => 'This invitation was cancelled. Ask the list\'s owner to send a new one.';
-
-  @override
-  String get invitationExpired => 'This invitation has expired. Ask the list\'s owner to send a new one.';
-
-  @override
-  String get invitationListDeleted => 'This list was deleted.';
-
-  @override
-  String get invitationListFull => 'This list already has as many members as a list can have.';
 
   @override
   String get listsTitle => 'Your Lists';
@@ -582,4 +551,87 @@ class AppLocalizationsEn extends AppLocalizations {
   String itemLimitBodyClearChecked(int max) {
     return 'A list can hold up to $max items. Clear checked items, or remove ones you no longer need, to make room.';
   }
+
+  @override
+  String get shareTitle => 'Share list';
+
+  @override
+  String get shareInviteExplanation => 'Invite people to add and check off items with you.';
+
+  @override
+  String get shareInviteByEmail => 'Invite by email';
+
+  @override
+  String shareInviteFormExplanation(String list) {
+    return 'We\'ll email them a link to join $list as an Editor. The link works for 14 days.';
+  }
+
+  @override
+  String get shareSendInvitation => 'Send invitation';
+
+  @override
+  String shareInvitationSent(String email) {
+    return 'Invitation sent to $email';
+  }
+
+  @override
+  String get sharePendingHeading => 'Waiting to join';
+
+  @override
+  String shareCancelInvitation(String email) {
+    return 'Cancel invitation to $email';
+  }
+
+  @override
+  String shareInvitationCancelled(String email) {
+    return 'Invitation to $email cancelled';
+  }
+
+  @override
+  String errorInvitationLimit(int limit) {
+    return 'You\'ve sent $limit invitations in the last 24 hours, the most allowed. Try again tomorrow.';
+  }
+
+  @override
+  String get errorInvitationLimitGeneric =>
+      'You\'ve sent the most invitations allowed in 24 hours. Try again tomorrow.';
+
+  @override
+  String get errorInvitationAccepted => 'This invitation was already accepted.';
+
+  @override
+  String get errorInvitationDeclined => 'This invitation was declined.';
+
+  @override
+  String get errorInvitationGone => 'This invitation is no longer available.';
+
+  @override
+  String invitationFrom(String name) {
+    return '$name invited you';
+  }
+
+  @override
+  String get invitationJoin => 'Join';
+
+  @override
+  String get invitationDecline => 'Decline';
+
+  @override
+  String invitationJoined(String list) {
+    return 'You joined $list';
+  }
+
+  @override
+  String invitationDeclined(String list) {
+    return 'Invitation to $list declined';
+  }
+
+  @override
+  String get errorInvitationCancelled => 'This invitation was cancelled. Ask for a new one.';
+
+  @override
+  String get errorInvitationExpired => 'This invitation expired. Ask for a new one.';
+
+  @override
+  String get errorListFull => 'This list already has the most members allowed.';
 }

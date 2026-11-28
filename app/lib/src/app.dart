@@ -13,6 +13,7 @@ import 'lists/lists_controller.dart';
 import 'pending_link.dart';
 import 'router.dart';
 import 'session/session_controller.dart';
+import 'sharing/sharing.dart';
 import 'sync/network_status.dart';
 import 'sync/outbox.dart';
 import 'sync/sync_engine.dart';
@@ -82,6 +83,7 @@ class _CestaAppState extends State<CestaApp> {
       api: widget.api,
       database: widget.database,
       pending: PendingLink(),
+      sharing: Sharing(api: widget.api),
       initialLocation: widget.initialLocation,
     );
   }

@@ -13,11 +13,15 @@ String inviteLink(String token) => 'https://cesta.tsantana.dev/invite/$token';
 /// in the Invitation's deep link.
 String anaInvites(Harness h, {String email = brunoEmail, InvitationStatus status = InvitationStatus.pending}) {
   final ana = h.existingUser(email: 'ana@example.com', password: password, displayName: 'Ana Souza');
-  final casa = h.api.addList(ana, name: 'Casa');
-  return h.api.addInvitation(casa, from: ana, email: email, status: status);
+  final invitation = h.api.addInvitation(h.api.addList(ana, name: 'Casa'), email: email);
+  h.api.setInvitationStatus(invitation, status);
+  return h.api.invitationToken(invitation);
 }
 
-final accept = find.widgetWithText(CesButton, 'Accept');
+/// The Invitation whose deep link carries [token].
+String invitationOf(String token) => token.substring('token-'.length);
+
+final accept = find.widgetWithText(CesButton, 'Join');
 final decline = find.widgetWithText(CesButton, 'Decline');
 
 void main() {
@@ -99,10 +103,10 @@ void main() {
 
       await h.tap(decline);
 
-      expect(find.text('Invitation declined'), findsOneWidget);
+      expect(find.text('Invitation to Casa declined'), findsOneWidget);
       expect(find.text('Your Lists'), findsOneWidget);
       expect(h.api.listNamesOf(bruno), isEmpty);
-      expect(h.api.invitationStatus(token), InvitationStatus.declined);
+      expect(h.api.invitationStatus(invitationOf(token)), InvitationStatus.declined);
     });
 
     testWidgets('says when it was sent to another email, and still lets the User accept', (tester) async {
@@ -122,8 +126,8 @@ void main() {
     });
 
     for (final (status, message) in [
-      (InvitationStatus.expired, "This invitation has expired. Ask the list's owner to send a new one."),
-      (InvitationStatus.cancelled, "This invitation was cancelled. Ask the list's owner to send a new one."),
+      (InvitationStatus.expired, 'This invitation expired. Ask for a new one.'),
+      (InvitationStatus.cancelled, 'This invitation was cancelled. Ask for a new one.'),
       (InvitationStatus.declined, 'This invitation was declined.'),
     ]) {
       testWidgets('a ${status.value} Invitation says so and offers only the way to the Lists', (tester) async {
@@ -148,10 +152,7 @@ void main() {
 
       await h.openLink(inviteLink('not-a-token'));
 
-      expect(
-        find.text("This invitation link doesn't work. Check that you opened the whole link from the email."),
-        findsOneWidget,
-      );
+      expect(find.text('This invitation is no longer available.'), findsOneWidget);
       expect(accept, findsNothing);
     });
 
@@ -161,11 +162,11 @@ void main() {
       h.signedIn(email: brunoEmail, displayName: 'Bruno');
       await h.pumpApp();
       await h.openLink(inviteLink(token));
-      h.api.setInvitationStatus(token, InvitationStatus.cancelled);
+      h.api.setInvitationStatus(invitationOf(token), InvitationStatus.cancelled);
 
       await h.tap(accept);
 
-      expect(find.text("This invitation was cancelled. Ask the list's owner to send a new one."), findsOneWidget);
+      expect(find.text('This invitation was cancelled. Ask for a new one.'), findsOneWidget);
       expect(accept, findsNothing);
     });
 
@@ -194,7 +195,7 @@ void main() {
       await h.openLink(inviteLink(token));
 
       expect(find.text('Ana Souza convidou você para a lista Casa'), findsOneWidget);
-      expect(find.widgetWithText(CesButton, 'Aceitar'), findsOneWidget);
+      expect(find.widgetWithText(CesButton, 'Entrar'), findsOneWidget);
       expect(find.widgetWithText(CesButton, 'Recusar'), findsOneWidget);
     });
   });
