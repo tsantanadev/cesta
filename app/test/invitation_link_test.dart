@@ -54,6 +54,19 @@ void main() {
       expect(find.text('Ana Souza invited you to join Casa'), findsOneWidget);
     });
 
+    testWidgets('is kept when the app restarts before the User signs in', (tester) async {
+      final h = Harness(tester);
+      final token = anaInvites(h);
+      h.existingUser(email: brunoEmail, password: password, displayName: 'Bruno');
+      await h.pumpApp();
+      await h.openLink(invitationLink(token));
+
+      await h.pumpApp();
+      await h.signInWithEmail(brunoEmail, password);
+
+      expect(find.text('Ana Souza invited you to join Casa'), findsOneWidget);
+    });
+
     testWidgets('is opened only once: signing out and in again goes to the Lists', (tester) async {
       final h = Harness(tester);
       final token = anaInvites(h);
