@@ -1,6 +1,6 @@
 // Checks what Firebase Hosting serves for deep links (#41): the two .well-known
 // files, their content type, and the /invite/<token> fallback page.
-// Run: node --test hosting/test/   (no dependencies)
+// Run: node --test 'hosting/test/*.test.mjs'   (no dependencies)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
