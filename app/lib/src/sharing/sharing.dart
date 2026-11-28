@@ -3,13 +3,32 @@ import 'package:dio/dio.dart';
 import '../api/generated/cesta_api.dart';
 import '../api/network.dart';
 
+/// What an operation on Invitations that returns something came to: either
+/// [InvitationDone] with its [InvitationDone.value], or an [InvitationFailure].
+sealed class InvitationResult<T> {
+  const InvitationResult();
+}
+
+/// The operation went through.
+final class InvitationDone<T> extends InvitationResult<T> {
+  const InvitationDone(this.value);
+
+  final T value;
+}
+
 /// Why an Invitation couldn't be sent, listed, cancelled, accepted or
-/// declined. Operations return null when it went through.
-sealed class InvitationFailure {
+/// declined. Operations that return nothing return null when it went through.
+sealed class InvitationFailure extends InvitationResult<Never> {
   const InvitationFailure();
 
   /// The server rejected the address.
   static const invalidEmail = InvitationInvalidEmail();
+
+  /// The address belongs to a Member of the List, the Owner included.
+  static const alreadyMember = InvitationAlreadyMember();
+
+  /// The email provider couldn't send the Invitation's email; nothing was made.
+  static const notSent = InvitationNotSent();
 
   /// The List is gone, deleted, or the User is no longer its Owner or a Member.
   static const listGone = InvitationListGone();
@@ -21,6 +40,14 @@ sealed class InvitationFailure {
 
 final class InvitationInvalidEmail extends InvitationFailure {
   const InvitationInvalidEmail();
+}
+
+final class InvitationAlreadyMember extends InvitationFailure {
+  const InvitationAlreadyMember();
+}
+
+final class InvitationNotSent extends InvitationFailure {
+  const InvitationNotSent();
 }
 
 /// The User already sent the most Invitations allowed in 24 hours.
@@ -75,75 +102,70 @@ class Sharing {
 
   final ApiClient _api;
 
-  /// The pending Invitations to List [listId], newest first. Owner only.
-  Future<(List<Invitation>?, InvitationFailure?)> pendingFor(String listId) => _load(() async {
+  /// The open Invitations to List [listId] (pending, or expired without an
+  /// answer), newest first. Owner only.
+  Future<InvitationResult<List<Invitation>>> openFor(String listId) => _load(() async {
     return switch (await _api.listListInvitations(listId: listId)) {
-      ListListInvitations200(:final value) => (value.invitations, null),
-      ListListInvitations404() ||
-      ListListInvitations409() ||
-      ListListInvitations403() => (null, InvitationFailure.listGone),
-      ListListInvitations429() => (null, InvitationFailure.rateLimited),
-      ListListInvitations400() || ListListInvitations401() => (null, InvitationFailure.failed),
+      ListListInvitations200(:final value) => InvitationDone(value.invitations),
+      ListListInvitations404() || ListListInvitations409() || ListListInvitations403() => InvitationFailure.listGone,
+      ListListInvitations429() => InvitationFailure.rateLimited,
+      ListListInvitations400() || ListListInvitations401() => InvitationFailure.failed,
     };
   });
 
   /// Invites [email] to List [listId] as an Editor; the email is written in [language].
-  Future<(Invitation?, InvitationFailure?)> invite(
+  Future<InvitationResult<Invitation>> invite(
     String listId,
     String email, {
     required InvitationCreateLanguage language,
   }) => _load(() async {
-    final body = InvitationCreate(email: canonicalEmail(email), language: language);
+    final body = InvitationCreate(email: email, language: language);
     return switch (await _api.createInvitation(listId: listId, body: body)) {
-      CreateInvitation201(:final value) => (value, null),
-      CreateInvitation400() => (null, InvitationFailure.invalidEmail),
-      CreateInvitation409(value: ApiError(code: ApiErrorCode.limitExceeded, :final limit)) => (
-        null,
-        InvitationLimitReached(limit),
+      CreateInvitation201(:final value) => InvitationDone(value),
+      CreateInvitation400() => InvitationFailure.invalidEmail,
+      CreateInvitation409(value: ApiError(code: ApiErrorCode.limitExceeded, :final limit)) => InvitationLimitReached(
+        limit,
       ),
-      CreateInvitation404() || CreateInvitation403() || CreateInvitation409() => (null, InvitationFailure.listGone),
-      CreateInvitation429() => (null, InvitationFailure.rateLimited),
-      CreateInvitation401() => (null, InvitationFailure.failed),
+      CreateInvitation409(value: ApiError(code: ApiErrorCode.alreadyMember)) => InvitationFailure.alreadyMember,
+      CreateInvitation404() || CreateInvitation403() || CreateInvitation409() => InvitationFailure.listGone,
+      CreateInvitation502() => InvitationFailure.notSent,
+      CreateInvitation429() => InvitationFailure.rateLimited,
+      CreateInvitation401() => InvitationFailure.failed,
     };
   });
 
   /// Cancels [invitation], so its link stops working.
-  Future<InvitationFailure?> cancel(Invitation invitation) async {
-    final (_, failure) = await _load(() async {
-      final result = await _api.cancelInvitation(listId: invitation.listId, invitationId: invitation.id);
-      return switch (result) {
-        CancelInvitation200() => (null, null),
-        CancelInvitation404(value: ApiError(:final code)) when code == ApiErrorCode.invitationNotFound => (
-          null,
-          InvitationUnanswerable(code),
-        ),
-        CancelInvitation409(value: ApiError(:final code))
-            when code == ApiErrorCode.invitationAccepted || code == ApiErrorCode.invitationDeclined =>
-          (null, InvitationUnanswerable(code)),
-        CancelInvitation404() || CancelInvitation403() || CancelInvitation409() => (null, InvitationFailure.listGone),
-        CancelInvitation429() => (null, InvitationFailure.rateLimited),
-        CancelInvitation400() || CancelInvitation401() => (null, InvitationFailure.failed),
-      };
-    });
-    return failure;
-  }
+  Future<InvitationFailure?> cancel(Invitation invitation) => _attempt(() async {
+    final result = await _api.cancelInvitation(listId: invitation.listId, invitationId: invitation.id);
+    return switch (result) {
+      CancelInvitation200() => null,
+      CancelInvitation404(value: ApiError(:final code)) when code == ApiErrorCode.invitationNotFound =>
+        InvitationUnanswerable(code),
+      CancelInvitation409(value: ApiError(:final code))
+          when code == ApiErrorCode.invitationAccepted || code == ApiErrorCode.invitationDeclined =>
+        InvitationUnanswerable(code),
+      CancelInvitation404() || CancelInvitation403() || CancelInvitation409() => InvitationFailure.listGone,
+      CancelInvitation429() => InvitationFailure.rateLimited,
+      CancelInvitation400() || CancelInvitation401() => InvitationFailure.failed,
+    };
+  });
 
   /// The pending Invitations addressed to the signed-in User's email, newest first.
-  Future<(List<Invitation>?, InvitationFailure?)> mine() => _load(() async {
+  Future<InvitationResult<List<Invitation>>> mine() => _load(() async {
     return switch (await _api.listMyInvitations()) {
-      ListMyInvitations200(:final value) => (value.invitations, null),
-      ListMyInvitations429() => (null, InvitationFailure.rateLimited),
-      ListMyInvitations401() => (null, InvitationFailure.failed),
+      ListMyInvitations200(:final value) => InvitationDone(value.invitations),
+      ListMyInvitations429() => InvitationFailure.rateLimited,
+      ListMyInvitations401() => InvitationFailure.failed,
     };
   });
 
   /// The Invitation whose deep link carries [token], whatever its status.
-  Future<(Invitation?, InvitationFailure?)> lookup(String token) => _load(() async {
+  Future<InvitationResult<Invitation>> lookup(String token) => _load(() async {
     return switch (await _api.lookupInvitation(body: InvitationRef(token: token))) {
-      LookupInvitation200(:final value) => (value, null),
-      LookupInvitation404(:final value) => (null, InvitationUnanswerable(value.code)),
-      LookupInvitation429() => (null, InvitationFailure.rateLimited),
-      LookupInvitation400() || LookupInvitation401() => (null, InvitationFailure.failed),
+      LookupInvitation200(:final value) => InvitationDone(value),
+      LookupInvitation404(:final value) => InvitationUnanswerable(value.code),
+      LookupInvitation429() => InvitationFailure.rateLimited,
+      LookupInvitation400() || LookupInvitation401() => InvitationFailure.failed,
     };
   });
 
@@ -157,18 +179,18 @@ class Sharing {
   };
 
   /// Accepts [invitation], making the User an Editor of its List, which it returns.
-  Future<(ListSummary?, InvitationFailure?)> accept(Invitation invitation) => _accept(InvitationRef(id: invitation.id));
+  Future<InvitationResult<ListSummary>> accept(Invitation invitation) => _accept(InvitationRef(id: invitation.id));
 
   /// Accepts the Invitation whose deep link carries [token], whoever it was
   /// addressed to, making the User an Editor of its List, which it returns.
-  Future<(ListSummary?, InvitationFailure?)> acceptLink(String token) => _accept(InvitationRef(token: token));
+  Future<InvitationResult<ListSummary>> acceptLink(String token) => _accept(InvitationRef(token: token));
 
-  Future<(ListSummary?, InvitationFailure?)> _accept(InvitationRef ref) => _load(() async {
+  Future<InvitationResult<ListSummary>> _accept(InvitationRef ref) => _load(() async {
     return switch (await _api.acceptInvitation(body: ref)) {
-      AcceptInvitation200(:final value) => (value, null),
-      AcceptInvitation404(:final value) || AcceptInvitation409(:final value) => (null, _unanswerable(value)),
-      AcceptInvitation429() => (null, InvitationFailure.rateLimited),
-      AcceptInvitation400() || AcceptInvitation401() => (null, InvitationFailure.failed),
+      AcceptInvitation200(:final value) => InvitationDone(value),
+      AcceptInvitation404(:final value) || AcceptInvitation409(:final value) => _unanswerable(value),
+      AcceptInvitation429() => InvitationFailure.rateLimited,
+      AcceptInvitation400() || AcceptInvitation401() => InvitationFailure.failed,
     };
   });
 
@@ -178,28 +200,36 @@ class Sharing {
   /// Declines the Invitation whose deep link carries [token], so it stops working.
   Future<InvitationFailure?> declineLink(String token) => _decline(InvitationRef(token: token));
 
-  Future<InvitationFailure?> _decline(InvitationRef ref) async {
-    final (_, failure) = await _load(() async {
-      return switch (await _api.declineInvitation(body: ref)) {
-        DeclineInvitation200() => (null, null),
-        DeclineInvitation404(:final value) || DeclineInvitation409(:final value) => (null, _unanswerable(value)),
-        DeclineInvitation429() => (null, InvitationFailure.rateLimited),
-        DeclineInvitation400() || DeclineInvitation401() => (null, InvitationFailure.failed),
-      };
-    });
-    return failure;
-  }
+  Future<InvitationFailure?> _decline(InvitationRef ref) => _attempt(() async {
+    return switch (await _api.declineInvitation(body: ref)) {
+      DeclineInvitation200() => null,
+      DeclineInvitation404(:final value) || DeclineInvitation409(:final value) => _unanswerable(value),
+      DeclineInvitation429() => InvitationFailure.rateLimited,
+      DeclineInvitation400() || DeclineInvitation401() => InvitationFailure.failed,
+    };
+  });
 
   static InvitationFailure _unanswerable(ApiError error) => switch (error.code) {
     ApiErrorCode.listDeleted || ApiErrorCode.listNotFound => InvitationFailure.listGone,
     final code => InvitationUnanswerable(code),
   };
 
-  Future<(T?, InvitationFailure?)> _load<T>(Future<(T?, InvitationFailure?)> Function() call) async {
+  Future<InvitationResult<T>> _load<T>(Future<InvitationResult<T>> Function() call) async {
     try {
       return await call();
     } on DioException catch (e) {
-      return (null, isOffline(e) ? InvitationFailure.offline : InvitationFailure.failed);
+      return _networkFailure(e);
     }
   }
+
+  Future<InvitationFailure?> _attempt(Future<InvitationFailure?> Function() call) async {
+    try {
+      return await call();
+    } on DioException catch (e) {
+      return _networkFailure(e);
+    }
+  }
+
+  static InvitationFailure _networkFailure(DioException e) =>
+      isOffline(e) ? InvitationFailure.offline : InvitationFailure.failed;
 }

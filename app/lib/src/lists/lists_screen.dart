@@ -45,9 +45,9 @@ class _ListsScreenState extends State<ListsScreen> {
   }
 
   Future<void> _loadInvitations() async {
-    final (invitations, _) = await widget.sharing.mine();
-    if (!mounted || invitations == null) return;
-    setState(() => _invitations = invitations);
+    if (await widget.sharing.mine() case InvitationDone(value: final invitations) when mounted) {
+      setState(() => _invitations = invitations);
+    }
   }
 
   /// Joins or declines [invitation] through [answer], then takes it off the
@@ -68,9 +68,13 @@ class _ListsScreenState extends State<ListsScreen> {
   }
 
   Future<void> _join(Invitation invitation) => _answer(invitation, () async {
-    final (_, failure) = await widget.sharing.accept(invitation);
-    if (failure == null) await _lists.refresh();
-    return failure;
+    switch (await widget.sharing.accept(invitation)) {
+      case InvitationDone():
+        await _lists.refresh();
+        return null;
+      case final InvitationFailure failure:
+        return failure;
+    }
   }, AppLocalizations.of(context).invitationJoined(invitation.listName));
 
   Future<void> _decline(Invitation invitation) => _answer(

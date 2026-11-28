@@ -212,4 +212,14 @@ void main() {
       expect(find.widgetWithText(CesButton, 'Recusar'), findsOneWidget);
     });
   });
+
+  testWidgets('a Share link (/join/, not built yet: #10) opens the Lists instead of an error', (tester) async {
+    final h = Harness(tester);
+    h.signedIn();
+    await h.pumpApp();
+
+    await h.openLink('https://cesta.tsantana.dev/join/some-code');
+
+    expect(find.text('Your Lists'), findsOneWidget);
+  });
 }

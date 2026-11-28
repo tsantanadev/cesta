@@ -422,6 +422,12 @@ final class CreateInvitation429 implements CreateInvitationResult {
   final models.ApiError value;
 }
 
+final class CreateInvitation502 implements CreateInvitationResult {
+  const CreateInvitation502(this.value);
+
+  final models.ApiError value;
+}
+
 sealed class CancelInvitationResult {}
 
 final class CancelInvitation200 implements CancelInvitationResult {

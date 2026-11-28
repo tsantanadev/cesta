@@ -12,7 +12,8 @@ import 'invite_by_email_form.dart';
 import 'sharing.dart';
 
 /// Share list (Figma "06 Share list" 4:365), as far as Invitations go: the
-/// card with Invite by email, then the List's pending Invitations, which the
+/// card with Invite by email, then the List's open Invitations (pending, or
+/// expired without an answer, so the Owner sees who never joined), which the
 /// Owner can cancel. The Share link, Share QR code and Members belong to
 /// later tickets; the invite form and the pending Invitations are provisional
 /// until their frames are designed (#44).
@@ -28,8 +29,9 @@ class ShareListScreen extends StatefulWidget {
 }
 
 class _ShareListScreenState extends State<ShareListScreen> {
-  /// Null while loading or when loading failed ([_failure] says why).
-  List<Invitation>? _pending;
+  /// The open Invitations; null while loading or when loading failed
+  /// ([_failure] says why).
+  List<Invitation>? _open;
   InvitationFailure? _failure;
 
   /// The Invitation being cancelled, if one is.
@@ -44,11 +46,16 @@ class _ShareListScreenState extends State<ShareListScreen> {
   ListSummary? get _list => widget.lists.lists.where((l) => l.id == widget.listId).firstOrNull;
 
   Future<void> _load() async {
-    final (pending, failure) = await widget.sharing.pendingFor(widget.listId);
+    final result = await widget.sharing.openFor(widget.listId);
     if (!mounted) return;
     setState(() {
-      _pending = pending ?? _pending;
-      _failure = failure;
+      switch (result) {
+        case InvitationDone(value: final open):
+          _open = open;
+          _failure = null;
+        case final InvitationFailure failure:
+          _failure = failure;
+      }
     });
   }
 
@@ -67,12 +74,16 @@ class _ShareListScreenState extends State<ShareListScreen> {
   /// Sends the Invitation; once it went through, shows it as pending and says so.
   Future<InvitationFailure?> _send(String email) async {
     final language = invitationLanguage(Localizations.localeOf(context).languageCode);
-    final (invitation, failure) = await widget.sharing.invite(widget.listId, email, language: language);
-    if (invitation != null && mounted) {
-      setState(() => _pending = [invitation, ...?_pending]);
-      showCesToast(context, message: AppLocalizations.of(context).shareInvitationSent(invitation.email));
+    switch (await widget.sharing.invite(widget.listId, email, language: language)) {
+      case InvitationDone(value: final invitation):
+        if (mounted) {
+          setState(() => _open = [invitation, ...?_open]);
+          showCesToast(context, message: AppLocalizations.of(context).shareInvitationSent(invitation.email));
+        }
+        return null;
+      case final InvitationFailure failure:
+        return failure;
     }
-    return failure;
   }
 
   Future<void> _cancel(Invitation invitation) async {
@@ -82,9 +93,9 @@ class _ShareListScreenState extends State<ShareListScreen> {
     final l10n = AppLocalizations.of(context);
     setState(() {
       _cancelling = null;
-      // Accepted or declined meanwhile: it isn't pending any more either way.
+      // Accepted or declined meanwhile: it isn't open any more either way.
       if (failure == null || failure is InvitationUnanswerable) {
-        _pending = _pending?.where((i) => i.id != invitation.id).toList();
+        _open = _open?.where((i) => i.id != invitation.id).toList();
       }
     });
     showCesToast(
@@ -98,7 +109,7 @@ class _ShareListScreenState extends State<ShareListScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final pending = _pending;
+    final open = _open;
     return ListenableBuilder(
       listenable: widget.lists,
       builder: (context, _) => Scaffold(
@@ -115,20 +126,21 @@ class _ShareListScreenState extends State<ShareListScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              if (_failure case final failure? when pending == null)
+              if (_failure case final failure? when open == null)
                 CesMessage(tone: CesMessageTone.error, text: invitationFailureMessage(l10n, failure))
-              else if (pending == null)
+              else if (open == null)
                 CesProgress(label: l10n.loading)
-              else if (pending.isNotEmpty) ...[
+              else if (open.isNotEmpty) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                   child: CesSectionHeading(l10n.sharePendingHeading),
                 ),
-                for (final invitation in pending)
+                for (final invitation in open)
                   CesPersonRow(
                     key: ValueKey(invitation.id),
                     icon: CesIcons.envelope,
                     label: invitation.email,
+                    detail: invitation.status == InvitationStatus.expired ? l10n.shareInvitationExpired : null,
                     trailing: CesIconButton(
                       icon: CesIcons.close,
                       tooltip: l10n.shareCancelInvitation(invitation.email),

@@ -5,6 +5,8 @@ import 'sharing.dart';
 /// What to tell the User when something about an Invitation didn't go through.
 String invitationFailureMessage(AppLocalizations l10n, InvitationFailure failure) => switch (failure) {
   InvitationInvalidEmail() => l10n.errorEmailInvalid,
+  InvitationAlreadyMember() => l10n.errorAlreadyMember,
+  InvitationNotSent() => l10n.errorInvitationNotSent,
   InvitationLimitReached(:final limit?) => l10n.errorInvitationLimit(limit),
   InvitationLimitReached(limit: null) => l10n.errorInvitationLimitGeneric,
   InvitationListGone() => l10n.errorListNotFound,

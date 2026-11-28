@@ -130,6 +130,7 @@ GoRouter buildRouter({
         ),
       ],
     ),
+    GoRoute(path: Routes.shareLinkPattern, redirect: (_, _) => Routes.home),
     GoRoute(
       path: Routes.invitation(':token'),
       builder: (_, state) {

@@ -1070,7 +1070,7 @@ abstract class AppLocalizations {
   /// **'Invitation sent to {email}'**
   String shareInvitationSent(String email);
 
-  /// Heading of the List's pending Invitations on Share list.
+  /// Heading of the List's unanswered Invitations on Share list: pending ones, and expired ones (marked so).
   ///
   /// In en, this message translates to:
   /// **'Waiting to join'**
@@ -1081,6 +1081,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel invitation to {email}'**
   String shareCancelInvitation(String email);
+
+  /// Under an expired Invitation on Share list: nobody accepted it in time.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired, never joined'**
+  String get shareInvitationExpired;
 
   /// Toast after the Owner cancels a pending Invitation.
   ///
@@ -1117,6 +1123,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This invitation is no longer available.'**
   String get errorInvitationGone;
+
+  /// Server: the invited address belongs to a Member of the List, the Owner included.
+  ///
+  /// In en, this message translates to:
+  /// **'That person is already on this list.'**
+  String get errorAlreadyMember;
+
+  /// Server: the email provider couldn't send the Invitation's email, so no Invitation was made.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t send the invitation email. Try again in a moment.'**
+  String get errorInvitationNotSent;
 
   /// Subtitle of an Invitation addressed to the User on the Lists screen; name is who sent it.
   ///

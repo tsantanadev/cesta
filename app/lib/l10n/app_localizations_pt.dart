@@ -581,6 +581,9 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get shareInvitationExpired => 'Expirou sem resposta';
+
+  @override
   String shareInvitationCancelled(String email) {
     return 'Convite para $email cancelado';
   }
@@ -602,6 +605,12 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get errorInvitationGone => 'Este convite não está mais disponível.';
+
+  @override
+  String get errorAlreadyMember => 'Essa pessoa já está nesta lista.';
+
+  @override
+  String get errorInvitationNotSent => 'Não conseguimos enviar o e-mail do convite. Tente de novo daqui a pouco.';
 
   @override
   String invitationFrom(String name) {

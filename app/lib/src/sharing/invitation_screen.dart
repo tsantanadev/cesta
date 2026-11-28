@@ -58,12 +58,18 @@ class _InvitationScreenState extends State<InvitationScreen> {
       _loading = true;
       _failure = null;
     });
-    final (invitation, failure) = await widget.sharing.lookup(widget.token);
+    final result = await widget.sharing.lookup(widget.token);
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _invitation = invitation;
-      _failure = failure ?? (invitation == null ? null : Sharing.closed(invitation));
+      switch (result) {
+        case InvitationDone(value: final invitation):
+          _invitation = invitation;
+          _failure = Sharing.closed(invitation);
+        case final InvitationFailure failure:
+          _invitation = null;
+          _failure = failure;
+      }
     });
   }
 
@@ -72,14 +78,14 @@ class _InvitationScreenState extends State<InvitationScreen> {
       _accepting = true;
       _failure = null;
     });
-    final (list, failure) = await widget.sharing.acceptLink(widget.token);
-    if (list != null) await widget.lists.joined(list);
+    final result = await widget.sharing.acceptLink(widget.token);
+    if (result case InvitationDone(value: final list)) await widget.lists.joined(list);
     if (!mounted) return;
     setState(() {
       _accepting = false;
-      _failure = failure;
+      _failure = result is InvitationFailure ? result : null;
     });
-    if (list != null) context.go(Routes.list(list.id));
+    if (result case InvitationDone(value: final list)) context.go(Routes.list(list.id));
   }
 
   Future<void> _decline(Invitation invitation) async {

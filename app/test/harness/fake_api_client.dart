@@ -661,6 +661,10 @@ class FakeApiClient implements ApiClient {
   final _invitations = <_FakeInvitation>[];
   int _nextInvitationId = 1;
 
+  /// When set, the email provider is down: creating an Invitation fails with
+  /// email_not_sent and makes nothing.
+  bool invitationEmailsFail = false;
+
   /// The emails, in the language they were sent in, one per Invitation sent.
   final sentInvitationEmails = <({String to, InvitationCreateLanguage language})>[];
 
@@ -754,12 +758,16 @@ class FakeApiClient implements ApiClient {
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       return CreateInvitation400(_error(ApiErrorCode.invalidEmail));
     }
+    if (list!.members.any((uid) => _users[uid]?.email.toLowerCase() == email)) {
+      return CreateInvitation409(_error(ApiErrorCode.alreadyMember));
+    }
     final dayAgo = DateTime.now().toUtc().subtract(const Duration(days: 1));
     final sentToday = _invitations.where((i) => i.invitedByUid == identity.uid && i.createdAt.isAfter(dayAgo));
     if (sentToday.length >= invitationLimit) {
       return CreateInvitation409(_error(ApiErrorCode.limitExceeded, limit: invitationLimit));
     }
-    final invitation = _invite(list!, email: email, byUid: identity.uid);
+    if (invitationEmailsFail) return CreateInvitation502(_error(ApiErrorCode.emailNotSent));
+    final invitation = _invite(list, email: email, byUid: identity.uid);
     sentInvitationEmails.add((to: email, language: body.language));
     return CreateInvitation201(_toInvitation(invitation));
   }
@@ -787,7 +795,8 @@ class FakeApiClient implements ApiClient {
       Invitations(
         invitations: [
           for (final i in _invitations.reversed)
-            if (i.listId == listId && i.status == InvitationStatus.pending) _toInvitation(i),
+            if (i.listId == listId && (i.status == InvitationStatus.pending || i.status == InvitationStatus.expired))
+              _toInvitation(i),
         ],
       ),
     );

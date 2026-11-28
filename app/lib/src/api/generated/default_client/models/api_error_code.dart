@@ -23,6 +23,8 @@ enum ApiErrorCode {
   invitationExpired("invitation_expired"),
   invitationAccepted("invitation_accepted"),
   listFull("list_full"),
+  alreadyMember("already_member"),
+  emailNotSent("email_not_sent"),
   internal("internal");
 
   const ApiErrorCode(this.value);

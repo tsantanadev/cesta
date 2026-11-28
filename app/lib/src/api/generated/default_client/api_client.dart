@@ -564,9 +564,9 @@ class ApiClient {
     };
   }
 
-  /// The List's pending Invitations (Owner only)
+  /// The List's open Invitations (Owner only)
   ///
-  /// Invitations not yet accepted, declined, cancelled or expired. Newest first.
+  /// Invitations not yet accepted, declined or cancelled: pending ones, and expired ones (status expired), so the Owner sees who never joined. Cancelling an expired Invitation removes it from here. Newest first.
   Future<ListListInvitationsResult> listListInvitations({
     Map<String, Object?> extra = const {
       "openapi.servers": [
@@ -627,7 +627,7 @@ class ApiClient {
 
   /// Invite an email address to the List as an Editor (Owner only)
   ///
-  /// Sends one email, in the given language, with the Invitation's deep link (https://cesta.tsantana.dev/invite/<token>). The token is single-use and only its hash is stored; the Invitation expires 14 days after it is created. A User can send at most 20 Invitations in any 24 hours; the next is rejected with limit_exceeded.
+  /// Sends one email, in the given language, with the Invitation's deep link (https://cesta.tsantana.dev/invite/<token>). The token is single-use and only its hash is stored; the Invitation expires 14 days after it is created. A User can send at most 20 Invitations in any 24 hours; the next is rejected with limit_exceeded. An address that already belongs to a Member of the List (the Owner included) is rejected with already_member, and doesn't count toward the limit. If the email can't be sent, no Invitation is made and the request fails with email_not_sent (502); it can be retried.
   Future<CreateInvitationResult> createInvitation({
     Map<String, Object?> extra = const {
       "openapi.servers": [
@@ -673,7 +673,8 @@ class ApiClient {
               status == 403 ||
               status == 404 ||
               status == 409 ||
-              status == 429),
+              status == 429 ||
+              status == 502),
     );
     final response = await _transport.request<dynamic>(
       "/api/lists/" + Uri.encodeComponent(listId) + "/invitations",
@@ -689,6 +690,7 @@ class ApiClient {
       404 => CreateInvitation404(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       409 => CreateInvitation409(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       429 => CreateInvitation429(models.ApiError.fromJson(response.data as Map<String, Object?>)),
+      502 => CreateInvitation502(models.ApiError.fromJson(response.data as Map<String, Object?>)),
       _ => throw StateError('Unexpected response status: ${response.statusCode}'),
     };
   }
