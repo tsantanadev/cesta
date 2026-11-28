@@ -677,6 +677,18 @@ class FakeApiClient implements ApiClient {
     return _invite(list, email: email, byUid: by?.uid ?? list.ownerUid).id;
   }
 
+  /// The token in the deep link of Invitation [invitationId].
+  String invitationToken(String invitationId) => _invitationById(invitationId).token;
+
+  /// The status of Invitation [invitationId].
+  InvitationStatus invitationStatus(String invitationId) => _invitationById(invitationId).status;
+
+  /// Invitation [invitationId] changes behind the app's back, e.g. it expires.
+  void setInvitationStatus(String invitationId, InvitationStatus status) =>
+      _invitationById(invitationId).status = status;
+
+  _FakeInvitation _invitationById(String id) => _invitations.firstWhere((i) => i.id == id);
+
   /// [by] sends [count] Invitations today to Lists of theirs other than these.
   void sendInvitationsToday(FakeIdentity by, int count) {
     final elsewhere = addList(by, name: 'Elsewhere');
@@ -839,10 +851,26 @@ class FakeApiClient implements ApiClient {
     );
   }
 
-  /// The Invitation [ref] names for [identity]: by id only when addressed to
-  /// their email. Tokens are left to the deep link's tests.
-  _FakeInvitation? _referenced(InvitationRef ref, FakeIdentity identity) =>
-      _invitations.where((i) => i.id == ref.id && i.email == identity.email.toLowerCase()).firstOrNull;
+  /// The Invitation [ref] names for [identity]: by its deep link's token
+  /// whoever they are, or by id only when addressed to their email.
+  _FakeInvitation? _referenced(InvitationRef ref, FakeIdentity identity) => ref.token != null
+      ? _invitations.where((i) => i.token == ref.token).firstOrNull
+      : _invitations.where((i) => i.id == ref.id && i.email == identity.email.toLowerCase()).firstOrNull;
+
+  @override
+  Future<LookupInvitationResult> lookupInvitation({
+    Map<String, Object?> extra = const {},
+    CancelToken? cancelToken,
+    Options? options,
+    required InvitationRef body,
+  }) async {
+    _failIfOffline('/api/invitations/lookup');
+    final identity = auth.current;
+    if (identity == null) return const LookupInvitation401(_unauthenticated);
+    final invitation = _referenced(body, identity);
+    if (invitation == null) return LookupInvitation404(_error(ApiErrorCode.invitationNotFound));
+    return LookupInvitation200(_toInvitation(invitation));
+  }
 
   /// Why [i] can't be accepted or declined any more, if it can't.
   ApiErrorCode? _noLongerValid(_FakeInvitation i) => switch (i.status) {
@@ -865,13 +893,17 @@ class FakeApiClient implements ApiClient {
     if (identity == null) return const AcceptInvitation401(_unauthenticated);
     final invitation = _referenced(body, identity);
     if (invitation == null) return AcceptInvitation404(_error(ApiErrorCode.invitationNotFound));
-    if (_noLongerValid(invitation) case final code?) return AcceptInvitation409(_error(code));
     final list = _lists[invitation.listId]!;
+    // Only a retry by whoever accepted it succeeds, and changes nothing.
+    if (invitation.acceptedByUid == identity.uid) return AcceptInvitation200(_summary(list, identity.uid));
+    if (_noLongerValid(invitation) case final code?) return AcceptInvitation409(_error(code));
     if (list.deletedAt != null) return AcceptInvitation409(_error(ApiErrorCode.listDeleted));
     if (list.members.length >= memberLimit) {
       return AcceptInvitation409(_error(ApiErrorCode.listFull, limit: memberLimit));
     }
-    invitation.status = InvitationStatus.accepted;
+    invitation
+      ..status = InvitationStatus.accepted
+      ..acceptedByUid = identity.uid;
     list.members.add(identity.uid);
     return AcceptInvitation200(_summary(list, identity.uid));
   }
@@ -1006,6 +1038,12 @@ class _FakeInvitation {
   final String invitedByUid;
   final DateTime createdAt;
   InvitationStatus status = InvitationStatus.pending;
+
+  /// The single-use token in its deep link (only its hash is on the server).
+  String get token => 'token-$id';
+
+  /// Who accepted it, so their retry succeeds.
+  String? acceptedByUid;
 }
 
 /// An Item history entry as the fake backend stores it.

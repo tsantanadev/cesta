@@ -129,9 +129,34 @@ class Sharing {
     };
   });
 
+  /// The Invitation whose deep link carries [token], whatever its status.
+  Future<(Invitation?, InvitationFailure?)> lookup(String token) => _load(() async {
+    return switch (await _api.lookupInvitation(body: InvitationRef(token: token))) {
+      LookupInvitation200(:final value) => (value, null),
+      LookupInvitation404(:final value) => (null, InvitationNoLongerValid(value.code)),
+      LookupInvitation429() => (null, InvitationFailure.rateLimited),
+      LookupInvitation400() || LookupInvitation401() => (null, InvitationFailure.failed),
+    };
+  });
+
+  /// Why [invitation] can't be accepted or declined any more; null while it is pending.
+  static InvitationFailure? closed(Invitation invitation) => switch (invitation.status) {
+    InvitationStatus.pending => null,
+    InvitationStatus.accepted => const InvitationNoLongerValid(ApiErrorCode.invitationAccepted),
+    InvitationStatus.declined => const InvitationNoLongerValid(ApiErrorCode.invitationDeclined),
+    InvitationStatus.cancelled => const InvitationNoLongerValid(ApiErrorCode.invitationCancelled),
+    InvitationStatus.expired => const InvitationNoLongerValid(ApiErrorCode.invitationExpired),
+  };
+
   /// Accepts [invitation], making the User an Editor of its List, which it returns.
-  Future<(ListSummary?, InvitationFailure?)> accept(Invitation invitation) => _load(() async {
-    return switch (await _api.acceptInvitation(body: InvitationRef(id: invitation.id))) {
+  Future<(ListSummary?, InvitationFailure?)> accept(Invitation invitation) => _accept(InvitationRef(id: invitation.id));
+
+  /// Accepts the Invitation whose deep link carries [token], whoever it was
+  /// addressed to, making the User an Editor of its List, which it returns.
+  Future<(ListSummary?, InvitationFailure?)> acceptLink(String token) => _accept(InvitationRef(token: token));
+
+  Future<(ListSummary?, InvitationFailure?)> _accept(InvitationRef ref) => _load(() async {
+    return switch (await _api.acceptInvitation(body: ref)) {
       AcceptInvitation200(:final value) => (value, null),
       AcceptInvitation404(:final value) || AcceptInvitation409(:final value) => (null, _noLongerValid(value)),
       AcceptInvitation429() => (null, InvitationFailure.rateLimited),
@@ -140,9 +165,14 @@ class Sharing {
   });
 
   /// Declines [invitation], so its link stops working.
-  Future<InvitationFailure?> decline(Invitation invitation) async {
+  Future<InvitationFailure?> decline(Invitation invitation) => _decline(InvitationRef(id: invitation.id));
+
+  /// Declines the Invitation whose deep link carries [token], so it stops working.
+  Future<InvitationFailure?> declineLink(String token) => _decline(InvitationRef(token: token));
+
+  Future<InvitationFailure?> _decline(InvitationRef ref) async {
     final (_, failure) = await _load(() async {
-      return switch (await _api.declineInvitation(body: InvitationRef(id: invitation.id))) {
+      return switch (await _api.declineInvitation(body: ref)) {
         DeclineInvitation200() => (null, null),
         DeclineInvitation404(:final value) || DeclineInvitation409(:final value) => (null, _noLongerValid(value)),
         DeclineInvitation429() => (null, InvitationFailure.rateLimited),

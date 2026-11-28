@@ -191,6 +191,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorDisplayNameInvalid => 'That name can\'t be used. Try another.';
 
   @override
+  String get invitationTitle => 'Invitation';
+
+  @override
+  String invitationHeading(String name, String list) {
+    return '$name invited you to join $list';
+  }
+
+  @override
+  String get invitationExplanation =>
+      'As an Editor, you can add, check and remove items on this list with everyone on it.';
+
+  @override
+  String invitationSentTo(String invited, String me) {
+    return 'This invitation was sent to $invited. You\'ll join as $me.';
+  }
+
+  @override
+  String get invitationGoToLists => 'Go to your lists';
+
+  @override
   String get listsTitle => 'Your Lists';
 
   @override

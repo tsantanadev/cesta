@@ -189,6 +189,26 @@ class AppLocalizationsPt extends AppLocalizations {
   String get errorDisplayNameInvalid => 'Esse nome não pode ser usado. Tente outro.';
 
   @override
+  String get invitationTitle => 'Convite';
+
+  @override
+  String invitationHeading(String name, String list) {
+    return '$name convidou você para a lista $list';
+  }
+
+  @override
+  String get invitationExplanation =>
+      'Como editor, você pode adicionar, marcar e remover itens desta lista com todos que fazem parte dela.';
+
+  @override
+  String invitationSentTo(String invited, String me) {
+    return 'Este convite foi enviado para $invited. Você vai entrar como $me.';
+  }
+
+  @override
+  String get invitationGoToLists => 'Ir para suas listas';
+
+  @override
   String get listsTitle => 'Suas listas';
 
   @override

@@ -446,6 +446,36 @@ abstract class AppLocalizations {
   /// **'That name can\'t be used. Try another.'**
   String get errorDisplayNameInvalid;
 
+  /// Title of the screen an Invitation's deep link opens (provisional, #44).
+  ///
+  /// In en, this message translates to:
+  /// **'Invitation'**
+  String get invitationTitle;
+
+  /// Heading of the Invitation screen: the Owner who invited the User, and the List.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} invited you to join {list}'**
+  String invitationHeading(String name, String list);
+
+  /// What accepting an Invitation lets the User do.
+  ///
+  /// In en, this message translates to:
+  /// **'As an Editor, you can add, check and remove items on this list with everyone on it.'**
+  String get invitationExplanation;
+
+  /// Shown when the signed-in User's email isn't the one the Invitation was sent to; they can still accept it.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation was sent to {invited}. You\'ll join as {me}.'**
+  String invitationSentTo(String invited, String me);
+
+  /// Leaves the Invitation screen for the Lists screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to your lists'**
+  String get invitationGoToLists;
+
   /// Title of the Lists screen (the home screen), which lists the User's Lists.
   ///
   /// In en, this message translates to:

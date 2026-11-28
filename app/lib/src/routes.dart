@@ -17,6 +17,14 @@ abstract final class Routes {
 
   /// Share list (06) for a List.
   static String shareList(String listId) => '/lists/$listId/share';
+
+  /// The accept screen an Invitation's deep link opens
+  /// (`https://cesta.tsantana.dev/invite/<token>`).
+  static String invitation(String token) => '/invite/$token';
+
+  /// Whether [path] is one a link from outside the app opens, which is kept
+  /// through sign-in.
+  static bool isDeepLink(String path) => path.startsWith('/invite/');
   static const changeDisplayName = '/me/name';
   static const serverStatus = '/server-status';
 }
