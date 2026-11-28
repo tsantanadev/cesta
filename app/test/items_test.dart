@@ -623,12 +623,12 @@ void main() {
     expect(h.api.itemsToBuy(list), ['leite', 'Leite']);
   });
 
-  testWidgets('Matches ignore case and accents, and leave out what is In the basket', (tester) async {
+  testWidgets('Matches ignore case and accents, and show Items In the basket after those to buy', (tester) async {
     final h = Harness(tester);
     final ana = h.signedIn();
     final list = h.api.addList(ana, name: 'Feira');
-    h.api.addItem(list, name: 'Pão de forma', addedBy: ana);
     h.api.addItem(list, name: 'Pãozinho', addedBy: ana, checkedBy: ana);
+    h.api.addItem(list, name: 'Pão de forma', addedBy: ana);
     h.api.addItem(list, name: 'Arroz', addedBy: ana);
     await h.pumpApp(locale: brazilianPortuguese);
     await h.openList('Feira');
@@ -636,12 +636,12 @@ void main() {
 
     await h.search('PAO');
 
-    expect(find.text('Resultados'), findsOneWidget);
-    expect(h.matches(), ['Pão de forma']);
+    expect(find.text('Correspondências'), findsOneWidget);
+    expect(h.matches(), ['Pão de forma', 'Pãozinho']);
 
     await h.search('feijão');
 
-    expect(find.text('Resultados'), findsNothing);
+    expect(find.text('Correspondências'), findsNothing);
     expect(h.matches(), isEmpty);
   });
 }

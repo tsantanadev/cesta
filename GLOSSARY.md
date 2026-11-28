@@ -73,11 +73,11 @@ The record of Items that were bought (cleared after being checked) on a List.
 _Avoid_: Purchase log, past items
 
 **Matches**:
-What Add items offers as the Member types: first the List's Items to buy whose names contain what was typed, ignoring case and accents, highlighted so the Member opens the Item already there instead of adding a duplicate; then the names from the List's Item history that match and aren't already to buy.
+What Add items offers as the Member types: first the List's Items (to buy, then In the basket) whose names contain what was typed, ignoring case and accents, highlighted so the Member opens the Item already there instead of adding a duplicate; then the names from the List's Item history that match and aren't already on the List.
 _Avoid_: Suggestions, search results, autocomplete
 
 **Bought before**:
-What Add items offers before anything is typed: the most recent distinct names from the List's Item history that aren't already to buy. Tapping one adds it to the List again, as it was last bought.
+What Add items offers before anything is typed: the most recent distinct names from the List's Item history that aren't already on the List. Tapping one adds it to the List again, as it was last bought.
 _Avoid_: Past items, recent items, favourites
 
 **Undo window**:

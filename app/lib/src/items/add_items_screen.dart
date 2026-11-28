@@ -149,7 +149,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                 ],
               ),
             ),
-            // Matches (Figma 4:280): the List's Items to buy, as on the List,
+            // Matches (Figma 4:280): the List's Items, as on the List,
             // then Items from the Item history; Bought before (Figma 4:311,
             // heading 4:312) while nothing is typed.
             if (matches.isNotEmpty || fromHistory.isNotEmpty)
@@ -168,7 +168,7 @@ class _AddItemsScreenState extends State<AddItemsScreen> {
                     name: item.name,
                     quantity: tagQuantity(l10n, item.quantity, item.unit),
                     semanticHint: l10n.itemAddAgain,
-                    suggestion: true,
+                    toAdd: true,
                     onTap: () => _addAgain(item),
                   ),
               ]),

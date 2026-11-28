@@ -8,33 +8,38 @@ bool nameMatches(String name, String query) {
   return q.isNotEmpty && foldName(name).contains(q);
 }
 
-/// The Matches that come from the List itself: its Items to buy whose names
-/// match [query], in the order the List shows them. They show highlighted, so
-/// the Member opens the Item already there instead of adding a duplicate.
+/// The Matches that come from the List itself: its Items whose names match
+/// [query], Items to buy first and then those In the basket, each in the
+/// order the List shows them. They show highlighted, so the Member opens the
+/// Item already there instead of adding a duplicate.
 List<ShownItem> listMatches(List<ShownItem> items, String query) => [
   for (final item in items)
     if (!item.checked && nameMatches(item.name, query)) item,
+  for (final item in items)
+    if (item.checked && nameMatches(item.name, query)) item,
 ];
 
 /// The entries of a List's Item [history] (most recent first) to offer on
-/// Add items: each name once, as last bought, leaving out names the List already has
-/// to buy ([onList]), since the List's own Item wins. With a blank [query]
-/// they are Bought before (the most recent [boughtBeforeCap]); otherwise the ones that
-/// match, shown under Matches after the List's.
+/// Add items: each name once, as last bought, leaving out names already on
+/// the List ([onList]), to buy or In the basket, since the List's own Item
+/// wins. With a blank [query] they are Bought before (the most recent
+/// [boughtBeforeCap]); otherwise the ones that match, shown under Matches
+/// after the List's.
 List<HistoryEntry> historyToOffer(List<HistoryEntry> history, List<ShownItem> onList, String query) {
-  final seen = {
-    for (final item in onList)
-      if (!item.checked) foldName(item.name.trim()),
-  };
+  // Names on the List, then also each name offered, so it's offered once.
+  final taken = {for (final item in onList) _key(item.name)};
   final blank = query.trim().isEmpty;
   final offered = <HistoryEntry>[];
   for (final entry in history) {
-    if (!seen.add(foldName(entry.name.trim()))) continue;
+    if (!taken.add(_key(entry.name))) continue;
     if (blank || nameMatches(entry.name, query)) offered.add(entry);
     if (blank && offered.length == boughtBeforeCap) break;
   }
   return offered;
 }
+
+/// [name] as names compare: trimmed and folded with [foldName].
+String _key(String name) => foldName(name.trim());
 
 /// How many names Bought before shows at most.
 const boughtBeforeCap = 12;

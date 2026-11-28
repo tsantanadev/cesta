@@ -106,4 +106,31 @@ void main() {
       expect(h.api.itemsToBuy(list), ['leite', 'Leite condensado']);
     },
   );
+
+  testWidgets('a name In the basket shows as the List’s Item, not from the Item history; tapping it opens that Item', (
+    tester,
+  ) async {
+    final h = Harness(tester);
+    final ana = h.signedIn();
+    final list = h.api.addList(ana, name: 'Weekend feira');
+    h.api.addItem(list, name: 'Leite', addedBy: ana, checkedBy: ana);
+    h.api.clearCheckedNow(list, by: ana);
+    h.api.addItem(list, name: 'leite', addedBy: ana, checkedBy: ana);
+    await h.pumpApp();
+    await h.openList('Weekend feira');
+    await h.tap(find.text('Add an item'));
+    expect(h.fromItemHistory(), isEmpty); // leite is In the basket
+
+    await h.search('Leite');
+
+    expect(h.matches(), ['leite']);
+    expect(h.fromItemHistory(), isEmpty);
+
+    await h.tap(find.widgetWithText(CesItemTile, 'leite'));
+
+    expect(find.text('Edit item'), findsOneWidget);
+    expect(find.text('Checked by you'), findsOneWidget);
+    expect(h.api.itemsInBasket(list), ['leite']);
+    expect(h.api.itemsToBuy(list), isEmpty);
+  });
 }
