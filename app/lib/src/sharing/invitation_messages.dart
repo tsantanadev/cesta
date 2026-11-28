@@ -8,7 +8,7 @@ String invitationFailureMessage(AppLocalizations l10n, InvitationFailure failure
   InvitationLimitReached(:final limit?) => l10n.errorInvitationLimit(limit),
   InvitationLimitReached(limit: null) => l10n.errorInvitationLimitGeneric,
   InvitationListGone() => l10n.errorListNotFound,
-  InvitationNoLongerValid(:final reason) => switch (reason) {
+  InvitationUnanswerable(:final reason) => switch (reason) {
     ApiErrorCode.invitationAccepted => l10n.errorInvitationAccepted,
     ApiErrorCode.invitationDeclined => l10n.errorInvitationDeclined,
     ApiErrorCode.invitationCancelled => l10n.errorInvitationCancelled,

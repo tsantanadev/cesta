@@ -35,10 +35,10 @@ final class InvitationListGone extends InvitationFailure {
   const InvitationListGone();
 }
 
-/// The Invitation was cancelled, declined, accepted, expired or is unknown,
-/// or its List is full: [reason] is the server's code.
-final class InvitationNoLongerValid extends InvitationFailure {
-  const InvitationNoLongerValid(this.reason);
+/// The Invitation can't be answered: it is unknown, was cancelled, declined,
+/// accepted or expired, or its List is full. [reason] is the server's code.
+final class InvitationUnanswerable extends InvitationFailure {
+  const InvitationUnanswerable(this.reason);
 
   final ApiErrorCode reason;
 }
@@ -115,11 +115,11 @@ class Sharing {
         CancelInvitation200() => (null, null),
         CancelInvitation404(value: ApiError(:final code)) when code == ApiErrorCode.invitationNotFound => (
           null,
-          InvitationNoLongerValid(code),
+          InvitationUnanswerable(code),
         ),
         CancelInvitation409(value: ApiError(:final code))
             when code == ApiErrorCode.invitationAccepted || code == ApiErrorCode.invitationDeclined =>
-          (null, InvitationNoLongerValid(code)),
+          (null, InvitationUnanswerable(code)),
         CancelInvitation404() || CancelInvitation403() || CancelInvitation409() => (null, InvitationFailure.listGone),
         CancelInvitation429() => (null, InvitationFailure.rateLimited),
         CancelInvitation400() || CancelInvitation401() => (null, InvitationFailure.failed),
@@ -141,7 +141,7 @@ class Sharing {
   Future<(Invitation?, InvitationFailure?)> lookup(String token) => _load(() async {
     return switch (await _api.lookupInvitation(body: InvitationRef(token: token))) {
       LookupInvitation200(:final value) => (value, null),
-      LookupInvitation404(:final value) => (null, InvitationNoLongerValid(value.code)),
+      LookupInvitation404(:final value) => (null, InvitationUnanswerable(value.code)),
       LookupInvitation429() => (null, InvitationFailure.rateLimited),
       LookupInvitation400() || LookupInvitation401() => (null, InvitationFailure.failed),
     };
@@ -150,10 +150,10 @@ class Sharing {
   /// Why [invitation] can't be accepted or declined any more; null while it is pending.
   static InvitationFailure? closed(Invitation invitation) => switch (invitation.status) {
     InvitationStatus.pending => null,
-    InvitationStatus.accepted => const InvitationNoLongerValid(ApiErrorCode.invitationAccepted),
-    InvitationStatus.declined => const InvitationNoLongerValid(ApiErrorCode.invitationDeclined),
-    InvitationStatus.cancelled => const InvitationNoLongerValid(ApiErrorCode.invitationCancelled),
-    InvitationStatus.expired => const InvitationNoLongerValid(ApiErrorCode.invitationExpired),
+    InvitationStatus.accepted => const InvitationUnanswerable(ApiErrorCode.invitationAccepted),
+    InvitationStatus.declined => const InvitationUnanswerable(ApiErrorCode.invitationDeclined),
+    InvitationStatus.cancelled => const InvitationUnanswerable(ApiErrorCode.invitationCancelled),
+    InvitationStatus.expired => const InvitationUnanswerable(ApiErrorCode.invitationExpired),
   };
 
   /// Accepts [invitation], making the User an Editor of its List, which it returns.
@@ -166,7 +166,7 @@ class Sharing {
   Future<(ListSummary?, InvitationFailure?)> _accept(InvitationRef ref) => _load(() async {
     return switch (await _api.acceptInvitation(body: ref)) {
       AcceptInvitation200(:final value) => (value, null),
-      AcceptInvitation404(:final value) || AcceptInvitation409(:final value) => (null, _noLongerValid(value)),
+      AcceptInvitation404(:final value) || AcceptInvitation409(:final value) => (null, _unanswerable(value)),
       AcceptInvitation429() => (null, InvitationFailure.rateLimited),
       AcceptInvitation400() || AcceptInvitation401() => (null, InvitationFailure.failed),
     };
@@ -182,7 +182,7 @@ class Sharing {
     final (_, failure) = await _load(() async {
       return switch (await _api.declineInvitation(body: ref)) {
         DeclineInvitation200() => (null, null),
-        DeclineInvitation404(:final value) || DeclineInvitation409(:final value) => (null, _noLongerValid(value)),
+        DeclineInvitation404(:final value) || DeclineInvitation409(:final value) => (null, _unanswerable(value)),
         DeclineInvitation429() => (null, InvitationFailure.rateLimited),
         DeclineInvitation400() || DeclineInvitation401() => (null, InvitationFailure.failed),
       };
@@ -190,9 +190,9 @@ class Sharing {
     return failure;
   }
 
-  static InvitationFailure _noLongerValid(ApiError error) => switch (error.code) {
+  static InvitationFailure _unanswerable(ApiError error) => switch (error.code) {
     ApiErrorCode.listDeleted || ApiErrorCode.listNotFound => InvitationFailure.listGone,
-    final code => InvitationNoLongerValid(code),
+    final code => InvitationUnanswerable(code),
   };
 
   Future<(T?, InvitationFailure?)> _load<T>(Future<(T?, InvitationFailure?)> Function() call) async {
