@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  Fallback for /invite/<token> when the app isn't installed (#41). With the app
+  installed, iOS universal links and Android App Links open the app instead.
+  REPLACE_ME_APP_STORE_ID: the numeric App Store ID, once the app is listed.
+-->
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <title>Cesta</title>
+    <style>
+      /* app/lib/src/ui/tokens.dart: alface, tinta, tintaMuted, folha, branco */
+      :root { --bg: #edf3ea; --fg: #17382a; --muted: #5e7466; --accent: #1e6b43; --on-accent: #fff; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #141316; --fg: #e6e1e5; --muted: #aaa6b0; --accent: #81c784; --on-accent: #0b2e0d; }
+      }
+      body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+      main { max-width: 28rem; margin: 0 auto; padding: 3rem 1rem; text-align: center; }
+      h1 { font-size: 1.75rem; margin: 0 0 0.5rem; }
+      p { color: var(--muted); margin: 0 0 1.5rem; }
+      a.store { display: block; margin: 0.75rem 0; padding: 0.875rem 1rem; border-radius: 0.75rem;
+        background: var(--accent); color: var(--on-accent); text-decoration: none; font-weight: 600; }
+      [lang="en"] { display: none; }
+      html.en [lang="pt-BR"] { display: none; }
+      html.en [lang="en"] { display: block; }
+    </style>
+    <script>
+      if (!/^pt\b/i.test(navigator.language || "")) document.documentElement.classList.add("en");
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Cesta</h1>
+      <section lang="pt-BR">
+        <p>Você recebeu um convite para uma lista. Instale o Cesta e abra o link do email de novo para aceitar.</p>
+      </section>
+      <section lang="en">
+        <p>You've been invited to a list. Install Cesta, then open the link in the email again to accept.</p>
+      </section>
+      <a class="store" href="https://apps.apple.com/app/idREPLACE_ME_APP_STORE_ID">App Store</a>
+      <a class="store" href="https://play.google.com/store/apps/details?id=dev.tsantana.cesta">Google Play</a>
+    </main>
+  </body>
+</html>
