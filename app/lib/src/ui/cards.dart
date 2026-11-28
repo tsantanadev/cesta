@@ -209,7 +209,7 @@ class CesItemTile extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.semanticHint,
-    this.suggestion = false,
+    this.toAdd = false,
   });
 
   /// An empty white tag (Figma "Item tile" State=Suggestion 3:39, as the empty
@@ -221,12 +221,12 @@ class CesItemTile extends StatelessWidget {
       onTap = null,
       onLongPress = null,
       semanticHint = null,
-      suggestion = true;
+      toAdd = true;
 
   /// A white tag with an outline (Figma "Item tile" State=Suggestion 3:39):
-  /// something to add, such as an Item under Bought before, rather than
+  /// something to add, such as an entry under Bought before, rather than
   /// an Item on the List.
-  final bool suggestion;
+  final bool toAdd;
 
   final String name;
   final IconData? icon;
@@ -254,7 +254,7 @@ class CesItemTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final scheme = Theme.of(context).colorScheme;
-    final ink = suggestion ? scheme.onSurface : palette.onToBuy;
+    final ink = toAdd ? scheme.onSurface : palette.onToBuy;
     final icon = this.icon;
     final quantity = this.quantity;
     final nameText = Text(
@@ -312,8 +312,8 @@ class CesItemTile extends StatelessWidget {
     final interactive = onTap != null || onLongPress != null;
     final outline = BorderSide(color: palette.bought, width: 1.5);
     Widget tile = Material(
-      color: suggestion ? scheme.surfaceContainerLow : palette.toBuy,
-      shape: RoundedRectangleBorder(borderRadius: radius, side: suggestion ? outline : BorderSide.none),
+      color: toAdd ? scheme.surfaceContainerLow : palette.toBuy,
+      shape: RoundedRectangleBorder(borderRadius: radius, side: toAdd ? outline : BorderSide.none),
       child: InkWell(
         borderRadius: radius,
         onTap: onTap,
@@ -350,7 +350,7 @@ class CesItemTile extends StatelessWidget {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: suggestion
+                  decoration: toAdd
                       ? BoxDecoration(border: Border.fromBorderSide(outline), shape: BoxShape.circle)
                       : BoxDecoration(color: scheme.surface, shape: BoxShape.circle),
                 ),
