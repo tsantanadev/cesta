@@ -64,16 +64,15 @@ func (r *Resend) Send(ctx context.Context, msg Message) error {
 	return nil
 }
 
-// Log is a Sender for local development: it logs each message's recipient and
-// subject instead of sending it. The body (with any Invitation token) is logged
-// only at debug level.
+// Log is a Sender for local development: it logs each message's subject
+// instead of sending it. The body is never logged: an Invitation's deep link
+// in it carries a token that works like a password.
 type Log struct {
 	Logger *slog.Logger
 }
 
-// Send logs msg.
+// Send logs msg's subject.
 func (l Log) Send(ctx context.Context, msg Message) error {
 	l.Logger.InfoContext(ctx, "email not sent (no RESEND_API_KEY)", slog.String("subject", msg.Subject))
-	l.Logger.DebugContext(ctx, "email body", slog.String("text", msg.Text))
 	return nil
 }
