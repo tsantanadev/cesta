@@ -2,10 +2,12 @@ package api_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -255,6 +257,25 @@ func TestOnlyMembersListsCanBeInvitedTo(t *testing.T) {
 	res.RequireErrorCode(t, "list_not_found")
 }
 
+func TestAnInvitationWhoseEmailCantBeSentIsNotMade(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	srv.Emails.FailWith(errors.New("provider down"))
+
+	res := ana.Post(t, "/api/lists/"+groceriesID+"/invitations", `{"email": "`+carlaEmail+`", "language": "en"}`)
+
+	res.RequireStatus(t, http.StatusInternalServerError)
+	if got := pendingInvitations(t, ana, "/api/lists/"+groceriesID+"/invitations"); len(got) != 0 {
+		t.Fatalf("pending on the List = %+v, want none when the email wasn't sent", got)
+	}
+	if got := pendingInvitations(t, srv.As(carlaIdentity), "/api/invitations"); len(got) != 0 {
+		t.Fatalf("Carla's pending = %+v, want none when the email wasn't sent", got)
+	}
+	srv.Emails.FailWith(nil)
+	invite(t, ana, groceriesID, carlaEmail)
+}
+
 func TestInvitingSomethingThatIsNotAnEmailAddressIsRejected(t *testing.T) {
 	srv := testkit.NewServer(t)
 	ana := srv.As(testkit.Ana)
@@ -305,6 +326,46 @@ func TestJoiningAListThatAlreadyHasTwentyMembersIsRejected(t *testing.T) {
 
 	res.RequireStatus(t, http.StatusConflict)
 	res.RequireErrorCode(t, "list_full")
+	if got := myLists(t, ana)[0].MemberCount; got != 20 {
+		t.Fatalf("memberCount = %d, want 20", got)
+	}
+}
+
+func TestTwoAcceptsRacingForTheLastPlaceLetExactlyOneJoin(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	for i := range 18 {
+		address := fmt.Sprintf("friend%d@example.com", i)
+		invite(t, ana, groceriesID, address)
+		friend := srv.As(auth.Identity{Subject: fmt.Sprintf("firebase-uid-friend%d", i), Email: address})
+		accept(friend, t, inviteToken(t, srv, address)).RequireStatus(t, http.StatusOK)
+	}
+	invite(t, ana, groceriesID, carlaEmail)
+	invite(t, ana, groceriesID, testkit.Bruno.Email)
+	racers := []*testkit.Client{srv.As(carlaIdentity), srv.As(testkit.Bruno)}
+	tokens := []string{inviteToken(t, srv, carlaEmail), inviteToken(t, srv, testkit.Bruno.Email)}
+	results := make([]*testkit.Response, len(racers))
+	var wg sync.WaitGroup
+
+	for i := range racers {
+		wg.Go(func() { results[i] = accept(racers[i], t, tokens[i]) })
+	}
+	wg.Wait()
+
+	var joined, full int
+	for _, res := range results {
+		switch {
+		case res.Status == http.StatusOK:
+			joined++
+		case res.Status == http.StatusConflict && strings.Contains(string(res.Body), `"list_full"`):
+			full++
+		}
+	}
+	if joined != 1 || full != 1 {
+		t.Fatalf("results = %d %s and %d %s, want one joined and one list_full",
+			results[0].Status, results[0].Body, results[1].Status, results[1].Body)
+	}
 	if got := myLists(t, ana)[0].MemberCount; got != 20 {
 		t.Fatalf("memberCount = %d, want 20", got)
 	}
