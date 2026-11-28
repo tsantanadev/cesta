@@ -102,6 +102,9 @@ class _CestaAppState extends State<CestaApp> {
     await _sync.flush();
   }
 
+  /// The context of the router's navigator, once it is built.
+  BuildContext? get _routerContext => _router.routerDelegate.navigatorKey.currentContext;
+
   /// Clears the Checked Items of List [listId] as the signed-in User.
   void _clearChecked(String listId) => _session.asMe((me) => unawaited(_items.clearChecked(listId: listId, by: me)));
 
@@ -109,7 +112,7 @@ class _CestaAppState extends State<CestaApp> {
   /// 38:2815). A create refused because the List is full opens the Item limit
   /// sheet instead (Figma "14 Item limit").
   void _tellRejected(RejectedChange change) {
-    if (change.reason == ApiErrorCode.limitExceeded && _router.routerDelegate.navigatorKey.currentContext != null) {
+    if (change.reason == ApiErrorCode.limitExceeded && _routerContext != null) {
       unawaited(_showItemLimit(change));
       return;
     }
@@ -120,7 +123,7 @@ class _CestaAppState extends State<CestaApp> {
   /// offering Clear checked when it has Checked Items.
   Future<void> _showItemLimit(RejectedChange change) async {
     final items = await _items.readList(change.listId);
-    if (_router.routerDelegate.navigatorKey.currentContext case final context? when context.mounted) {
+    if (_routerContext case final context? when context.mounted) {
       await showItemLimitSheet(
         context,
         limit: change.limit ?? _sync.itemLimit.value,
