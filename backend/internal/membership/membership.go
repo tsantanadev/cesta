@@ -76,10 +76,12 @@ func (s *Service) RoleIn(ctx context.Context, tx pgx.Tx, listID, userID uuid.UUI
 	return roleOf(ctx, tx, listID, userID)
 }
 
-func roleOf(ctx context.Context, q interface {
+// querier is a pool or a transaction.
+type querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}, listID, userID uuid.UUID,
-) (Role, error) {
+}
+
+func roleOf(ctx context.Context, q querier, listID, userID uuid.UUID) (Role, error) {
 	var role string
 	err := q.QueryRow(ctx,
 		"SELECT role FROM list_members WHERE list_id = $1 AND user_id = $2", listID, userID).Scan(&role)
@@ -140,8 +142,12 @@ func (s *Service) Memberships(ctx context.Context, userID uuid.UUID) ([]Membersh
 
 // Count returns how many Members listID has.
 func (s *Service) Count(ctx context.Context, listID uuid.UUID) (int, error) {
+	return count(ctx, s.db, listID)
+}
+
+func count(ctx context.Context, q querier, listID uuid.UUID) (int, error) {
 	var n int
-	if err := s.db.QueryRow(ctx, "SELECT count(*) FROM list_members WHERE list_id = $1", listID).Scan(&n); err != nil {
+	if err := q.QueryRow(ctx, "SELECT count(*) FROM list_members WHERE list_id = $1", listID).Scan(&n); err != nil {
 		return 0, fmt.Errorf("membership: count: %w", err)
 	}
 	return n, nil
@@ -166,9 +172,9 @@ func (s *Service) Join(ctx context.Context, tx pgx.Tx, listID, userID uuid.UUID,
 	case !errors.Is(err, ErrNotAMember):
 		return false, err
 	}
-	var n int
-	if err := tx.QueryRow(ctx, "SELECT count(*) FROM list_members WHERE list_id = $1", listID).Scan(&n); err != nil {
-		return false, fmt.Errorf("membership: join: %w", err)
+	n, err := count(ctx, tx, listID)
+	if err != nil {
+		return false, err
 	}
 	if n >= MaxPerList {
 		return false, ErrListFull

@@ -265,7 +265,8 @@ func TestAnInvitationWhoseEmailCantBeSentIsNotMade(t *testing.T) {
 
 	res := ana.Post(t, "/api/lists/"+groceriesID+"/invitations", `{"email": "`+carlaEmail+`", "language": "en"}`)
 
-	res.RequireStatus(t, http.StatusInternalServerError)
+	res.RequireStatus(t, http.StatusBadGateway)
+	res.RequireErrorCode(t, "email_not_sent")
 	if got := pendingInvitations(t, ana, "/api/lists/"+groceriesID+"/invitations"); len(got) != 0 {
 		t.Fatalf("pending on the List = %+v, want none when the email wasn't sent", got)
 	}
@@ -466,5 +467,65 @@ func TestAcceptNeedsExactlyOneOfTokenOrID(t *testing.T) {
 		res := srv.As(testkit.Bruno).Post(t, "/api/invitations/accept", body)
 		res.RequireStatus(t, http.StatusBadRequest)
 		res.RequireErrorCode(t, "invalid_request")
+	}
+}
+
+func TestInvitingSomeoneAlreadyOnTheListIsRejected(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana, bruno := srv.As(testkit.Ana), srv.As(testkit.Bruno)
+	createList(t, ana, groceriesID, "Groceries")
+	invite(t, ana, groceriesID, testkit.Bruno.Email)
+	accept(bruno, t, inviteToken(t, srv, testkit.Bruno.Email)).RequireStatus(t, http.StatusOK)
+	sentBefore := len(srv.Emails.SentTo(testkit.Bruno.Email))
+
+	for _, address := range []string{" Bruno.Lima@Example.com", testkit.Ana.Email} {
+		res := ana.Post(t, "/api/lists/"+groceriesID+"/invitations", `{"email": "`+address+`", "language": "en"}`)
+		res.RequireStatus(t, http.StatusConflict)
+		res.RequireErrorCode(t, "already_member")
+	}
+
+	if got := len(srv.Emails.SentTo(testkit.Bruno.Email)); got != sentBefore {
+		t.Fatalf("sent %d emails to Bruno, want %d: none for the rejected Invitation", got, sentBefore)
+	}
+	if got := pendingInvitations(t, ana, "/api/lists/"+groceriesID+"/invitations"); len(got) != 0 {
+		t.Fatalf("open Invitations on the List = %+v, want none", got)
+	}
+}
+
+func TestTheOwnerStillSeesInvitationsThatExpired(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	expired := invite(t, ana, groceriesID, carlaEmail)
+
+	srv.Clock.Advance(14 * 24 * time.Hour)
+
+	onList := pendingInvitations(t, ana, "/api/lists/"+groceriesID+"/invitations")
+	if len(onList) != 1 || onList[0].ID != expired.ID || onList[0].Status != "expired" {
+		t.Fatalf("open Invitations on the List = %+v, want Carla's, expired", onList)
+	}
+	if got := pendingInvitations(t, srv.As(carlaIdentity), "/api/invitations"); len(got) != 0 {
+		t.Fatalf("Carla's pending = %+v, want none once expired", got)
+	}
+	ana.Delete(t, "/api/lists/"+groceriesID+"/invitations/"+expired.ID).RequireStatus(t, http.StatusOK)
+	if got := pendingInvitations(t, ana, "/api/lists/"+groceriesID+"/invitations"); len(got) != 0 {
+		t.Fatalf("open Invitations on the List = %+v, want none once cancelled", got)
+	}
+}
+
+func TestAnExpiredInvitationDropsOutOnceTheAddressIsInvitedAgain(t *testing.T) {
+	srv := testkit.NewServer(t)
+	ana := srv.As(testkit.Ana)
+	createList(t, ana, groceriesID, "Groceries")
+	invite(t, ana, groceriesID, carlaEmail)
+	expiredToBruno := invite(t, ana, groceriesID, testkit.Bruno.Email)
+	srv.Clock.Advance(14 * 24 * time.Hour)
+
+	again := invite(t, ana, groceriesID, carlaEmail)
+
+	onList := pendingInvitations(t, ana, "/api/lists/"+groceriesID+"/invitations")
+	if len(onList) != 2 || onList[0].ID != again.ID || onList[0].Status != "pending" ||
+		onList[1].ID != expiredToBruno.ID || onList[1].Status != "expired" {
+		t.Fatalf("open Invitations on the List = %+v, want Carla's new one, then Bruno's expired one", onList)
 	}
 }

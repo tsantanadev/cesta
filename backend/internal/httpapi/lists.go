@@ -51,7 +51,7 @@ func (s *Server) CreateList(ctx context.Context, req CreateListRequestObject) (C
 	case errors.Is(err, lists.ErrIDTaken):
 		return CreateList409JSONResponse{ConflictJSONResponse{Code: ApiErrorCodeListIdTaken, Message: "another List has this id"}}, nil
 	case errors.Is(err, lists.ErrLimitReached):
-		return CreateList409JSONResponse{ConflictJSONResponse(limitExceeded(s.Lists.MaxPerUser()))}, nil
+		return CreateList409JSONResponse{ConflictJSONResponse(limitExceeded(s.Lists.MaxPerUser(), "the User already owns the limit of %d Lists"))}, nil
 	case errors.Is(err, lists.ErrDeleted):
 		return CreateList409JSONResponse{ConflictJSONResponse(listDeleted())}, nil
 	case err != nil:
@@ -128,7 +128,7 @@ func (s *Server) RestoreList(ctx context.Context, req RestoreListRequestObject) 
 	case errors.Is(err, lists.ErrNotOwner):
 		return RestoreList403JSONResponse{ForbiddenJSONResponse(notListOwner())}, nil
 	case errors.Is(err, lists.ErrLimitReached):
-		return RestoreList409JSONResponse{ConflictJSONResponse(limitExceeded(s.Lists.MaxPerUser()))}, nil
+		return RestoreList409JSONResponse{ConflictJSONResponse(limitExceeded(s.Lists.MaxPerUser(), "the User already owns the limit of %d Lists"))}, nil
 	case err != nil:
 		return nil, err
 	}
@@ -179,12 +179,10 @@ func notListOwner() ApiError {
 	return ApiError{Code: ApiErrorCodeNotListOwner, Message: "only the List's Owner can do this"}
 }
 
-func limitExceeded(limit int) ApiError {
-	return ApiError{
-		Code:    ApiErrorCodeLimitExceeded,
-		Message: fmt.Sprintf("the User already owns the limit of %d Lists", limit),
-		Limit:   &limit,
-	}
+// limitExceeded is the error for a limit of limit reached; format says which,
+// with %d for the limit.
+func limitExceeded(limit int, format string) ApiError {
+	return ApiError{Code: ApiErrorCodeLimitExceeded, Message: fmt.Sprintf(format, limit), Limit: &limit}
 }
 
 // listSummary returns l as the API shows it, with its count of Items to buy.

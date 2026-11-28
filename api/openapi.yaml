@@ -300,11 +300,14 @@ paths:
       - $ref: "#/components/parameters/ListId"
     get:
       operationId: listListInvitations
-      summary: The List's pending Invitations (Owner only)
-      description: Invitations not yet accepted, declined, cancelled or expired. Newest first.
+      summary: The List's open Invitations (Owner only)
+      description: >-
+        Invitations not yet accepted, declined or cancelled: pending ones, and expired
+        ones (status expired), so the Owner sees who never joined. Cancelling an
+        expired Invitation removes it from here. Newest first.
       responses:
         "200":
-          description: The List's pending Invitations
+          description: The List's open Invitations
           content:
             application/json:
               schema:
@@ -329,7 +332,10 @@ paths:
         (https://cesta.tsantana.dev/invite/<token>). The token is single-use and only
         its hash is stored; the Invitation expires 14 days after it is created. A User
         can send at most 20 Invitations in any 24 hours; the next is rejected with
-        limit_exceeded.
+        limit_exceeded. An address that already belongs to a Member of the List (the
+        Owner included) is rejected with already_member, and doesn't count toward the
+        limit. If the email can't be sent, no Invitation is made and the request fails
+        with email_not_sent (502); it can be retried.
       requestBody:
         required: true
         content:
@@ -355,6 +361,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "429":
           $ref: "#/components/responses/RateLimited"
+        "502":
+          $ref: "#/components/responses/EmailNotSent"
   /api/lists/{listId}/invitations/{invitationId}:
     parameters:
       - $ref: "#/components/parameters/ListId"
@@ -564,6 +572,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiError"
+    EmailNotSent:
+      description: The email provider couldn't send the email (code email_not_sent); nothing was made
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
   schemas:
     ApiError:
       type: object
@@ -594,6 +608,8 @@ components:
             - invitation_expired
             - invitation_accepted
             - list_full
+            - already_member
+            - email_not_sent
             - internal
         message:
           type: string

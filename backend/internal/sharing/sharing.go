@@ -58,6 +58,12 @@ var (
 	// ErrLimitReached is returned when the User already sent MaxPerDay
 	// Invitations in the last 24 hours.
 	ErrLimitReached error = sharingError("invitation limit reached")
+	// ErrAlreadyMember is returned for inviting an address that belongs to a
+	// Member of the List, the Owner included.
+	ErrAlreadyMember error = sharingError("already a member of the list")
+	// ErrNotSent is returned when the Invitation's email couldn't be sent; no
+	// Invitation was made.
+	ErrNotSent error = sharingError("invitation email not sent")
 )
 
 // Status is where an Invitation stands.
@@ -78,12 +84,14 @@ type Invitation struct {
 	ID          uuid.UUID
 	ListID      uuid.UUID
 	ListName    string
-	Email       string
+	Email       Email
 	InvitedBy   uuid.UUID
 	InviterName string
 	Status      Status
 	CreatedAt   time.Time
 	ExpiresAt   time.Time
+	// listLive is false when the List is deleted (ListName is then empty).
+	listLive bool
 }
 
 // Ref identifies an Invitation by its token or, for one addressed to the
@@ -96,7 +104,32 @@ type Ref struct {
 // Invitee is the signed-in User acting on an Invitation.
 type Invitee struct {
 	ID    uuid.UUID
-	Email string
+	Email Email
+}
+
+// Email is an email address in the one form it is stored and compared in:
+// trimmed and lowercased.
+type Email string
+
+// CanonicalEmail returns address in canonical form, without checking that it
+// is an email address: for one the identity provider vouched for.
+func CanonicalEmail(address string) Email {
+	return Email(strings.ToLower(strings.TrimSpace(address)))
+}
+
+// ParseEmail returns address in canonical form, or ErrInvalidEmail unless it
+// is a plain email address (no display name) at most MaxEmailLength long.
+func ParseEmail(address string) (Email, error) {
+	e := CanonicalEmail(address)
+	plain := string(e)
+	if plain == "" || len(plain) > MaxEmailLength {
+		return "", ErrInvalidEmail
+	}
+	parsed, err := mail.ParseAddress(plain)
+	if err != nil || parsed.Address != plain || !strings.Contains(plain[strings.LastIndex(plain, "@"):], ".") {
+		return "", ErrInvalidEmail
+	}
+	return e, nil
 }
 
 // Service manages Invitations.
@@ -117,12 +150,13 @@ func NewService(db *pgxpool.Pool, c clock.Clock, ls *lists.Service, members *mem
 }
 
 // Create invites address to listID, which inviter must own, and emails it the
-// Invitation's deep link in lang. It returns ErrInvalidEmail, ErrLimitReached,
-// or lists.ErrNotFound, lists.ErrNotOwner or lists.ErrDeleted.
+// Invitation's deep link in lang. It returns ErrInvalidEmail, ErrAlreadyMember,
+// ErrLimitReached, ErrNotSent, or lists.ErrNotFound, lists.ErrNotOwner or
+// lists.ErrDeleted.
 func (s *Service) Create(ctx context.Context, inviter, listID uuid.UUID, address string, lang notify.Language) (Invitation, error) {
-	address, ok := normalizeEmail(address)
-	if !ok {
-		return Invitation{}, ErrInvalidEmail
+	to, err := ParseEmail(address)
+	if err != nil {
+		return Invitation{}, err
 	}
 	token, hash, err := newToken()
 	if err != nil {
@@ -130,11 +164,15 @@ func (s *Service) Create(ctx context.Context, inviter, listID uuid.UUID, address
 	}
 	now := s.clock.Now()
 	inv := Invitation{
-		ListID: listID, Email: address, InvitedBy: inviter, Status: Pending,
-		CreatedAt: now, ExpiresAt: now.Add(ExpiresAfter),
+		ListID: listID, Email: to, InvitedBy: inviter, Status: Pending,
+		CreatedAt: now, ExpiresAt: now.Add(ExpiresAfter), listLive: true,
 	}
 	err = pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		if inv.ListName, err = s.lists.LockOwnedLive(ctx, tx, inviter, listID); err != nil {
+			return err
+		}
+		// Under the List's lock, so nobody joins between this check and the insert.
+		if err := s.requireNotMember(ctx, tx, listID, to); err != nil {
 			return err
 		}
 		// Serialize the inviter's Invitations so two at the limit can't both pass.
@@ -154,7 +192,7 @@ func (s *Service) Create(ctx context.Context, inviter, listID uuid.UUID, address
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO invitations (list_id, email, token_hash, invited_by, created_at, expires_at)
 			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-			listID, address, hash, inviter, inv.CreatedAt, inv.ExpiresAt).Scan(&inv.ID); err != nil {
+			listID, string(to), hash, inviter, inv.CreatedAt, inv.ExpiresAt).Scan(&inv.ID); err != nil {
 			return err
 		}
 		names, err := s.users.DisplayNamesIn(ctx, tx, []uuid.UUID{inviter})
@@ -171,19 +209,41 @@ func (s *Service) Create(ctx context.Context, inviter, listID uuid.UUID, address
 	// provider. If the email can't go out, the Invitation is removed: none is
 	// left behind that nobody received. Nobody else has its token meanwhile.
 	if err := s.notifier.Invited(ctx, notify.Invitation{
-		To: address, InviterName: inv.InviterName, ListName: inv.ListName,
+		To: string(to), InviterName: inv.InviterName, ListName: inv.ListName,
 		Token: token, ExpiresAt: inv.ExpiresAt, Language: lang,
 	}); err != nil {
+		err = fmt.Errorf("%w: %w", ErrNotSent, err)
 		if _, delErr := s.db.Exec(context.WithoutCancel(ctx), "DELETE FROM invitations WHERE id = $1", inv.ID); delErr != nil {
 			err = errors.Join(err, fmt.Errorf("remove unsent invitation: %w", delErr))
 		}
-		return Invitation{}, wrap("create", err)
+		return Invitation{}, err
 	}
 	return inv, nil
 }
 
-// ForList returns the pending Invitations to listID, which owner must own,
-// newest first. It returns lists.ErrNotFound, lists.ErrNotOwner or lists.ErrDeleted.
+// requireNotMember returns ErrAlreadyMember if a User with address is a Member
+// of listID.
+func (s *Service) requireNotMember(ctx context.Context, tx pgx.Tx, listID uuid.UUID, address Email) error {
+	userIDs, err := s.users.WithEmailIn(ctx, tx, string(address))
+	if err != nil {
+		return err
+	}
+	for _, id := range userIDs {
+		_, err := s.members.RoleIn(ctx, tx, listID, id)
+		switch {
+		case err == nil:
+			return ErrAlreadyMember
+		case !errors.Is(err, membership.ErrNotAMember):
+			return err
+		}
+	}
+	return nil
+}
+
+// ForList returns the open Invitations to listID, which owner must own: those
+// pending, and those expired, so the Owner sees who never joined, until the
+// address is invited again. Newest first. It
+// returns lists.ErrNotFound, lists.ErrNotOwner or lists.ErrDeleted.
 func (s *Service) ForList(ctx context.Context, owner, listID uuid.UUID) ([]Invitation, error) {
 	var out []Invitation
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
@@ -191,7 +251,11 @@ func (s *Service) ForList(ctx context.Context, owner, listID uuid.UUID) ([]Invit
 			return err
 		}
 		var err error
-		out, err = s.query(ctx, tx, "list_id = $1 AND status = 'pending' AND expires_at > $2", listID, s.clock.Now())
+		// An expired one drops out once its address is invited to the List again.
+		out, err = s.listWhere(ctx, tx, `list_id = $1 AND status = 'pending' AND (expires_at > $2 OR NOT EXISTS (
+			SELECT 1 FROM invitations newer
+			WHERE newer.list_id = invitations.list_id AND newer.email = invitations.email
+				AND newer.created_at > invitations.created_at))`, listID, s.clock.Now())
 		return err
 	})
 	if err != nil {
@@ -206,8 +270,8 @@ func (s *Service) ForUser(ctx context.Context, who Invitee) ([]Invitation, error
 	var out []Invitation
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
 		var err error
-		out, err = s.query(ctx, tx, "email = $1 AND status = 'pending' AND expires_at > $2",
-			canonicalEmail(who.Email), s.clock.Now())
+		out, err = s.listWhere(ctx, tx, "email = $1 AND status = 'pending' AND expires_at > $2",
+			string(who.Email), s.clock.Now())
 		return err
 	})
 	if err != nil {
@@ -221,8 +285,11 @@ func (s *Service) ForUser(ctx context.Context, who Invitee) ([]Invitation, error
 func (s *Service) Lookup(ctx context.Context, who Invitee, ref Ref) (Invitation, error) {
 	var inv Invitation
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		var err error
-		inv, err = s.find(ctx, tx, who, ref, false)
+		found, err := s.find(ctx, tx, who, ref)
+		if err == nil && !found.listLive {
+			return ErrNotFound
+		}
+		inv = found
 		return err
 	})
 	if err != nil {
@@ -238,7 +305,7 @@ func (s *Service) Lookup(ctx context.Context, who Invitee, ref Ref) (Invitation,
 func (s *Service) Accept(ctx context.Context, who Invitee, ref Ref) (uuid.UUID, error) {
 	var listID uuid.UUID
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		inv, err := s.find(ctx, tx, who, ref, true)
+		inv, err := s.find(ctx, tx, who, ref)
 		if err != nil {
 			return err
 		}
@@ -283,7 +350,7 @@ func (s *Service) Accept(ctx context.Context, who Invitee, ref Ref) (uuid.UUID, 
 func (s *Service) Decline(ctx context.Context, who Invitee, ref Ref) (Invitation, error) {
 	var inv Invitation
 	err := pgx.BeginFunc(ctx, s.db, func(tx pgx.Tx) error {
-		found, err := s.find(ctx, tx, who, ref, true)
+		found, err := s.find(ctx, tx, who, ref)
 		if err != nil {
 			return err
 		}
@@ -340,44 +407,54 @@ func (s *Service) Cancel(ctx context.Context, owner, listID, invitationID uuid.U
 
 const invitationColumns = "id, list_id, email, invited_by, status, created_at, expires_at, responded_by"
 
-type row struct {
+// stored is an Invitation as stored, with who responded to it.
+type stored struct {
 	inv         Invitation
 	respondedBy *uuid.UUID
 }
 
-func scanRow(r pgx.CollectableRow) (row, error) {
-	var x row
-	var status string
-	err := r.Scan(&x.inv.ID, &x.inv.ListID, &x.inv.Email, &x.inv.InvitedBy, &status,
-		&x.inv.CreatedAt, &x.inv.ExpiresAt, &x.respondedBy)
-	x.inv.Status = Status(status)
-	x.inv.CreatedAt, x.inv.ExpiresAt = x.inv.CreatedAt.UTC(), x.inv.ExpiresAt.UTC()
-	return x, err
+func scanStored(r pgx.CollectableRow) (stored, error) {
+	var st stored
+	var email, status string
+	err := r.Scan(&st.inv.ID, &st.inv.ListID, &email, &st.inv.InvitedBy, &status,
+		&st.inv.CreatedAt, &st.inv.ExpiresAt, &st.respondedBy)
+	st.inv.Email, st.inv.Status = Email(email), Status(status)
+	st.inv.CreatedAt, st.inv.ExpiresAt = st.inv.CreatedAt.UTC(), st.inv.ExpiresAt.UTC()
+	return st, err
 }
 
-// query returns the Invitations matching where, newest first, with their List
-// and inviter names; those whose List is deleted are left out.
-func (s *Service) query(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Invitation, error) {
+// listWhere returns the Invitations matching where, newest first, with their
+// List and inviter names; those whose List is deleted are left out.
+func (s *Service) listWhere(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Invitation, error) {
 	rows, err := tx.Query(ctx,
 		"SELECT "+invitationColumns+" FROM invitations WHERE "+where+" ORDER BY created_at DESC, id DESC", args...)
 	if err != nil {
 		return nil, err
 	}
-	found, err := pgx.CollectRows(rows, scanRow)
+	found, err := pgx.CollectRows(rows, scanStored)
 	if err != nil {
 		return nil, err
 	}
 	invs := make([]Invitation, 0, len(found))
-	for _, r := range found {
-		invs = append(invs, r.inv)
+	for _, st := range found {
+		invs = append(invs, st.inv)
 	}
-	return s.complete(ctx, tx, invs, false)
+	named, err := s.withNames(ctx, tx, invs)
+	if err != nil {
+		return nil, err
+	}
+	live := named[:0]
+	for _, inv := range named {
+		if inv.listLive {
+			live = append(live, inv)
+		}
+	}
+	return live, nil
 }
 
-// complete fills in List and inviter names and the expired Status. Invitations
-// whose List is deleted are dropped, or with keepDeleted kept with an empty
-// List name (a live List's name is never empty).
-func (s *Service) complete(ctx context.Context, tx pgx.Tx, invs []Invitation, keepDeleted bool) ([]Invitation, error) {
+// withNames returns invs with their List and inviter names, whether their
+// List is live, and the expired Status filled in.
+func (s *Service) withNames(ctx context.Context, tx pgx.Tx, invs []Invitation) ([]Invitation, error) {
 	listIDs := make([]uuid.UUID, 0, len(invs))
 	userIDs := make([]uuid.UUID, 0, len(invs))
 	for _, inv := range invs {
@@ -395,11 +472,8 @@ func (s *Service) complete(ctx context.Context, tx pgx.Tx, invs []Invitation, ke
 	out := make([]Invitation, 0, len(invs))
 	now := s.clock.Now()
 	for _, inv := range invs {
-		name, live := listNames[inv.ListID]
-		if !live && !keepDeleted {
-			continue
-		}
-		inv.ListName, inv.InviterName = name, userNames[inv.InvitedBy]
+		inv.ListName, inv.listLive = listNames[inv.ListID]
+		inv.InviterName = userNames[inv.InvitedBy]
 		inv.Status = inv.statusAt(now)
 		out = append(out, inv)
 	}
@@ -415,55 +489,52 @@ func (inv Invitation) statusAt(now time.Time) Status {
 	return inv.Status
 }
 
-// find returns the Invitation ref identifies for who: the one with ref.Token,
-// or the one with ref.ID addressed to who's email. With anyList it is found
-// even if its List is deleted (its List name is then empty).
-func (s *Service) find(ctx context.Context, tx pgx.Tx, who Invitee, ref Ref, anyList bool) (Invitation, error) {
-	var inv Invitation
+// find returns the Invitation ref identifies for who, even if its List is
+// deleted: the one with ref.Token, or the one with ref.ID addressed to who's
+// email. It returns ErrNotFound if there is none.
+func (s *Service) find(ctx context.Context, tx pgx.Tx, who Invitee, ref Ref) (Invitation, error) {
+	const query = "SELECT " + invitationColumns + " FROM invitations WHERE "
+	var st stored
 	var err error
 	switch {
 	case ref.Token != "" && ref.ID == uuid.Nil:
-		inv, _, err = s.one(ctx, tx, false, "token_hash = $1", hashToken(ref.Token))
+		st, err = s.queryOne(ctx, tx, query+"token_hash = $1", hashToken(ref.Token))
 	case ref.Token == "" && ref.ID != uuid.Nil:
-		inv, _, err = s.one(ctx, tx, false, "id = $1 AND email = $2", ref.ID, canonicalEmail(who.Email))
+		st, err = s.queryOne(ctx, tx, query+"id = $1 AND email = $2", ref.ID, string(who.Email))
 	default:
 		return Invitation{}, ErrNotFound
 	}
-	if err == nil && inv.ListName == "" && !anyList {
-		return Invitation{}, ErrNotFound
-	}
-	return inv, err
+	return st.inv, err
 }
 
-// lock locks invitationID until tx ends and returns it, with who responded to it.
+// lock locks invitationID until tx ends and returns it, even if its List is
+// deleted, with who responded to it. It returns ErrNotFound if there is none.
 func (s *Service) lock(ctx context.Context, tx pgx.Tx, invitationID uuid.UUID) (Invitation, *uuid.UUID, error) {
-	return s.one(ctx, tx, true, "id = $1", invitationID)
+	st, err := s.queryOne(ctx, tx,
+		"SELECT "+invitationColumns+" FROM invitations WHERE id = $1 FOR UPDATE", invitationID)
+	return st.inv, st.respondedBy, err
 }
 
-// one returns the Invitation matching where, completed (its List name empty
-// if the List is deleted), with who responded to it, locked until tx ends
-// when forUpdate is set. It returns ErrNotFound if there is none.
-func (s *Service) one(ctx context.Context, tx pgx.Tx, forUpdate bool, where string, args ...any) (Invitation, *uuid.UUID, error) {
-	query := "SELECT " + invitationColumns + " FROM invitations WHERE " + where
-	if forUpdate {
-		query += " FOR UPDATE"
-	}
+// queryOne returns the one Invitation query selects, with its names, or
+// ErrNotFound if there is none.
+func (s *Service) queryOne(ctx context.Context, tx pgx.Tx, query string, args ...any) (stored, error) {
 	rows, err := tx.Query(ctx, query, args...)
 	if err != nil {
-		return Invitation{}, nil, err
+		return stored{}, err
 	}
-	r, err := pgx.CollectExactlyOneRow(rows, scanRow)
+	st, err := pgx.CollectExactlyOneRow(rows, scanStored)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Invitation{}, nil, ErrNotFound
+		return stored{}, ErrNotFound
 	}
 	if err != nil {
-		return Invitation{}, nil, err
+		return stored{}, err
 	}
-	invs, err := s.complete(ctx, tx, []Invitation{r.inv}, true)
+	named, err := s.withNames(ctx, tx, []Invitation{st.inv})
 	if err != nil {
-		return Invitation{}, nil, err
+		return stored{}, err
 	}
-	return invs[0], r.respondedBy, nil
+	st.inv = named[0]
+	return st, nil
 }
 
 func (s *Service) respond(ctx context.Context, tx pgx.Tx, id uuid.UUID, status Status, by uuid.UUID, at time.Time) error {
@@ -473,20 +544,21 @@ func (s *Service) respond(ctx context.Context, tx pgx.Tx, id uuid.UUID, status S
 	return err
 }
 
+// closedErrors is the error for acting on an Invitation in each Status that
+// is no longer pending.
+var closedErrors = map[Status]error{
+	Accepted:  ErrAccepted,
+	Declined:  ErrDeclined,
+	Cancelled: ErrCancelled,
+	Expired:   ErrExpired,
+}
+
 // statusError is the error for acting on an Invitation that is no longer pending.
 func statusError(st Status) error {
-	switch st {
-	case Accepted:
-		return ErrAccepted
-	case Declined:
-		return ErrDeclined
-	case Cancelled:
-		return ErrCancelled
-	case Expired:
-		return ErrExpired
-	default:
-		return fmt.Errorf("sharing: unexpected status %q", st)
+	if err, ok := closedErrors[st]; ok {
+		return err
 	}
+	return fmt.Errorf("sharing: unexpected status %q", st)
 }
 
 // newToken returns a random single-use token (256 bits, URL-safe) and its hash.
@@ -502,26 +574,6 @@ func newToken() (string, []byte, error) {
 func hashToken(token string) []byte {
 	h := sha256.Sum256([]byte(token))
 	return h[:]
-}
-
-// canonicalEmail is the one form an email address is stored and compared in:
-// trimmed and lowercased. The app compares addresses the same way.
-func canonicalEmail(address string) string {
-	return strings.ToLower(strings.TrimSpace(address))
-}
-
-// normalizeEmail returns address in canonical form and reports whether it is
-// a plain email address (no display name), at most MaxEmailLength long.
-func normalizeEmail(address string) (string, bool) {
-	address = canonicalEmail(address)
-	if address == "" || len(address) > MaxEmailLength {
-		return "", false
-	}
-	parsed, err := mail.ParseAddress(address)
-	if err != nil || parsed.Address != address || !strings.Contains(address[strings.LastIndex(address, "@"):], ".") {
-		return "", false
-	}
-	return address, true
 }
 
 // sharingError is the type of this package's sentinel errors, so wrap passes

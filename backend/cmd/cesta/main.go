@@ -174,6 +174,10 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	sender, err := emailSender(logger)
+	if err != nil {
+		return err
+	}
 	publicHost := os.Getenv("PUBLIC_HOST")
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -204,7 +208,7 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 			DB:               pool,
 			Logger:           logger,
 			TokenVerifier:    firebase.NewVerifier(projectID),
-			EmailSender:      emailSender(logger),
+			EmailSender:      sender,
 			TrustedProxyHops: hops,
 			RateLimits:       limits,
 			PublicHost:       publicHost,
@@ -233,19 +237,24 @@ func serve(ctx context.Context, logger *slog.Logger) error {
 // defaultEmailFrom is the sender of emails when EMAIL_FROM is unset.
 const defaultEmailFrom = "Cesta <convites@cesta.tsantana.dev>"
 
-// emailSender returns Resend when RESEND_API_KEY is set, else a sender that
-// only logs, so local dev runs without an email provider.
-func emailSender(logger *slog.Logger) email.Sender {
+// emailSender returns Resend when RESEND_API_KEY is set. Without it, the
+// backend only starts when EMAIL_LOG_ONLY is "true" (local dev), and then
+// emails are logged, not sent: a deployment missing its key must not make
+// Invitations look sent when no email left.
+func emailSender(logger *slog.Logger) (email.Sender, error) {
 	key := os.Getenv("RESEND_API_KEY")
 	if key == "" {
-		logger.Warn("RESEND_API_KEY is not set: emails will be logged, not sent")
-		return email.Log{Logger: logger}
+		if os.Getenv("EMAIL_LOG_ONLY") != "true" {
+			return nil, errors.New(`RESEND_API_KEY is not set (set EMAIL_LOG_ONLY="true" to only log emails, for local dev)`)
+		}
+		logger.Warn("RESEND_API_KEY is not set and EMAIL_LOG_ONLY is true: emails will be logged, not sent")
+		return email.Log{Logger: logger}, nil
 	}
 	from := os.Getenv("EMAIL_FROM")
 	if from == "" {
 		from = defaultEmailFrom
 	}
-	return email.NewResend(key, from)
+	return email.NewResend(key, from), nil
 }
 
 // positiveEnv returns the positive integer in environment variable name, or 0 when it is unset.

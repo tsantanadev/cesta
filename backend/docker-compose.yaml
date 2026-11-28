@@ -34,6 +34,12 @@ services:
       LOG_LEVEL: debug
       # Tokens from the app's dev build verify against the dev Firebase project.
       FIREBASE_PROJECT_ID: cesta-dev
+      # Invitation emails: with RESEND_API_KEY unset they're only logged, which
+      # EMAIL_LOG_ONLY allows (without it the backend won't start). Export these in
+      # your shell to send through Resend (EMAIL_FROM unset: Cesta <convites@cesta.tsantana.dev>).
+      EMAIL_LOG_ONLY: "true"
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
       # Uncomment to export traces and metrics to a local OTLP collector:
       # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:

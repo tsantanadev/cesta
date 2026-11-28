@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
+	"log/slog"
 
 	"github.com/google/uuid"
 
@@ -25,43 +25,46 @@ func (s *Server) CreateInvitation(ctx context.Context, req CreateInvitationReque
 		return CreateInvitation400JSONResponse{BadRequestJSONResponse(invalidRequest())}, nil
 	}
 	inv, err := s.Sharing.Create(ctx, u.ID, req.ListId, req.Body.Email, notify.Language(req.Body.Language))
-	if err != nil {
-		status, apiErr, ok := invitationError(err)
-		switch {
-		case !ok:
-			return nil, err
-		case status == http.StatusBadRequest:
-			return CreateInvitation400JSONResponse{BadRequestJSONResponse(apiErr)}, nil
-		case status == http.StatusForbidden:
-			return CreateInvitation403JSONResponse{ForbiddenJSONResponse(apiErr)}, nil
-		case status == http.StatusNotFound:
-			return CreateInvitation404JSONResponse{NotFoundJSONResponse(apiErr)}, nil
-		default:
-			return CreateInvitation409JSONResponse{ConflictJSONResponse(apiErr)}, nil
-		}
+	switch {
+	case errors.Is(err, sharing.ErrInvalidEmail):
+		return CreateInvitation400JSONResponse{BadRequestJSONResponse(invalidEmail())}, nil
+	case errors.Is(err, lists.ErrNotFound):
+		return CreateInvitation404JSONResponse{NotFoundJSONResponse(listNotFound())}, nil
+	case errors.Is(err, lists.ErrNotOwner):
+		return CreateInvitation403JSONResponse{ForbiddenJSONResponse(notListOwner())}, nil
+	case errors.Is(err, lists.ErrDeleted):
+		return CreateInvitation409JSONResponse{ConflictJSONResponse(listDeleted())}, nil
+	case errors.Is(err, sharing.ErrAlreadyMember):
+		return CreateInvitation409JSONResponse{ConflictJSONResponse(alreadyMember())}, nil
+	case errors.Is(err, sharing.ErrLimitReached):
+		return CreateInvitation409JSONResponse{ConflictJSONResponse(
+			limitExceeded(sharing.MaxPerDay, "the User already sent the limit of %d Invitations in 24 hours"))}, nil
+	case errors.Is(err, sharing.ErrNotSent):
+		// The cause (the provider's error) is only logged.
+		s.Logger.ErrorContext(ctx, "invitation email not sent", slog.String("error", err.Error()))
+		return CreateInvitation502JSONResponse{EmailNotSentJSONResponse(emailNotSent())}, nil
+	case err != nil:
+		return nil, err
 	}
 	return CreateInvitation201JSONResponse(apiInvitation(inv)), nil
 }
 
-// ListListInvitations returns the pending Invitations to a List the signed-in User owns.
+// ListListInvitations returns the open Invitations to a List the signed-in User owns.
 func (s *Server) ListListInvitations(ctx context.Context, req ListListInvitationsRequestObject) (ListListInvitationsResponseObject, error) {
 	u, err := signedIn(ctx)
 	if err != nil {
 		return nil, err
 	}
 	invs, err := s.Sharing.ForList(ctx, u.ID, req.ListId)
-	if err != nil {
-		status, apiErr, ok := invitationError(err)
-		switch {
-		case !ok:
-			return nil, err
-		case status == http.StatusForbidden:
-			return ListListInvitations403JSONResponse{ForbiddenJSONResponse(apiErr)}, nil
-		case status == http.StatusNotFound:
-			return ListListInvitations404JSONResponse{NotFoundJSONResponse(apiErr)}, nil
-		default:
-			return ListListInvitations409JSONResponse{ConflictJSONResponse(apiErr)}, nil
-		}
+	switch {
+	case errors.Is(err, lists.ErrNotFound):
+		return ListListInvitations404JSONResponse{NotFoundJSONResponse(listNotFound())}, nil
+	case errors.Is(err, lists.ErrNotOwner):
+		return ListListInvitations403JSONResponse{ForbiddenJSONResponse(notListOwner())}, nil
+	case errors.Is(err, lists.ErrDeleted):
+		return ListListInvitations409JSONResponse{ConflictJSONResponse(listDeleted())}, nil
+	case err != nil:
+		return nil, err
 	}
 	return ListListInvitations200JSONResponse(apiInvitations(invs)), nil
 }
@@ -73,18 +76,20 @@ func (s *Server) CancelInvitation(ctx context.Context, req CancelInvitationReque
 		return nil, err
 	}
 	inv, err := s.Sharing.Cancel(ctx, u.ID, req.ListId, req.InvitationId)
-	if err != nil {
-		status, apiErr, ok := invitationError(err)
-		switch {
-		case !ok:
-			return nil, err
-		case status == http.StatusForbidden:
-			return CancelInvitation403JSONResponse{ForbiddenJSONResponse(apiErr)}, nil
-		case status == http.StatusNotFound:
-			return CancelInvitation404JSONResponse{NotFoundJSONResponse(apiErr)}, nil
-		default:
-			return CancelInvitation409JSONResponse{ConflictJSONResponse(apiErr)}, nil
-		}
+	if apiErr, ok := invitationClosed(err); ok {
+		return CancelInvitation409JSONResponse{ConflictJSONResponse(apiErr)}, nil
+	}
+	switch {
+	case errors.Is(err, sharing.ErrNotFound):
+		return CancelInvitation404JSONResponse{NotFoundJSONResponse(invitationNotFound())}, nil
+	case errors.Is(err, lists.ErrNotFound):
+		return CancelInvitation404JSONResponse{NotFoundJSONResponse(listNotFound())}, nil
+	case errors.Is(err, lists.ErrNotOwner):
+		return CancelInvitation403JSONResponse{ForbiddenJSONResponse(notListOwner())}, nil
+	case errors.Is(err, lists.ErrDeleted):
+		return CancelInvitation409JSONResponse{ConflictJSONResponse(listDeleted())}, nil
+	case err != nil:
+		return nil, err
 	}
 	return CancelInvitation200JSONResponse(apiInvitation(inv)), nil
 }
@@ -113,10 +118,10 @@ func (s *Server) LookupInvitation(ctx context.Context, req LookupInvitationReque
 		return LookupInvitation400JSONResponse{BadRequestJSONResponse(invalidInvitationRef())}, nil
 	}
 	inv, err := s.Sharing.Lookup(ctx, invitee(u), ref)
-	if err != nil {
-		if _, apiErr, ok := invitationError(err); ok {
-			return LookupInvitation404JSONResponse{NotFoundJSONResponse(apiErr)}, nil
-		}
+	switch {
+	case errors.Is(err, sharing.ErrNotFound):
+		return LookupInvitation404JSONResponse{NotFoundJSONResponse(invitationNotFound())}, nil
+	case err != nil:
 		return nil, err
 	}
 	return LookupInvitation200JSONResponse(apiInvitation(inv)), nil
@@ -133,16 +138,18 @@ func (s *Server) AcceptInvitation(ctx context.Context, req AcceptInvitationReque
 		return AcceptInvitation400JSONResponse{BadRequestJSONResponse(invalidInvitationRef())}, nil
 	}
 	listID, err := s.Sharing.Accept(ctx, invitee(u), ref)
-	if err != nil {
-		status, apiErr, ok := invitationError(err)
-		switch {
-		case !ok:
-			return nil, err
-		case status == http.StatusNotFound:
-			return AcceptInvitation404JSONResponse{NotFoundJSONResponse(apiErr)}, nil
-		default:
-			return AcceptInvitation409JSONResponse{ConflictJSONResponse(apiErr)}, nil
-		}
+	if apiErr, ok := invitationClosed(err); ok {
+		return AcceptInvitation409JSONResponse{ConflictJSONResponse(apiErr)}, nil
+	}
+	switch {
+	case errors.Is(err, sharing.ErrNotFound):
+		return AcceptInvitation404JSONResponse{NotFoundJSONResponse(invitationNotFound())}, nil
+	case errors.Is(err, lists.ErrDeleted):
+		return AcceptInvitation409JSONResponse{ConflictJSONResponse(listDeleted())}, nil
+	case errors.Is(err, membership.ErrListFull):
+		return AcceptInvitation409JSONResponse{ConflictJSONResponse(listFull())}, nil
+	case err != nil:
+		return nil, err
 	}
 	l, err := s.Lists.Get(ctx, u.ID, listID)
 	if err != nil {
@@ -166,66 +173,64 @@ func (s *Server) DeclineInvitation(ctx context.Context, req DeclineInvitationReq
 		return DeclineInvitation400JSONResponse{BadRequestJSONResponse(invalidInvitationRef())}, nil
 	}
 	inv, err := s.Sharing.Decline(ctx, invitee(u), ref)
-	if err != nil {
-		status, apiErr, ok := invitationError(err)
-		switch {
-		case !ok:
-			return nil, err
-		case status == http.StatusNotFound:
-			return DeclineInvitation404JSONResponse{NotFoundJSONResponse(apiErr)}, nil
-		default:
-			return DeclineInvitation409JSONResponse{ConflictJSONResponse(apiErr)}, nil
-		}
+	if apiErr, ok := invitationClosed(err); ok {
+		return DeclineInvitation409JSONResponse{ConflictJSONResponse(apiErr)}, nil
+	}
+	switch {
+	case errors.Is(err, sharing.ErrNotFound):
+		return DeclineInvitation404JSONResponse{NotFoundJSONResponse(invitationNotFound())}, nil
+	case err != nil:
+		return nil, err
 	}
 	return DeclineInvitation200JSONResponse(apiInvitation(inv)), nil
 }
 
-// invitationError returns the HTTP status and API error for an error from
-// package sharing, or ok false for an unexpected one.
-func invitationError(err error) (status int, apiErr ApiError, ok bool) {
-	conflict := func(code ApiErrorCode, msg string) (int, ApiError, bool) {
-		return http.StatusConflict, ApiError{Code: code, Message: msg}, true
-	}
+// invitationClosed returns the API error for acting on an Invitation that is
+// no longer pending, or ok false for any other error.
+func invitationClosed(err error) (apiErr ApiError, ok bool) {
 	switch {
-	case errors.Is(err, sharing.ErrInvalidEmail):
-		return http.StatusBadRequest, ApiError{Code: ApiErrorCodeInvalidEmail, Message: "not a valid email address"}, true
-	case errors.Is(err, sharing.ErrNotFound):
-		return http.StatusNotFound, ApiError{Code: ApiErrorCodeInvitationNotFound, Message: "no such Invitation"}, true
 	case errors.Is(err, sharing.ErrCancelled):
-		return conflict(ApiErrorCodeInvitationCancelled, "the Owner cancelled this Invitation")
+		return ApiError{Code: ApiErrorCodeInvitationCancelled, Message: "the Owner cancelled this Invitation"}, true
 	case errors.Is(err, sharing.ErrDeclined):
-		return conflict(ApiErrorCodeInvitationDeclined, "this Invitation was declined")
+		return ApiError{Code: ApiErrorCodeInvitationDeclined, Message: "this Invitation was declined"}, true
 	case errors.Is(err, sharing.ErrExpired):
-		return conflict(ApiErrorCodeInvitationExpired,
-			fmt.Sprintf("this Invitation expired %d days after it was sent", int(sharing.ExpiresAfter.Hours()/24)))
+		return ApiError{
+			Code:    ApiErrorCodeInvitationExpired,
+			Message: fmt.Sprintf("this Invitation expired %d days after it was sent", int(sharing.ExpiresAfter.Hours()/24)),
+		}, true
 	case errors.Is(err, sharing.ErrAccepted):
-		return conflict(ApiErrorCodeInvitationAccepted, "this Invitation was already accepted")
-	case errors.Is(err, sharing.ErrLimitReached):
-		limit := sharing.MaxPerDay
-		return http.StatusConflict, ApiError{
-			Code:    ApiErrorCodeLimitExceeded,
-			Message: fmt.Sprintf("the User already sent the limit of %d Invitations in 24 hours", limit),
-			Limit:   &limit,
-		}, true
-	case errors.Is(err, membership.ErrListFull):
-		limit := membership.MaxPerList
-		return http.StatusConflict, ApiError{
-			Code:    ApiErrorCodeListFull,
-			Message: fmt.Sprintf("the List already has the limit of %d Members", limit),
-			Limit:   &limit,
-		}, true
-	case errors.Is(err, lists.ErrNotFound):
-		return http.StatusNotFound, listNotFound(), true
-	case errors.Is(err, lists.ErrNotOwner):
-		return http.StatusForbidden, notListOwner(), true
-	case errors.Is(err, lists.ErrDeleted):
-		return http.StatusConflict, listDeleted(), true
+		return ApiError{Code: ApiErrorCodeInvitationAccepted, Message: "this Invitation was already accepted"}, true
 	}
-	return 0, ApiError{}, false
+	return ApiError{}, false
+}
+
+func invalidEmail() ApiError {
+	return ApiError{Code: ApiErrorCodeInvalidEmail, Message: "not a valid email address"}
+}
+
+func invitationNotFound() ApiError {
+	return ApiError{Code: ApiErrorCodeInvitationNotFound, Message: "no such Invitation"}
+}
+
+func alreadyMember() ApiError {
+	return ApiError{Code: ApiErrorCodeAlreadyMember, Message: "this address belongs to a Member of the List"}
+}
+
+func emailNotSent() ApiError {
+	return ApiError{Code: ApiErrorCodeEmailNotSent, Message: "the Invitation email couldn't be sent; try again"}
+}
+
+func listFull() ApiError {
+	limit := membership.MaxPerList
+	return ApiError{
+		Code:    ApiErrorCodeListFull,
+		Message: fmt.Sprintf("the List already has the limit of %d Members", limit),
+		Limit:   &limit,
+	}
 }
 
 func invitee(u identity.User) sharing.Invitee {
-	return sharing.Invitee{ID: u.ID, Email: u.Email}
+	return sharing.Invitee{ID: u.ID, Email: sharing.CanonicalEmail(u.Email)}
 }
 
 // invitationRef reads an InvitationRef with exactly one of token or id.
@@ -259,7 +264,7 @@ func apiInvitation(inv sharing.Invitation) Invitation {
 		Id:        inv.ID,
 		ListId:    inv.ListID,
 		ListName:  inv.ListName,
-		Email:     inv.Email,
+		Email:     string(inv.Email),
 		InvitedBy: UserRef{Id: inv.InvitedBy, DisplayName: inv.InviterName},
 		Status:    InvitationStatus(inv.Status),
 		CreatedAt: inv.CreatedAt,

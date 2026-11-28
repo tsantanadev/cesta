@@ -159,6 +159,20 @@ func (s *Service) DisplayNamesIn(ctx context.Context, tx pgx.Tx, userIDs []uuid.
 	return out, nil
 }
 
+// WithEmailIn returns the Users whose email address, trimmed and lowercased,
+// is address (already in that form), read inside the caller's transaction tx.
+func (s *Service) WithEmailIn(ctx context.Context, tx pgx.Tx, address string) ([]uuid.UUID, error) {
+	rows, err := tx.Query(ctx, "SELECT id FROM users WHERE lower(btrim(email)) = $1", address)
+	if err != nil {
+		return nil, fmt.Errorf("identity: with email: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return nil, fmt.Errorf("identity: with email: %w", err)
+	}
+	return ids, nil
+}
+
 func scanUserOrWrap(row pgx.Row, what string) (User, error) {
 	u, err := scanUser(row)
 	if err != nil {
