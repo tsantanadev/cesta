@@ -12,12 +12,27 @@
       {
         "source": "/health",
         "run": { "serviceId": "cesta-backend", "region": "southamerica-east1" }
+      },
+      {
+        "source": "/invite/**",
+        "destination": "/invite.html"
       }
     ],
     "headers": [
       {
         "source": "/.well-known/apple-app-site-association",
         "headers": [{ "key": "Content-Type", "value": "application/json" }]
+      },
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [{ "key": "Content-Type", "value": "application/json" }]
+      },
+      {
+        "source": "/invite/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-store" },
+          { "key": "Referrer-Policy", "value": "no-referrer" }
+        ]
       }
     ]
   }

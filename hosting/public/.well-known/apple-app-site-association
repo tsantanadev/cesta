@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["REPLACE_ME_APPLE_TEAM_ID.dev.tsantana.cesta"],
+        "components": [
+          { "/": "/invite/*", "comment": "Email Invitation (#9)" },
+          { "/": "/join/*", "comment": "Share link (#10)" }
+        ]
+      }
+    ]
+  }
+}
